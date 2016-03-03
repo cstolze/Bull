@@ -8,6 +8,11 @@ type m =
 	| MLambda of string * int * m
 	| MApp of m * m
 
+type bruijn =
+  | BVar of string * bool * int (* varname * bound? * bruijn index *)
+  | BLambda of bruijn
+  | BApp of bruijn * bruijn
+
 type delta =
 	| DMark of int
 	| DLambda of int * sigma * delta
@@ -56,15 +61,29 @@ type opt =
 
 let var k = "x"^(string_of_int k)
 
+let rec to_bruijn m =
+  let rec update b x n =
+    match b with
+    | BVar (y,false,_) -> if (y = x) then BVar(y, true, n) else b
+    | BVar (_,true,_) -> b
+    | BLambda b' -> update b' x (n+1)
+    | BApp (b', b'') -> BApp (update b' x (n+1), update b'' x (n+1))
+  in
+  match m with
+  | MVar x -> BVar(x, false, 0)
+  | MLambda (x, i, m') -> BLambda (update (to_bruijn m') x 0)
+  | MApp (m', m'') -> BApp (to_bruijn m', to_bruijn m'')
+
 let alpha_conversion m n =
-	let rec aux m n liste =
-		match m, n with
-			| MVar x, MVar y -> List.assoc x liste = y
-			| MApp (m', m''), MApp (n', n'') -> aux m' n' liste && aux m'' n'' liste
-			| MLambda (x, i, m'), MLambda (y, j, n') -> aux m' n' ((x, y)::liste) && i = j
-			| _, _ -> false
-	in
-	aux m n []
+  let rec foo b c =
+    match b, c with
+    | BVar (x,false,_), BVar(y,false,_) -> x = y (* free variables *)
+    | BVar (_,true, x), BVar(_,true,y) -> x = y (* bound variables *)
+    | BLambda b', BLambda c' -> foo b' c'
+    | BApp (b', b''), BApp (c', c'') -> foo b' c' && foo b'' c''
+    | _, _ -> false
+  in
+  foo (to_bruijn m) (to_bruijn n)
 
 let rec trouve_sigma x =
 	function
