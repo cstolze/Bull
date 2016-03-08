@@ -1,20 +1,19 @@
 %{open Definitions%}
 
-%token POUVR
-%token PFERM
+%token OPENP
+%token CLOSP
 %token LAMBDA
 %token <int> INT
 %token AS
-%token AP
-%token EG
-%token ED
+%token AL
+%token AR
 %token A
 %token FC
-%token ET
+%token AND
 %token EOF
-%token PRES
+%token COLON
 
-%left AP
+%left AS
 
 %start d
 %type <Definitions.delta> d
@@ -22,22 +21,22 @@
 %%
 
 d :
-	| POUVR d PFERM {$2}
+	| OPENP d CLOSP {$2}
 	| l AS d {let i, s = $1 in DLambda (i, s, $3)}
-	| d AP d {DApp ($1, $3)}
+	| d d {DApp ($1, $2)}
 	| INT {DMark $1}
-	| d ED {DDt $1}
-	| EG d {DGc $2}
-	| d ET d {DEt ($1, $3)}
+	| d AR {DRight $1}
+	| AL d {DLeft $2}
+	| d AND d {DAnd ($1, $3)}
 ;
 
 l :
-	| LAMBDA INT PRES s {($2, $4)}
+	| LAMBDA INT COLON s {($2, $4)}
 ;
 
-s:	
+s:
 	| s FC s {SFc ($1, $3)}
-	| s ET s {SEt ($1, $3)}
-	| A {SA}
-	| POUVR s PFERM {$2}
+	| s AND s {SAnd ($1, $3)}
+	| A {SAtom}
+	| OPENP s CLOSP {$2}
 ;

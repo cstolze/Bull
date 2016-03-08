@@ -1,9 +1,9 @@
 %{open Definitions%}
 
-%token POUVR
-%token PFERM
+%token OPENP
+%token CLOSP
 %token A
-%token ET
+%token AND
 %token FC
 %token EOF
 %token INT
@@ -15,10 +15,10 @@
 
 %%
 
-s:	
+s:
 	| s FC s {SFc ($1, $3)}
-	| s ET s {SEt ($1, $3)}
-	| A {SA}
+	| s AND s {SAnd ($1, $3)}
+	| A {SAtom}
 	| s INT {let a = SFc ($1, $1) in SFc (a, a)}
-	| POUVR s PFERM {$2}
+	| OPENP s CLOSP {$2}
 ;

@@ -1,11 +1,11 @@
 {open Parser_sigma}
 
-rule lecture = parse
-	| [' ' '\t' '\n'] {lecture lexbuf}
+rule read = parse
+	| [' ' '\t' '\n'] {read lexbuf}
 	| "a" {A}
-	| '(' {POUVR}
-	| ')' {PFERM}
+	| '(' {OPENP}
+	| ')' {CLOSP}
 	| "->" {FC}
-	| '&' {ET}
+	| '&' {AND}
 	| "int" {INT}
 	| eof {EOF}
