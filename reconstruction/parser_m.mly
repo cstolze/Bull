@@ -23,3 +23,4 @@ m :
 
 l :
 	| LAMBDA VAR COLON VAR {($2, $4)}
+	| LAMBDA VAR {($2, $2)}

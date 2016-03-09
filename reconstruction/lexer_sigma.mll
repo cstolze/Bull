@@ -7,5 +7,4 @@ rule read = parse
 	| ')' {CLOSP}
 	| "->" {FC}
 	| '&' {AND}
-	| "int" {INT}
 	| eof {EOF}
