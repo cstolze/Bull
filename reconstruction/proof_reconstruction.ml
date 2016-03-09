@@ -50,106 +50,87 @@ let replace derivation leaf =
     | AAndER (t, a) -> AAndER (t, visit a)
   in visit derivation
 
-let copy_pb pb =
-  let pb' = {
-    judg = None;
-    jlist = [];
-    derivation = ANull
-  }
-  in
-  pb'.judg <- pb.judg;
-  pb'.jlist <- pb.jlist;
-  pb'.derivation <- pb.derivation;
-  pb'
-
 let shift pb =
   match pb.jlist with
-  | [] ->
-     begin
-       pb.judg <- None;
-       pb.jlist <- []
-     end
-  | t :: l ->
-     begin
-       pb.judg <- Some t;
-       pb.jlist <- l
-     end
+  | [] -> failwith "should not happen"
+  | t :: l -> { jlist = l; derivation = pb.derivation }
 
 let choose_var pb =
   (
-    match pb.judg with
-    | Some t ->
+    match pb.jlist with
+    | t :: l ->
        (
 	 match t.m with
 	 | MVar x ->
 	    let i = find_i x t.s t.g in
-	    pb.derivation <- replace pb.derivation (AMark i);
+	    shift ({jlist = pb.jlist; derivation = replace pb.derivation (AMark i)})
 	 | _ -> failwith "var"
        )
     | _ -> failwith "var"
-  );
-  shift pb
+  )
 
 let choose_fci pb =
-  match pb.judg with
-  | Some t ->
+  match pb.jlist with
+  | t :: l ->
      (
        match t.m, t.s with
        | MLambda (x, i, m), SFc (s1, s2) ->
-	  begin
-	    pb.derivation <- replace pb.derivation (AFcI (t, ANull));
-	    pb.judg <- Some {g = (x, i, s1)::t.g; m = m; s = s2}
-	  end
+	  {
+	    jlist = {g = (x, i, s1)::t.g; m = m; s = s2} :: l;
+	    derivation = replace pb.derivation (AFcI (t, ANull));
+	  }
        | _ -> failwith "fci"
      )
   | _ -> failwith "fci"
 
 let choose_fce pb a =
-  match pb.judg with
-  | Some t ->
+  match pb.jlist with
+  | t :: l ->
      (
        match t.m with
        | MApp (m1, m2) ->
-	  begin
-	    pb.derivation <- replace pb.derivation (AFcE (t, ANull, ANull));
-	    pb.judg <- Some {g = t.g; m = m1; s = SFc (a, t.s)};
-	    pb.jlist <- {g = t.g; m = m2; s = a} :: pb.jlist
-	  end
+	  {
+	    jlist = {g = t.g; m = m1; s = SFc (a, t.s)}
+		    :: {g = t.g; m = m2; s = a}
+		    :: l;
+	    derivation = replace pb.derivation (AFcE (t, ANull, ANull))
+	  }
        | _ -> failwith "fce"
      )
   | _ -> failwith "fce"
 
 let choose_andi pb =
-  match pb.judg with
-  | Some t ->
+  match pb.jlist with
+  | t :: l ->
      (
        match t.s with
        | SAnd (s1, s2) ->
-	  begin
-	    pb.derivation <- replace pb.derivation (AAndI (t, ANull, ANull));
-	    pb.judg <- Some {g = t.g; m = t.m; s = s1};
-	    pb.jlist <- {g = t.g; m = t.m; s = s2} :: pb.jlist
-	  end
+	  {
+	    jlist = {g = t.g; m = t.m; s = s1}
+		    :: {g = t.g; m = t.m; s = s2}
+		    :: l;
+	    derivation = replace pb.derivation (AAndI (t, ANull, ANull));
+	  }
        | _ -> failwith "andi"
      )
   | _ -> failwith "andi"
 
 let choose_andel pb a =
-  match pb.judg with
-  | Some t ->
-     begin
-       pb.derivation <- replace pb.derivation (AAndEL (t, ANull));
-       pb.judg <- Some {g = t.g; m = t.m; s = SAnd (t.s, a)}
-     end
+  match pb.jlist with
+  | t :: l ->
+     {
+       jlist = {g = t.g; m = t.m; s = SAnd (t.s, a)} :: l ;
+       derivation = replace pb.derivation (AAndEL (t, ANull));
+     }
   | _ -> failwith "andel"
 
 let choose_ander pb a =
-  match pb.judg with
-  | Some t ->
-     begin
-       pb.derivation <- replace pb.derivation (AAndER (t, ANull));
-       pb.judg <- Some {g = t.g; m = t.m; s = SAnd (a, t.s)}
-     end
+  match pb.jlist with
+  | t :: l ->
+     {
+       jlist = {g = t.g; m = t.m; s = SAnd (a, t.s)} :: l ;
+       derivation = replace pb.derivation (AAndER (t, ANull));
+     }
   | _ -> failwith "ander"
 
 let possibilities t bol =
@@ -206,9 +187,9 @@ let choose pb bol =
 	 end
   and loop () =
     (
-      match pb.judg with
-      | None -> failwith "abnormal"
-      | Some t ->
+      match pb.jlist with
+      | [] -> failwith "abnormal"
+      | t :: l ->
 	 (
 	   print_string "\n";
 	   print_pb pb;
@@ -253,43 +234,24 @@ let rec algorithm pb_tot =
   match pb_tot with
   | [] -> failwith "should not happen"
   | pb :: lnext ->
-     match pb.judg with
-     | None ->
+     match pb.jlist with
+     | [] ->
 	print_string ("\nYou succeeded, here is the delta you were looking for:\n"^(delta_to_string (rebuild_delta pb.derivation))^ "\n\n")
-     | _	 ->
-	let pb' = copy_pb pb in
-	let opt = choose pb' (if lnext = [] then false else true) in
+     | _ ->
+	let opt = choose pb (if lnext = [] then false else true) in
 	match opt with
 	| OFcI ->
-	   begin
-	     choose_fci pb';
-	     algorithm (pb' :: pb_tot)
-	   end
+	   algorithm ((choose_fci pb) :: pb_tot)
 	| OFcE a ->
-	   begin
-	     choose_fce pb' a;
-	     algorithm (pb' :: pb_tot)
-	   end
+	   algorithm ((choose_fce pb a) :: pb_tot)
 	| OAndI ->
-	   begin
-	     choose_andi pb';
-	     algorithm (pb' :: pb_tot)
-	   end
+	   algorithm ((choose_andi pb) :: pb_tot)
 	| OAndEL a ->
-	   begin
-	     choose_andel pb' a;
-	     algorithm (pb' :: pb_tot)
-	   end
+	   algorithm ((choose_andel pb a) :: pb_tot)
 	| OAndER a ->
-	   begin
-	     choose_ander pb' a;
-	     algorithm (pb' :: pb_tot)
-	   end
+	   algorithm ((choose_ander pb a) :: pb_tot)
 	| OVar ->
-	   begin
-	     choose_var pb';
-	     algorithm (pb' :: pb_tot)
-	   end
+	   algorithm ((choose_var pb) :: pb_tot)
 	| OBacktrack -> algorithm lnext
 
 let main_pr lbm lbs =
@@ -297,8 +259,7 @@ let main_pr lbm lbs =
   and s = Parser_sigma.s Lexer_sigma.read lbs
   in
   let pb = {
-    judg = Some {g = []; m = m; s = s};
-    jlist =  [];
+    jlist =  [{g = []; m = m; s = s}];
     derivation = ANull
   }
   in algorithm [pb]

@@ -49,9 +49,8 @@ type derivation =
   | AAndER of (judgment * derivation)
 
 type pb = {
-  mutable judg : judgment option;
-  mutable jlist : judgment list;
-  mutable derivation : derivation
+  jlist : judgment list;
+  derivation : derivation
 }
 
 type pb_tot = pb list
@@ -194,17 +193,18 @@ let judgment_to_string t =
 
 let print_pb pb =
   let aux1 () =
-    match pb.judg with
-    | Some t ->
+    match pb.jlist with
+    | t :: _ ->
        begin
 	 print_string "$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$\n\n<> goal to achieve :\n\n";
 	 print_string ("   " ^ (judgment_to_string t) ^ "\n\n");
        end
-    | None -> failwith "empty pb";
+    | [] -> failwith "empty pb";
   and aux2 () =
     match pb.jlist with
-    | [] -> ()
-    | _ ->
+    | [] -> failwith "empty pb"
+    | t :: [] -> ()
+    | t :: (t' :: l) ->
        let rec aux l =
 	 match l with
 	 | [] -> ()
@@ -216,7 +216,7 @@ let print_pb pb =
        in
        begin
 	 print_string "<> other goal(s) :\n\n";
-	 aux pb.jlist;
+	 aux (t' :: l);
        end
   in
   begin
