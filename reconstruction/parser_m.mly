@@ -4,7 +4,6 @@
 %token CLOSP
 %token <string> VAR
 %token LAMBDA
-%token <int> INT
 %token AS
 %token EOF
 %token COLON
@@ -23,4 +22,4 @@ m :
 	| VAR {MVar $1}
 
 l :
-	| LAMBDA VAR COLON INT {($2, $4)}
+	| LAMBDA VAR COLON VAR {($2, $4)}

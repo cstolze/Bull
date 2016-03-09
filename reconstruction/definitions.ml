@@ -5,7 +5,7 @@ type sigma =
 
 type m =
   | MVar of string
-  | MLambda of string * int * m
+  | MLambda of string * string * m
   | MApp of m * m
 
 type bruijn =
@@ -14,14 +14,14 @@ type bruijn =
   | BApp of bruijn * bruijn
 
 type delta =
-  | DMark of int
-  | DLambda of int * sigma * delta
+  | DMark of string
+  | DLambda of string * sigma * delta
   | DAnd of delta * delta
   | DApp of delta * delta
   | DRight of delta
   | DLeft of delta
 
-type gamma = (string * int * sigma) list
+type gamma = (string * string * sigma) list (* var * mark * type *)
 
 type judgment = {
   g : gamma;
@@ -31,7 +31,7 @@ type judgment = {
 
 type derivation =
   | ANull
-  | AMark of int
+  | AMark of string
   | AFcI of (judgment * derivation)
   | AFcE of (judgment * derivation * derivation)
   | AAndI of (judgment * derivation * derivation)
@@ -54,8 +54,6 @@ type opt =
   | OAndI
   | OAndEL of sigma
   | OAndER of sigma
-
-let var k = "x"^(string_of_int k)
 
 let rec to_bruijn m =
   let rec update b x n =
@@ -87,7 +85,7 @@ let rec find_sigma x =
   | (y, _, sigma) :: _ when x = y -> sigma
   | _ :: l -> find_sigma x l
 
-let rec find_x i sigma : (string * int * sigma) list -> string =
+let rec find_x i sigma : (string * string * sigma) list -> string =
   function
   | [] -> failwith "empty list"
   | (x, j, sigma') :: _ when j = i && sigma = sigma' -> x
@@ -131,7 +129,7 @@ let rec m_to_string =
   | MVar s -> s
   | MLambda (s, i, m) ->
      let t = aux m in
-     "\\" ^ s ^ ":"^(string_of_int i)^". " ^ t
+     "\\" ^ s ^ ":"^i^". " ^ t
   | MApp (m1, m2) ->
      let t1 = aux m1
      and t2 = aux m2 in
@@ -140,14 +138,14 @@ let rec m_to_string =
 let rec delta_to_string : delta -> string =
   let rec aux (delta : delta) =
     match delta with
-    | DMark i -> string_of_int i
+    | DMark i -> i
     | _ -> let sd = delta_to_string delta in "(" ^ sd ^ ")"
   in
   function
-  | DMark i -> string_of_int i
+  | DMark i -> i
   | DLambda (i, s, d) ->
      let t = aux d in
-     "\\" ^ (string_of_int i) ^ ":" ^ (sigma_to_string s) ^ ". " ^ t
+     "\\" ^ i ^ ":" ^ (sigma_to_string s) ^ ". " ^ t
   | DApp (d1, d2) ->
      let t1 = aux d1
      and t2 = aux d2 in
@@ -168,9 +166,9 @@ let judgment_to_string t =
     function
     | [] -> "]"
     | [x, i, s] ->
-       " " ^ x ^ "@" ^ (string_of_int i) ^ " : " ^ (sigma_to_string s) ^ " ]"
+       " " ^ x ^ "@" ^ i ^ " : " ^ (sigma_to_string s) ^ " ]"
     | (x, i, s) :: l ->
-       " " ^ x ^ "@" ^ (string_of_int i) ^ " : " ^ (sigma_to_string s) ^ " ;" ^ (aux_g l)
+       " " ^ x ^ "@" ^ i ^ " : " ^ (sigma_to_string s) ^ " ;" ^ (aux_g l)
   in
   "[" ^ aux_g t.g ^ " > " ^ m_to_string t.m ^ " @ ? : " ^ sigma_to_string t.s
 

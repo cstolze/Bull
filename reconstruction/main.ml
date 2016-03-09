@@ -32,9 +32,9 @@ let main () =
 	       else
 		 (
 		   try (Type_reconstruction.main_tr (Lexing.from_string lm) (Lexing.from_string ld))
-		   with _ -> 
+		   with Failure a ->
 		     begin
-		       print_string "\nYou typed something wrong\n";
+		       print_string ("\nYou typed something wrong\n" ^ a ^ "\n");
 		       loop1()
 		     end
 		 )
@@ -58,9 +58,9 @@ let main () =
 	   else
 	     (
 	       try (Type_inhabitation.main_ti (Lexing.from_string ld))
-	       with _ ->
+	       with Failure a ->
 		 begin
-		   print_string "\nYou typed something wrong\n";
+		   print_string ("\nYou typed something wrong\n" ^ a ^ "\n");
 		   loop2 ()
 		 end
 	     )
@@ -91,7 +91,7 @@ let main () =
 		   try (Proof_reconstruction.main_pr (Lexing.from_string lm) (Lexing.from_string ls));
 		   with Failure a ->
 		     begin
-		       print_string ("\nYou typed something wrong\n" ^ a);
+		       print_string ("\nYou typed something wrong\n" ^ a ^ "\n");
 		       loop3 ()
 		     end
 		 )

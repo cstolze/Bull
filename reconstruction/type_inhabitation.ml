@@ -3,7 +3,7 @@ open Definitions
 let rec find_sigma list_ =
 	let rec associate x =
 		function
-		| [] -> failwith "no"
+		| [] -> failwith "there's a free variable"
 		| (x', s) :: _ when x' = x -> s
 		| _ :: l -> associate x l
 	in

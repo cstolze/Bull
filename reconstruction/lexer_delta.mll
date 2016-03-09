@@ -9,8 +9,7 @@ rule read = parse
 	| ':' {COLON}
 	| "=>" {AR}
 	| "<=" {AL}
-	| ['0' - '9']+ as s {let i = int_of_string s in INT i}
-	| "a" {A}
-	| " -> " {FC}
-	| " & " {AND}
+	| ['a' - 'z']+ as x {VAR x}
+	| "->" {FC}
+	| "&" {AND}
 	| eof {EOF}

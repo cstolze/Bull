@@ -7,6 +7,5 @@ rule read = parse
 	| "\\" {LAMBDA}
 	| "." {AS}
 	| ':' {COLON}
-	| ['0' - '9']+ as s {let i = int_of_string s in INT i}
 	| ['a' - 'z']+ as x {VAR x}
 	| eof {EOF}
