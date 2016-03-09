@@ -9,7 +9,7 @@ rule read = parse
 	| ':' {COLON}
 	| "=>" {AR}
 	| "<=" {AL}
-	| ['a' - 'z']+ as x {VAR x}
+	| ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x {VAR x}
 	| "->" {FC}
 	| "&" {AND}
 	| eof {EOF}

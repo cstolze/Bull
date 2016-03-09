@@ -36,6 +36,6 @@ l :
 s:
 	| s FC s {SFc ($1, $3)}
 	| s AND s {SAnd ($1, $3)}
-	| VAR {SAtom}
+	| VAR {SAtom $1}
 	| OPENP s CLOSP {$2}
 ;

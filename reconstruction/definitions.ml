@@ -1,7 +1,7 @@
 type sigma =
   | SFc of sigma * sigma
   | SAnd of sigma * sigma
-  | SAtom
+  | SAtom of string
 
 type m =
   | MVar of string
@@ -99,25 +99,13 @@ let rec find_i x sigma =
 
 let rec sigma_to_string sigma =
   match sigma with
-  | SAtom -> "a"
+  | SAtom x -> x
   | SFc (sigma1, sigma2) ->
      let s1 = sigma_to_string sigma1
-     and s2 = sigma_to_string sigma2 in (
-       match s1, s2 with
-       | "a", "a" -> "a -> a"
-       | "a", _ -> "a -> (" ^ s2 ^ ")"
-       | _, "a" -> "(" ^ s1 ^ ") -> a"
-       | _, _ -> "(" ^ s1 ^ ") -> (" ^ s2 ^ ")"
-     )
+     and s2 = sigma_to_string sigma2 in "(" ^ s1 ^ ") -> (" ^ s2 ^ ")"
   | SAnd (sigma1, sigma2) ->
      let s1 = sigma_to_string sigma1
-     and s2 = sigma_to_string sigma2 in (
-       match s1, s2 with
-       | "a", "a" -> "a & a"
-       | "a", _ -> "a & (" ^ s2 ^ ")"
-       | _, "a" -> "(" ^ s1 ^ ") & a"
-       | _, _ -> "(" ^ s1 ^ ") & (" ^ s2 ^ ")"
-     )
+     and s2 = sigma_to_string sigma2 in "(" ^ s1 ^ ") & (" ^ s2 ^ ")"
 
 let rec m_to_string =
   let rec aux m =

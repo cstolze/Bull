@@ -2,7 +2,7 @@
 
 rule read = parse
 	| [' ' '\t' '\n'] {read lexbuf}
-	| "a" {A}
+	| ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x {VAR x}
 	| '(' {OPENP}
 	| ')' {CLOSP}
 	| "->" {FC}

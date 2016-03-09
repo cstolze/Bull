@@ -2,7 +2,7 @@
 
 %token OPENP
 %token CLOSP
-%token A
+%token <string> VAR
 %token AND
 %token FC
 %token EOF
@@ -18,7 +18,7 @@
 s:
 	| s FC s {SFc ($1, $3)}
 	| s AND s {SAnd ($1, $3)}
-	| A {SAtom}
+	| VAR {SAtom $1}
 	| s INT {let a = SFc ($1, $1) in SFc (a, a)}
 	| OPENP s CLOSP {$2}
 ;
