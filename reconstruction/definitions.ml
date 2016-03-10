@@ -133,9 +133,15 @@ let rec find_i x sigma l =
 let rec sigma_to_string sigma =
   match sigma with
   | SAtom x -> x
+  | SFc (SAtom x, SAtom y) -> x ^ " -> " ^ y
+  | SFc (SAtom x, y) -> x ^ " -> " ^ (sigma_to_string y)
+  | SFc (x, SAtom y) -> (sigma_to_string x) ^ " -> " ^ y
   | SFc (sigma1, sigma2) ->
      let s1 = sigma_to_string sigma1
      and s2 = sigma_to_string sigma2 in "(" ^ s1 ^ ") -> (" ^ s2 ^ ")"
+  | SAnd (SAtom x, SAtom y) -> x ^ " & " ^ y
+  | SAnd (SAtom x, y) -> x ^ " & " ^ (sigma_to_string y)
+  | SAnd (x, SAtom y) -> (sigma_to_string x) ^ " & " ^ y
   | SAnd (sigma1, sigma2) ->
      let s1 = sigma_to_string sigma1
      and s2 = sigma_to_string sigma2 in "(" ^ s1 ^ ") & (" ^ s2 ^ ")"
