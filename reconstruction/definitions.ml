@@ -34,13 +34,14 @@ type bruijndelta =
 type gamma = (string * string * sigma) list (* var * mark * type *)
 
 type judgment = {
+  c : int; (* judgment identifier *)
   g : gamma;
   m : m;
   s : sigma
 }
 
 type derivation =
-  | ANull
+  | ANull of int
   | AMark of string
   | AFcI of (judgment * derivation)
   | AFcE of (judgment * derivation * derivation)
@@ -49,6 +50,7 @@ type derivation =
   | AAndER of (judgment * derivation)
 
 type pb = {
+  cmax : int;
   jlist : judgment list;
   derivation : derivation
 }
@@ -63,7 +65,7 @@ type opt =
   | OAndI
   | OAndEL of sigma
   | OAndER of sigma
-(* TODO : OChangeGoal *)
+  | OChangeGoal
 
 let rec to_bruijn m =
   let rec update b x n =

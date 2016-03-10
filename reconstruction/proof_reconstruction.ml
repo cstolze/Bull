@@ -18,12 +18,13 @@ let rec rebuild_delta derivation =
      DLeft (rebuild_delta a)
   | AAndER (_, a) ->
      DRight (rebuild_delta a)
-  | ANull -> failwith "empty tree"
+  | ANull _ -> failwith "empty tree"
 
-let replace derivation leaf =
+let replace derivation leaf c =
   let rec visit (derivation : derivation) =
     match derivation with
-    | ANull -> leaf
+    | ANull c' when c = c' -> leaf
+    | ANull _ -> failwith "full"
     | AMark _ -> failwith "full"
     | AFcI (t, a) -> AFcI (t, visit a)
     | AFcE (t, a1, a2) ->
@@ -53,7 +54,7 @@ let replace derivation leaf =
 let shift pb =
   match pb.jlist with
   | [] -> failwith "should not happen"
-  | t :: l -> { jlist = l; derivation = pb.derivation }
+  | t :: l -> {cmax = pb.cmax; jlist = l; derivation = pb.derivation }
 
 let choose_var pb =
   (
@@ -63,7 +64,7 @@ let choose_var pb =
 	 match t.m with
 	 | MVar x ->
 	    let i = find_i x t.s t.g in
-	    shift ({jlist = pb.jlist; derivation = replace pb.derivation (AMark i)})
+	    shift ({cmax = pb.cmax; jlist = pb.jlist; derivation = replace pb.derivation (AMark i) t.c})
 	 | _ -> failwith "var"
        )
     | _ -> failwith "var"
@@ -76,8 +77,9 @@ let choose_fci pb =
        match t.m, t.s with
        | MLambda (x, i, m), SFc (s1, s2) ->
 	  {
-	    jlist = {g = (x, i, s1)::t.g; m = m; s = s2} :: l;
-	    derivation = replace pb.derivation (AFcI (t, ANull));
+	    cmax = pb.cmax;
+	    jlist = {c = t.c; g = (x, i, s1)::t.g; m = m; s = s2} :: l;
+	    derivation = replace pb.derivation (AFcI (t, ANull t.c)) t.c
 	  }
        | _ -> failwith "fci"
      )
@@ -90,10 +92,11 @@ let choose_fce pb a =
        match t.m with
        | MApp (m1, m2) ->
 	  {
-	    jlist = {g = t.g; m = m1; s = SFc (a, t.s)}
-		    :: {g = t.g; m = m2; s = a}
+	    cmax = pb.cmax+1;
+	    jlist = {c = pb.cmax+1; g = t.g; m = m1; s = SFc (a, t.s)}
+		    :: {c = t.c; g = t.g; m = m2; s = a}
 		    :: l;
-	    derivation = replace pb.derivation (AFcE (t, ANull, ANull))
+	    derivation = replace pb.derivation (AFcE (t, ANull (pb.cmax+1), ANull t.c)) t.c
 	  }
        | _ -> failwith "fce"
      )
@@ -106,10 +109,11 @@ let choose_andi pb =
        match t.s with
        | SAnd (s1, s2) ->
 	  {
-	    jlist = {g = t.g; m = t.m; s = s1}
-		    :: {g = t.g; m = t.m; s = s2}
+	    cmax = pb.cmax+1;
+	    jlist = {c = pb.cmax+1; g = t.g; m = t.m; s = s1}
+		    :: {c = t.c; g = t.g; m = t.m; s = s2}
 		    :: l;
-	    derivation = replace pb.derivation (AAndI (t, ANull, ANull));
+	    derivation = replace pb.derivation (AAndI (t, ANull (pb.cmax+1), ANull t.c)) t.c;
 	  }
        | _ -> failwith "andi"
      )
@@ -119,8 +123,9 @@ let choose_andel pb a =
   match pb.jlist with
   | t :: l ->
      {
-       jlist = {g = t.g; m = t.m; s = SAnd (t.s, a)} :: l ;
-       derivation = replace pb.derivation (AAndEL (t, ANull));
+       cmax = pb.cmax;
+       jlist = {c = t.c; g = t.g; m = t.m; s = SAnd (t.s, a)} :: l ;
+       derivation = replace pb.derivation (AAndEL (t, ANull t.c)) t.c;
      }
   | _ -> failwith "andel"
 
@@ -128,12 +133,28 @@ let choose_ander pb a =
   match pb.jlist with
   | t :: l ->
      {
-       jlist = {g = t.g; m = t.m; s = SAnd (a, t.s)} :: l ;
-       derivation = replace pb.derivation (AAndER (t, ANull));
+       cmax = pb.cmax;
+       jlist = {c = t.c; g = t.g; m = t.m; s = SAnd (a, t.s)} :: l ;
+       derivation = replace pb.derivation (AAndER (t, ANull t.c)) t.c;
      }
   | _ -> failwith "ander"
 
-let possibilities t bol =
+let changegoal pb =
+  let rec cdr x l =
+    match l with
+    | [] -> x :: []
+    | y :: l' -> y :: (cdr x l')
+  in
+  match pb.jlist with
+  | t :: l ->
+     {
+       cmax = pb.cmax;
+       jlist = cdr t l;
+       derivation = pb.derivation
+     }
+  | _ -> failwith "change"
+
+let possibilities t list bol =
   let visit_fci l =
     match t.m, t.s with
     | MLambda _, SFc _ -> "->I" :: l
@@ -157,7 +178,11 @@ let possibilities t bol =
     match t.s with
     | SAnd _ -> "&I" :: l
     | _ -> l
-  in visit_fci (visit_fce (visit_var (visit_andi ("&El" :: "&Er" :: (if bol then ["backtrack"] else [])))))
+  and visit_change l =
+    match list with
+    | [] -> l
+    | _ -> "change" :: l
+  in visit_fci (visit_fce (visit_var (visit_andi (visit_change ("&El" :: "&Er" :: (if bol then ["backtrack"] else []))))))
 
 let choose pb bol =
   let rec aux =
@@ -194,7 +219,7 @@ let choose pb bol =
 	   print_string "\n";
 	   print_pb pb;
 	   print_string "Choose your rule :\n\n";
-	   let lp = possibilities t bol in
+	   let lp = possibilities t l bol in
 	   aux lp;
 	   let opt = read_line () in
 	   if List.exists (fun o -> opt = o) lp
@@ -204,6 +229,7 @@ let choose pb bol =
 	     | "var" -> OVar
 	     | "backtrack" -> OBacktrack
 	     | "&I" -> OAndI
+	     | "change" -> OChangeGoal
 	     | "->E" ->
 		(
 		  try OFcE (choose_type ())
@@ -253,13 +279,15 @@ let rec algorithm pb_tot =
 	| OVar ->
 	   algorithm ((choose_var pb) :: pb_tot)
 	| OBacktrack -> algorithm lnext
+	| OChangeGoal -> algorithm ((changegoal pb) :: pb_tot)
 
 let main_pr lbm lbs =
   let m = Parser_m.m Lexer_m.read lbm
   and s = Parser_sigma.s Lexer_sigma.read lbs
   in
   let pb = {
-    jlist =  [{g = []; m = m; s = s}];
-    derivation = ANull
+    cmax = 0;
+    jlist =  [{c = 0; g = []; m = m; s = s}];
+    derivation = ANull 0
   }
   in algorithm [pb]
