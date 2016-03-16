@@ -10,11 +10,9 @@ rule read = parse
 	| ':' {COLON}
 	| '=' {EQUAL}
 	| ';' {SEMICOLON}
-	| '*' {STAR}
 	| "->" {ARROW}
 	| "&" {SAND}
 	| "|" {SOR}
-	| "omega" {OMEGA}
 	| "var" {VAR}
 	| "intro" {INTRO}
 	| "elim" {ELIM}
@@ -24,6 +22,9 @@ rule read = parse
 	| "inj_l" {INJLEFT}
 	| "inj_r" {INJRIGHT}
 	| "sdisj" {SDISJ}
+	| "backtrack" {BACKTRACK}
+	| "changerule" {CHANGERULE}
+	| "abort" {ABORT}
 	| "Quit" {QUIT}
 	| "Load" {LOAD}
 	| "Proof" {PROOF}
