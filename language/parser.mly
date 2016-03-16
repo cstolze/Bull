@@ -29,6 +29,8 @@
 %token TYPE
 %token CONSTANT
 %token DELTATERM
+%token PRINT
+%token SIG
 %token <string> ID
 		%token EOF
 
@@ -57,6 +59,8 @@
     | CONSTANT ID COLON family SEMICOLON { Cst ($2, $4) }
     | DELTATERM ID EQUAL deltaterm COLON family SEMICOLON { Typecheck ($2, $4, $6) }
     | DELTATERM ID EQUAL deltaterm SEMICOLON { Typeinfer ($2, $4) }
+    | PRINT ID SEMICOLON { Print $2 }
+    | SIG SEMICOLON { Print_all }
     | error SEMICOLON { Error }
     ;
 
