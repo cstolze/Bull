@@ -32,18 +32,12 @@
 %token PRINT
 %token SIG
 %token HELP
-%token APP
 %token <string> ID
 		%token EOF
 
-		%right LAMBDA DOT
-		%left APP
 		%right ARROW
 		%right SOR
 		%right SAND
-		%left PROJLEFT PROJRIGHT INJLEFT INJRIGHT
-		%nonassoc OPENP
-		%nonassoc ID
 
 		%start proof
 		%type <Utils.proofrule> proof
@@ -81,17 +75,27 @@
     | family SOR family { SOr ($1, $3) }
     ;
 
+      /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the application operator (which does not exist, haha) automatically */
       deltaterm:
-    | OPENP deltaterm CLOSP { $2 }
+    | LAMBDA ID COLON family DOT deltaterm { DLambda ($2, $4, $6) } /* lowest precedence */
+    | deltaterm2 { $1 }
+
+	deltaterm2:
+    | deltaterm2 deltaterm3 { DApp ($1, $2) } /* applications are left-to-right */
+    | deltaterm3 { $1 }
+
+		 deltaterm3:
+    | PROJLEFT deltaterm3 { DProjL $2 }
+    | PROJRIGHT deltaterm3 { DProjR $2 }
+    | INJLEFT deltaterm3 { DInjL $2 }
+    | INJRIGHT deltaterm3 { DInjR $2 }
+    | deltaterm4 { $1 }
+
+	deltaterm4:
+    | OPENP deltaterm CLOSP { $2 } /* highest precedence */
     | ID { DVar $1 }
-    | LAMBDA ID COLON family DOT deltaterm { DLambda ($2, $4, $6) }
-    | PROJLEFT deltaterm { DProjL $2 }
-    | PROJRIGHT deltaterm { DProjR $2 }
-    | INJLEFT deltaterm { DInjL $2 }
-    | INJRIGHT deltaterm { DInjR $2 }
     | OPENP deltaterm SAND deltaterm CLOSP { DAnd ($2, $4) }
     | OPENP deltaterm SOR deltaterm CLOSP { DOr ($2, $4) }
-    | deltaterm deltaterm %prec APP { DApp ($1, $2) }
     ;
 
       proof:

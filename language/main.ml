@@ -112,19 +112,19 @@ let typecheck id d f ctx verb =
 	      end)
 	  else
 	    begin
-	      prerr_endline "Error: type-checking failed.\n";
+	      prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ ".\n");
 	      ctx
 	    end
 	 )
        else
 	 begin
-	   prerr_endline "Error: type not inferable.\n";
+	   prerr_endline ("Error: type not inferable for " ^ (delta_to_string d) ^ ".\n");
 	   ctx
 	 end
       )
     else
       begin
-	prerr_endline "Error: ill-formed term.\n";
+	prerr_endline ("Error: " ^ (delta_to_string d) ^ " is ill-formed.\n");
 	ctx
       end
 
@@ -145,13 +145,13 @@ let typeinfer id d ctx verb =
 	   end)
        else
 	 begin
-	   prerr_endline "Error: type not inferable.\n";
+	   prerr_endline ("Error: type not inferable for " ^ (delta_to_string d) ^ ".\n");
 	   ctx
 	 end
       )
     else
       begin
-	prerr_endline "Error: ill-formed term.\n";
+	prerr_endline ("Error: " ^ (delta_to_string d) ^ " is ill-formed.\n");
 	ctx
       end
 
@@ -195,7 +195,7 @@ let main =
       | Typecst (id, k) -> main_loop lx (typecst id k ctx)
       | Cst (id, f) -> main_loop lx (cst id f ctx)
       | Typecheck (id, d, f) -> main_loop lx (typecheck id d f ctx true)
-      | Typeinfer (id, d) -> print_endline (delta_to_string d); main_loop lx (typeinfer id d ctx true)
+      | Typeinfer (id, d) -> main_loop lx (typeinfer id d ctx true)
       | Print id -> print id ctx; main_loop lx ctx
       | Print_all -> print_all ctx; main_loop lx ctx
       | Help -> help (); main_loop lx ctx
