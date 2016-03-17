@@ -1,0 +1,1 @@
+Type int : Type; Type float : Type; Constant c : int; Constant add : (int -> int -> int) & (float -> float -> float);

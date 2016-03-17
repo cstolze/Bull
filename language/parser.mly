@@ -32,6 +32,7 @@
 %token PRINT
 %token SIG
 %token HELP
+%token APP
 %token <string> ID
 		%token EOF
 
@@ -40,7 +41,7 @@
 		%right ARROW
 		%right SOR
 		%right SAND
-		%right PROJLEFT PROJRIGHT INJLEFT INJRIGHT
+		%left PROJLEFT PROJRIGHT INJLEFT INJRIGHT
 		%nonassoc OPENP
 		%nonassoc ID
 
@@ -64,6 +65,7 @@
     | SIG SEMICOLON { Print_all }
     | HELP SEMICOLON { Help }
     | error SEMICOLON { Error }
+    | EOF { Quit }
     ;
 
       kind:
@@ -83,13 +85,13 @@
     | OPENP deltaterm CLOSP { $2 }
     | ID { DVar $1 }
     | LAMBDA ID COLON family DOT deltaterm { DLambda ($2, $4, $6) }
-    | deltaterm deltaterm %prec APP { DApp ($1, $2) }
     | PROJLEFT deltaterm { DProjL $2 }
     | PROJRIGHT deltaterm { DProjR $2 }
     | INJLEFT deltaterm { DInjL $2 }
     | INJRIGHT deltaterm { DInjR $2 }
     | OPENP deltaterm SAND deltaterm CLOSP { DAnd ($2, $4) }
     | OPENP deltaterm SOR deltaterm CLOSP { DOr ($2, $4) }
+    | deltaterm deltaterm %prec APP { DApp ($1, $2) }
     ;
 
       proof:

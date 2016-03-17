@@ -155,7 +155,31 @@ let typeinfer id d ctx verb =
 	ctx
       end
 
-let load file ctx = print_string "Not implemented yet\n"; ctx
+let rec load file ctx =
+  let rec load_loop lx ctx =
+    begin
+      try
+	match Parser.s Lexer.read lx with
+	| Quit -> ctx
+	| Load id -> load_loop lx (load id ctx)
+	| Proof (id, f) -> load_loop lx (proof id f ctx)
+	| Typecst (id, k) -> load_loop lx (typecst id k ctx)
+	| Cst (id, f) -> load_loop lx (cst id f ctx)
+	| Typecheck (id, d, f) -> load_loop lx (typecheck id d f ctx false)
+	| Typeinfer (id, d) -> load_loop lx (typeinfer id d ctx false)
+	| Print id -> print id ctx; load_loop lx ctx
+	| Print_all -> print_all ctx; load_loop lx ctx
+	| Help -> help (); load_loop lx ctx
+	| Error -> prerr_endline "Syntax error.\n"; load_loop lx ctx
+      with
+      | Failure a -> Lexing.flush_input lx; prerr_endline ("Error: " ^ a ^ ".\n"); load_loop lx ctx
+      | _ -> Lexing.flush_input lx; prerr_endline ("Error.\n"); load_loop lx ctx
+    end
+  in
+  let channel = open_in file in
+  let lx = Lexing.from_channel channel in
+  load_loop lx ctx
+
 
 (* main *)
 
@@ -171,7 +195,7 @@ let main =
       | Typecst (id, k) -> main_loop lx (typecst id k ctx)
       | Cst (id, f) -> main_loop lx (cst id f ctx)
       | Typecheck (id, d, f) -> main_loop lx (typecheck id d f ctx true)
-      | Typeinfer (id, d) -> main_loop lx (typeinfer id d ctx true)
+      | Typeinfer (id, d) -> print_endline (delta_to_string d); main_loop lx (typeinfer id d ctx true)
       | Print id -> print id ctx; main_loop lx ctx
       | Print_all -> print_all ctx; main_loop lx ctx
       | Help -> help (); main_loop lx ctx
