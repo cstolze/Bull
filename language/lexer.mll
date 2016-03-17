@@ -33,5 +33,6 @@ rule read = parse
 	| "Definition" {DELTATERM}
 	| "Print" {PRINT}
 	| "Print_all" {SIG}
+	| "Help" {HELP}
 	| ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x {ID x}
 	| eof {EOF}

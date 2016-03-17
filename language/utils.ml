@@ -28,6 +28,7 @@ type sentence =
   | Typeinfer of string * delta
   | Print of string
   | Print_all
+  | Help
   | Error
 
 type proofrule =
@@ -81,7 +82,7 @@ let rec delta_to_string d =
   | DVar i -> i
   | DLambda (i, s, d) ->
      let t = aux d in
-     "\\" ^ i ^ ":" ^ (family_to_string s) ^ ". " ^ t
+     "\\" ^ i ^ " : " ^ (family_to_string s) ^ ". " ^ t
   | DApp (d1, d2) ->
      let t1 = aux d1
      and t2 = aux d2 in
@@ -109,11 +110,6 @@ let rec delta_to_string d =
 
 (* auxiliary functions for using signature *)
 
-let rec clean_list x l =
-  match l with
-  | [] -> []
-  | (y, z) :: l' -> if x = y then clean_list x l' else (y, z) :: (clean_list x l')
-
 let rec find id l =
   match l with
   | [] -> false
@@ -130,6 +126,7 @@ let find_cst id ctx = let Sig (a,b,c) = ctx in find id b
 let get_cst id ctx = let Sig (a,b,c) = ctx in get id b (* we suppose id has already been found *)
 let find_def id ctx = let Sig (a,b,c) = ctx in find id c
 let get_def id ctx = let Sig (a,b,c) = ctx in get id c (* we suppose id has already been found *)
+let find_all id ctx = find_type id ctx || find_cst id ctx || find_def id ctx
 
 
 let typecst_to_string id t = id ^ " : " ^ (kind_to_string t) ^ "\n"

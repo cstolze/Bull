@@ -31,6 +31,7 @@
 %token DELTATERM
 %token PRINT
 %token SIG
+%token HELP
 %token <string> ID
 		%token EOF
 
@@ -61,6 +62,7 @@
     | DELTATERM ID EQUAL deltaterm SEMICOLON { Typeinfer ($2, $4) }
     | PRINT ID SEMICOLON { Print $2 }
     | SIG SEMICOLON { Print_all }
+    | HELP SEMICOLON { Help }
     | error SEMICOLON { Error }
     ;
 
