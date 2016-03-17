@@ -1,1 +1,6 @@
-Type int : Type; Type float : Type; Constant c : int; Constant add : (int -> int -> int) & (float -> float -> float);
+Type int : Type;
+Type float : Type;
+
+Constant 0 : int;
+Constant add : (int -> int -> int) & (float -> float -> float);
+Definition test = \x : int. proj_l add x 0;

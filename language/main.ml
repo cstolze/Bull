@@ -26,7 +26,8 @@ let version _ = print_string "<program>  Copyright (C) 2016  Claude Stolze, ENS 
 
 let versiondoc = "output version information and exit\n"
 
-let arg_file arg = print_string ("loading " ^ arg ^ " not implemented yet\n")
+let initfile = ref ""
+let arg_file arg = initfile := arg
 
 let options = ("-v", Arg.Unit (version), versiondoc) :: []
 
@@ -210,7 +211,10 @@ let main =
   begin
     Arg.parse options arg_file usage;
     print_endline "Type \"Help;\" for help.\n";
-    main_loop lx (Sig ([], [], []))
+    if (!initfile) = "" then
+      main_loop lx (Sig ([], [], []))
+    else
+      main_loop lx (load (!initfile) (Sig ([], [], [])))
   end
 ;;
 
