@@ -21,6 +21,7 @@ Proof proofname : type;        	     start an interactive proof (not implemented
 Definition name = term [: type];     define a term
 Print name; 	       	  	     print the definition of name
 Print_all; 			     print all the signature (type constants, constants, definitions)
+Compute name;			     normalize name and print the result
 Quit; 				     quit
 
 Syntax of types:
@@ -56,5 +57,8 @@ f = < (\x : a. cst) & (\y : b. cst) > : (a -> c) & (b -> c)
 
 > Definition g = \ x : a . < \ y : a . proj_l f y | \ z : b . proj_r f z # inj_l x >;
 g = \x : a. < \y : a. ((proj_l f) y) | \z : b. ((proj_r f) z) # inj_l x > : a -> c
+
+> Compute g;
+\$x : a. cst
 
 > Quit;

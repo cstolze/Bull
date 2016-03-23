@@ -34,6 +34,7 @@ rule read = parse
 	| "Type" {TYPE}
 	| "Constant" {CONSTANT}
 	| "Definition" {DELTATERM}
+	| "Compute" {COMPUTE}
 	| "Print" {PRINT}
 	| "Print_all" {SIG}
 	| "Help" {HELP}

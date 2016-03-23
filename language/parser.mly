@@ -28,6 +28,7 @@
 %token PROOF
 %token TYPE
 %token CONSTANT
+%token COMPUTE
 %token LT
 %token GT
 %token SHARP
@@ -60,6 +61,7 @@
     | DELTATERM ID EQUAL deltaterm SEMICOLON { Typeinfer ($2, $4) }
     | PRINT ID SEMICOLON { Print $2 }
     | SIG SEMICOLON { Print_all }
+    | COMPUTE ID SEMICOLON { Compute $2 }
     | HELP SEMICOLON { Help }
     | error SEMICOLON { Error }
     | EOF { Quit }

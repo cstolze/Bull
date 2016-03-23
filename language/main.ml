@@ -33,7 +33,7 @@ let options = ("-v", Arg.Unit (version), versiondoc) :: []
 
 (* commands *)
 
-let help () = print_endline "List of commands:\nHelp;\t\t\t\t\tshow this help\nLoad file;\t\t\t\tload a script file\nType typename : kind;\t\t\tdefine a type constant in the signature\nConstant cstname : type;\t\tdefine a constant in the signature\nProof proofname : type;\t\t\tstart an interactive proof\nDefinition name = deltaterm [: type];\tdefine a delta-term\nPrint name;\t\t\t\tprint the definition of name\nPrint_all;\t\t\t\tprint the signature\nQuit;\t\t\t\t\tquit\n"
+let help () = print_endline "List of commands:\nHelp;\t\t\t\t\tshow this help\nLoad file;\t\t\t\tload a script file\nType typename : kind;\t\t\tdefine a type constant in the signature\nConstant cstname : type;\t\tdefine a constant in the signature\nProof proofname : type;\t\t\tstart an interactive proof\nDefinition name = deltaterm [: type];\tdefine a delta-term\nPrint name;\t\t\t\tprint the definition of name\nPrint_all;\t\t\t\tprint the signature\nCompute name;\t\t\t\tprint the normalized form of name\nQuit;\t\t\t\t\tquit\n"
 
 let print id ctx = if find_type id ctx then
 		     print_endline (typecst_to_string id (get_type id ctx))
@@ -156,6 +156,13 @@ let typeinfer id d ctx verb =
 	ctx
       end
 
+let normalize id ctx =
+  if find_def id ctx then
+    let (d,_) = get_def id ctx in
+    print_endline ((delta_to_string (Reduction.compute d ctx)) ^ "\n")
+  else
+    prerr_endline (id ^ "has not been declared yet.\n")
+
 let rec load file ctx =
   let rec load_loop lx ctx =
     begin
@@ -170,6 +177,7 @@ let rec load file ctx =
 	| Typeinfer (id, d) -> load_loop lx (typeinfer id d ctx false)
 	| Print id -> print id ctx; load_loop lx ctx
 	| Print_all -> print_all ctx; load_loop lx ctx
+	| Compute id -> normalize id ctx; load_loop lx ctx
 	| Help -> help (); load_loop lx ctx
 	| Error -> prerr_endline "Syntax error.\n"; load_loop lx ctx
       with
@@ -199,6 +207,7 @@ let main =
       | Typeinfer (id, d) -> main_loop lx (typeinfer id d ctx true)
       | Print id -> print id ctx; main_loop lx ctx
       | Print_all -> print_all ctx; main_loop lx ctx
+      | Compute id -> normalize id ctx; main_loop lx ctx
       | Help -> help (); main_loop lx ctx
       | Error -> prerr_endline "Syntax error.\n"; main_loop lx ctx
     with

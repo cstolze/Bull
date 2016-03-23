@@ -29,6 +29,7 @@ type sentence =
   | Typeinfer of string * delta
   | Print of string
   | Print_all
+  | Compute of string
   | Help
   | Error
 
