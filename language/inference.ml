@@ -2,7 +2,7 @@ open Utils
 
 let rec is_wellformed d =
   let rec to_bruijn d = (* convert d to a lambda-term with De Bruijn indexes, here d is supposed well-formed *)
-    let rec update b x n =
+    let rec update b x n = (* bind x in b *)
       match b with
       | BVar (y,false,_) -> if (y = x) then BVar(y, true, n) else b
       | BVar (_,true,_) -> b
@@ -11,19 +11,19 @@ let rec is_wellformed d =
     in
     match d with
       | DVar x -> BVar(x, false, 0)
-      | DLambda (x, f, d') -> BLambda (update (to_bruijn d') x 0)
+      | DLambda (x, _, d') -> BLambda (update (to_bruijn d') x 0)
       | DApp (d', d'') -> BApp (to_bruijn d', to_bruijn d'')
       | DAnd (d', _) -> to_bruijn d'
       | DProjL d' -> to_bruijn d'
       | DProjR d' -> to_bruijn d'
-      | DOr (d', _) -> to_bruijn d'
+      | DOr (x, f, d', _, _, _, _) -> to_bruijn (DLambda (x, f, d'))
       | DInjL d' -> to_bruijn d'
       | DInjR d' -> to_bruijn d'
   in
   let rec equal_bruijn b1 b2 =
     match (b1, b2) with
-    | BVar (x, false,_), BVar(y, false, _) -> x = y
-    | BVar (_, true, n), BVar(_, true, n') -> n = n'
+    | BVar (x, false,_), BVar(y, false, _) -> x = y (* free variables *)
+    | BVar (_, true, n), BVar(_, true, n') -> n = n' (* bound variables *)
     | BLambda b1', BLambda b2' -> equal_bruijn b1' b2'
     | BApp (b1', b1''), BApp (b2', b2'') -> equal_bruijn b1' b2' && equal_bruijn b1'' b2''
     | _, _ -> false
@@ -35,62 +35,95 @@ let rec is_wellformed d =
   | DAnd (d',d'') -> (is_wellformed d') && (is_wellformed d'') && (equal_bruijn (to_bruijn d') (to_bruijn d''))
   | DProjL d' -> is_wellformed d'
   | DProjR d' -> is_wellformed d'
-  | DOr (d',d'') -> (is_wellformed d') && (is_wellformed d'') && (equal_bruijn (to_bruijn d') (to_bruijn d''))
+  | DOr (x', f', d', x'', f'', d'', d''') -> (is_wellformed d') && (is_wellformed d'') && (is_wellformed d''') && (equal_bruijn (to_bruijn (DLambda (x',f',d'))) (to_bruijn (DLambda (x'',f'',d''))))
   | DInjL d' -> is_wellformed d'
   | DInjR d' -> is_wellformed d'
 
+let rec unifiable f1 f2 =
+  match (f1, f2) with
+  | (SAnything, f) -> true
+  | (f, SAnything) -> true
+  | (SFc (a,b), SFc(a',b')) -> unifiable a a' && unifiable b b'
+  | (SAnd (a,b), SAnd(a',b')) -> unifiable a a' && unifiable b b'
+  | (SOr (a,b), SOr(a',b')) -> unifiable a a' && unifiable b b'
+  | (SAtom x, SAtom y) -> if x = y then true else false
+  | (_,_) -> false
 
-(* IMPORTANT NOTE : THE DISJUNCTION IS NOT SUPPORTED YET *)
+let rec unify f1 f2 =
+  match (f1, f2) with
+  | (SAnything, f) -> f
+  | (f, SAnything) -> f
+  | (SFc (a,b), SFc(a',b')) -> SFc(unify a a', unify b b')
+  | (SAnd (a,b), SAnd(a',b')) -> SAnd(unify a a', unify b b')
+  | (SOr (a,b), SOr(a',b')) -> SOr(unify a a', unify b b')
+  | (SAtom x, SAtom y) -> if x = y then SAtom x else failwith "the programmer should ensure this does not happen (use the unifiable function)"
+  | (_,_) -> failwith "the programmer should ensure this does not happen (use the unifiable function)"
+
 let (inference, inferable) =
-  let rec foo d gamma ctx =
+  let rec inference' d gamma ctx =
     match d with
     | DVar x -> if find x gamma then get x gamma else
 		  (if find_cst x ctx then get_cst x ctx else
 		     (if find_def x ctx then let (_, f) = get_def x ctx in f else
 			failwith "the programmer should ensure this does not happen (use the inferable function)"))
-    | DLambda (x, f, d') -> SFc (f, foo d' ((x,f)::gamma) ctx)
+    | DLambda (x, f, d') -> SFc (f, inference' d' ((x,f)::gamma) ctx)
     | DApp (d', d'') ->
-       let f1 = foo d'' gamma ctx in
-       (match foo d' gamma ctx with
-       | SFc (f', f2) -> if f' = f1 then f2 else failwith "the programmer should ensure this does not happen (use the inferable function)"
+       let f1 = inference' d'' gamma ctx in
+       (match inference' d' gamma ctx with
+	| SFc (f', f2) -> if unifiable f' f1 then f2 else failwith "the programmer should ensure this does not happen (use the inferable function)"
        | _ -> failwith "the programmer should ensure this does not happen (use the inferable function)")
-    | DAnd (d', d'') -> SAnd (foo d' gamma ctx, foo d'' gamma ctx)
-    | DProjL d' -> (match (foo d' gamma ctx) with
+    | DAnd (d', d'') -> SAnd (inference' d' gamma ctx, inference' d'' gamma ctx)
+    | DProjL d' -> (match (inference' d' gamma ctx) with
 		   | SAnd (f1, f2) -> f1
 		   | _ -> failwith "the programmer should ensure this does not happen (use the inferable function)")
-    | DProjR d' -> (match (foo d' gamma ctx) with
+    | DProjR d' -> (match (inference' d' gamma ctx) with
 		   | SAnd (f1, f2) -> f2
 		   | _ -> failwith "the programmer should ensure this does not happen (use the inferable function)")
-    | DOr (d', d'') -> failwith "not implemented yet"
-    | DInjL d' -> failwith "not implemented yet"
-    | DInjR d' -> failwith "not implemented yet"
+    | DOr (x', f', d', x'', f'', d'', d''') ->
+       let f1 = inference' d' ((x',f')::gamma) ctx in
+       let f2 = inference' d'' ((x'',f'')::gamma) ctx in
+       let f3 = inference' d''' gamma ctx in
+       if (unifiable f1 f2) && (unifiable (SOr(f',f'')) f3) then
+	 unify f1 f2
+       else
+	 failwith "the programmer should ensure this does not happen (use the inferable function)"
+    | DInjL d' -> SOr(inference' d' gamma ctx, SAnything)
+    | DInjR d' -> SOr(SAnything, inference' d' gamma ctx)
   in
-  let rec bar d gamma ctx =
+  let rec inferable' d gamma ctx =
     match d with
     | DVar x -> if find x gamma then true else
 		  (if find_cst x ctx then true else
-		     (if find_def x ctx then true else
-			false))
-    | DLambda (x, f, d') -> bar d' ((x,f)::gamma) ctx
+		     find_def x ctx)
+    | DLambda (x, f, d') -> inferable' d' ((x,f)::gamma) ctx
     | DApp (d', d'') ->
-       if (bar d' gamma ctx && bar d'' gamma ctx) then
-	 let f1 = foo d'' gamma ctx in
-	 match foo d' gamma ctx with
-	 | SFc (f', f2) -> if f' = f1 then true else false
+       if (inferable' d' gamma ctx && inferable' d'' gamma ctx) then
+	 let f1 = inference' d'' gamma ctx in
+	 match inference' d' gamma ctx with
+	 | SFc (f', f2) -> unifiable f' f1
 	 | _ -> false
        else false
-    | DAnd (d', d'') -> bar d' gamma ctx && bar d'' gamma ctx
-    | DProjL d' -> if bar d' gamma ctx then
-		     match (foo d' gamma ctx) with
+    | DAnd (d', d'') -> inferable' d' gamma ctx && inferable' d'' gamma ctx
+    | DProjL d' -> if inferable' d' gamma ctx then
+		     match (inference' d' gamma ctx) with
 		     | SAnd (_, _) -> true
 		     | _ -> false
 		   else false
-    | DProjR d' -> if bar d' gamma ctx then
-		     match (foo d' gamma ctx) with
+    | DProjR d' -> if inferable' d' gamma ctx then
+		     match (inference' d' gamma ctx) with
 		     | SAnd (_, _) -> true
 		     | _ -> false
 		   else false
-    | DOr (d', d'') -> false (* not implemented yet *)
-    | DInjL d' -> false (* not implemented yet *)
-    | DInjR d' -> false (* not implemented yet *)
-  in ((fun d ctx -> foo d [] ctx), (fun d ctx -> bar d [] ctx))
+    | DOr (x', f', d', x'', f'', d'', d''') ->
+       let f1' = inferable' d' ((x',f')::gamma) ctx in
+       let f2' = inferable' d'' ((x'',f'')::gamma) ctx in
+       let f3' = inferable' d''' gamma ctx in
+       if f1' && f2' && f3' then
+	 let f1 = inference' d' ((x',f')::gamma) ctx in
+	 let f2 = inference' d'' ((x'',f'')::gamma) ctx in
+	 let f3 = inference' d''' gamma ctx in
+	 (unifiable f1 f2) && (unifiable (SOr(f',f'')) f3)
+       else false
+    | DInjL d' -> inferable' d' gamma ctx
+    | DInjR d' -> inferable' d' gamma ctx
+  in ((fun d ctx -> inference' d [] ctx), (fun d ctx -> inferable' d [] ctx))

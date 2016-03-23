@@ -6,6 +6,7 @@ type family =
   | SAnd of family * family
   | SOr of family * family
   | SAtom of string
+  | SAnything
 
 type delta =
   | DVar of string
@@ -14,7 +15,7 @@ type delta =
   | DAnd of delta * delta
   | DProjL of delta
   | DProjR of delta
-  | DOr of delta * delta
+  | DOr of string * family * delta * string * family * delta * delta
   | DInjL of delta
   | DInjR of delta
 
@@ -71,12 +72,15 @@ let rec family_to_string f =
   | SAnd (f1, f2) -> (aux f1) ^ " & " ^ (aux f2)
   | SOr (f1, f2) -> (aux f1) ^ " | " ^ (aux f2)
   | SAtom id -> id
+  | SAnything -> "?"
 
 let rec delta_to_string d =
   let aux delta =
     match delta with
     | DVar i -> i
-    | _ -> let sd = delta_to_string delta in "(" ^ sd ^ ")"
+    | DAnd (_, _) -> delta_to_string delta
+    | DOr (_, _, _, _, _, _, _) -> delta_to_string delta
+    | _ -> "(" ^ (delta_to_string delta) ^ ")"
   in
   match d with
   | DVar i -> i
@@ -85,28 +89,29 @@ let rec delta_to_string d =
      "\\" ^ i ^ " : " ^ (family_to_string s) ^ ". " ^ t
   | DApp (d1, d2) ->
      let t1 = aux d1
-     and t2 = aux d2 in
+     in let t2 = aux d2 in
      t1 ^ " " ^ t2
   | DAnd (d1, d2) ->
      let t1 = aux d1
-     and t2 = aux d2 in
-     t1 ^ " & " ^ t2
+     in let t2 = aux d2 in
+     "< " ^ t1 ^ " & " ^ t2 ^ " >"
   | DProjL d ->
      let t = aux d in
      "proj_l " ^ t
   | DProjR d ->
      let t = aux d in
-     "proj_r" ^ t
-  | DOr (d1, d2) ->
-     let t1 = aux d1
-     and t2 = aux d2 in
-     t1 ^ " | " ^ t2
+     "proj_r " ^ t
+  | DOr (x1, f1, d1, x2, f2, d2, d3) ->
+     let t1 = delta_to_string (DLambda (x1,f1,d1))
+     in let t2 = delta_to_string (DLambda (x2,f2,d2))
+     in let t3 = delta_to_string d3 in
+     "< " ^ t1 ^  " | " ^ t2 ^ " # " ^ t3 ^ " >"
   | DInjL d ->
      let t = aux d in
      "inj_l " ^ t
   | DInjR d ->
      let t = aux d in
-     "inj_r" ^ t
+     "inj_r " ^ t
 
 (* auxiliary functions for using signature *)
 
@@ -140,5 +145,6 @@ let rec is_family_sound f ctx = (* to use when the user declares a constant *)
   | SAnd (f', f'') -> (is_family_sound f' ctx) ^ (is_family_sound f'' ctx)
   | SOr (f', f'') -> (is_family_sound f' ctx) ^ (is_family_sound f'' ctx)
   | SAtom x -> if find_type x ctx then "" else "Error: the type " ^ x ^ " has not been declared yet.\n"
+  | SAnything -> "Error: type unknown.\n" (* should not happen *)
 
-											 (* todo : proof, type_infer *)
+											 (* todo : proof *)

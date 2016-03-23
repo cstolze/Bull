@@ -106,14 +106,14 @@ let typecheck id d f ctx verb =
     if Inference.is_wellformed d then
       (if Inference.inferable d ctx then
 	 let f' = Inference.inference d ctx in
-	 (if f = f' then
+	 (if Inference.unifiable f f' then
 	    (begin
-		(if verb then print_endline (def_to_string id (d,f)) else ());
+		(if verb then print_endline (def_to_string id (d,Inference.unify f f')) else ());
 		Sig (a, b, (id,(d,f)):: c)
 	      end)
 	  else
 	    begin
-	      prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ ".\n");
+	      prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ " (its type should be " ^ (family_to_string f') ^ ").\n");
 	      ctx
 	    end
 	 )

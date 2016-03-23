@@ -4,15 +4,18 @@ rule read = parse
 	| ['\n' ' ' '\t'] {read lexbuf}
 	| '(' {OPENP}
 	| ')' {CLOSP}
+	| '<' {LT}
+	| '>' {GT}
 	| '\\' {LAMBDA}
 	| '.' {DOT}
 	| ',' {COMMA}
 	| ':' {COLON}
 	| '=' {EQUAL}
 	| ';' {SEMICOLON}
+	| '#' {SHARP}
 	| "->" {ARROW}
-	| "&" {SAND}
-	| "|" {SOR}
+	| '&' {SAND}
+	| '|' {SOR}
 	| "var" {VAR}
 	| "intro" {INTRO}
 	| "elim" {ELIM}

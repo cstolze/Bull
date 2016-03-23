@@ -28,6 +28,9 @@
 %token PROOF
 %token TYPE
 %token CONSTANT
+%token LT
+%token GT
+%token SHARP
 %token DELTATERM
 %token PRINT
 %token SIG
@@ -75,7 +78,7 @@
     | family SOR family { SOr ($1, $3) }
     ;
 
-      /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the application operator (which does not exist, haha) automatically */
+      /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the "application operator" (which does not exist, haha) automatically */
       deltaterm:
     | LAMBDA ID COLON family DOT deltaterm { DLambda ($2, $4, $6) } /* lowest precedence */
     | deltaterm2 { $1 }
@@ -94,8 +97,8 @@
 	deltaterm4:
     | OPENP deltaterm CLOSP { $2 } /* highest precedence */
     | ID { DVar $1 }
-    | OPENP deltaterm SAND deltaterm CLOSP { DAnd ($2, $4) }
-    | OPENP deltaterm SOR deltaterm CLOSP { DOr ($2, $4) }
+    | LT deltaterm SAND deltaterm GT { DAnd ($2, $4) }
+    | LT LAMBDA ID COLON family DOT deltaterm SOR LAMBDA ID COLON family DOT deltaterm SHARP deltaterm GT { DOr ($3, $5, $7, $10, $12, $14, $16) }
     ;
 
       proof:
