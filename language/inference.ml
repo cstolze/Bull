@@ -62,7 +62,7 @@ let rec unify f1 f2 =
 let (inference, inferable) =
   let rec inference' d gamma ctx =
     match d with
-    | DVar x -> if find x gamma then get x gamma else
+    | DVar x -> if find x gamma then get x gamma else (* local variables shadow global ones *)
 		  (if find_cst x ctx then get_cst x ctx else
 		     (if find_def x ctx then let (_, f) = get_def x ctx in f else
 			failwith "the programmer should ensure this does not happen (use the inferable function)"))

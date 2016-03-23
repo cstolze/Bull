@@ -1,0 +1,60 @@
+- How to compile this program:
+
+$ ocamlbuild main.native
+
+- How to run this program:
+
+Preferably:
+$ rlwrap ./main.native [initfile]
+(see http://linux.die.net/man/1/rlwrap)
+
+Or:
+$ ./main.native [initfile]
+
+- How to use this program:
+
+Help;				     for a list of commands
+Load file;		      	     for loading a script file
+Type typename : Type;	    	     define a type constant
+Constant cstname : type;       	     define a constant
+Proof proofname : type;        	     start an interactive proof (not implemented yet)
+Definition name = term [: type];     define a term
+Print name; 	       	  	     print the definition of name
+Print_all; 			     print all the signature (type constants, constants, definitions)
+Quit; 				     quit
+
+Syntax of types:
+type ::=
+| id
+| type -> type
+| type & type
+| type | type
+
+term ::=
+| id
+| term term
+| \ id : type . term
+| < term & term >
+| proj_l term
+| proj_r term
+| < \ id : type . term | \ id : type . term # term >
+| inj_l term
+| inj_r term
+
+The file "loadme" is an example of script/init file.
+
+Example of user session:
+$ rlwrap ./main.native
+Type "Help;" for help.
+
+> Type a : Type;
+> Type b : Type;
+> Type c : Type;
+> Constant cst : c;
+> Definition f = <\x:a.cst & \y:b.cst>;
+f = < (\x : a. cst) & (\y : b. cst) > : (a -> c) & (b -> c)
+
+> Definition g = \ x : a . < \ y : a . proj_l f y | \ z : b . proj_r f z # inj_l x >;
+g = \x : a. < \y : a. ((proj_l f) y) | \z : b. ((proj_r f) z) # inj_l x > : a -> c
+
+> Quit;
