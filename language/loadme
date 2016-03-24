@@ -1,6 +1,10 @@
 Type int : Type;
 Type float : Type;
+Type True : Type;
+Type False : Type;
 
+Constant true : True;
+Constant false : False;
 Constant 0 : int;
 Constant S : int -> int;
 
@@ -11,6 +15,19 @@ Definition add = \m : (int -> int) -> (int -> int). \n : (int -> int) -> (int ->
 Definition mul = \m : (int -> int) -> (int -> int) . \n : (int -> int) -> (int -> int) . \f : int -> int . m (n f);
 Definition exp = \m : (int -> int) -> (int -> int). \n : ((int -> int) -> (int -> int)) -> ((int -> int) -> (int -> int)). n m;
 
+Definition churchtrue = \ t : (True | False). \ f : (True | False). t;
+Definition churchfalse = \ t : (True | False). \ f : (True | False). f;
+
+Definition and = \ x : (True | False) -> ((True | False) -> (True | False)). \ y : (True | False) -> ((True | False) -> (True | False)). \ t : (True | False). \ f : (True | False). x (y t f) f;
+
+Definition or = \ x : (True | False) -> ((True | False) -> (True | False)). \ y : (True | False) -> ((True | False) -> (True | False)). \ t : (True | False). \ f : (True | False). x t (y t f);
+
+Definition not = \ x : (True | False) -> ((True | False) -> (True | False)). \ t : (True | False). \ f : (True | False). x f t;
+
+Definition xor = \ x : (True | False) -> ((True | False) -> (True | False)). \ y : (True | False) -> ((True | False) -> (True | False)). and (or x y) (not (and x y));
+
 Definition 5 = add proj_l church2 proj_l church3 S 0;
 Definition 10 = mul (add proj_l church2 proj_l church3) proj_l church2 S 0;
 Definition 8 = exp proj_l church2 proj_r church3 S 0;
+
+Definition test = xor churchtrue churchfalse inj_l true inj_r false;
