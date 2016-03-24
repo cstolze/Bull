@@ -1,6 +1,18 @@
 open Utils
 
 let rec is_wellformed d =
+  let apply b b' =
+    let rec replace b b' n =
+      match b with
+      | BVar (y, false, _) -> b
+      | BVar (_, true, n') -> if n = n' then b' else b
+      | BLambda b1 -> replace b b' (n+1)
+      | BApp (b1, b2) -> BApp (replace b1 b' n, replace b2 b' n)
+    in
+    match b with
+    | BLambda b1 -> replace b1 b' 0
+    | _ -> b' (* SHOULD NOT HAPPEN *)
+  in
   let rec to_bruijn d = (* convert d to a lambda-term with De Bruijn indexes, here d is supposed well-formed *)
     let rec update b x n = (* bind x in b *)
       match b with
@@ -16,7 +28,7 @@ let rec is_wellformed d =
       | DAnd (d', _) -> to_bruijn d'
       | DProjL d' -> to_bruijn d'
       | DProjR d' -> to_bruijn d'
-      | DOr (x, f, d', _, _, _, _) -> to_bruijn (DLambda (x, f, d'))
+      | DOr (x, f, d', _, _, _, d'') -> apply (to_bruijn (DLambda (x, f, d'))) (to_bruijn d'')
       | DInjL d' -> to_bruijn d'
       | DInjR d' -> to_bruijn d'
   in

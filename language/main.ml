@@ -44,7 +44,7 @@ let print id ctx = if find_type id ctx then
 			(if find_def id ctx then
 			   print_endline (def_to_string id (get_def id ctx))
 			 else
-			   prerr_endline (id ^ "has not been declared yet.\n")
+			   prerr_endline (id ^ " has not been declared yet.\n")
 			)
 		     )
 
@@ -161,7 +161,7 @@ let normalize id ctx =
     let (d,_) = get_def id ctx in
     print_endline ((delta_to_string (Reduction.compute d ctx)) ^ "\n")
   else
-    prerr_endline (id ^ "has not been declared yet.\n")
+    prerr_endline (id ^ " has not been declared yet.\n")
 
 let rec load file ctx =
   let rec load_loop lx ctx =
