@@ -55,9 +55,42 @@ let rec to_string bd = (* for debugging purposes *)
  *)
 
 let rec to_delta bd =
+  let rec replace bd x x' n = (* replace x (with n as a de Bruijn) index by x' in bd *)
+    match bd with
+    | BDVar (_,false,_) -> bd
+    | BDVar (y, true, n') -> if (x = y) && (n = n') then BDVar(x', false, n') else bd
+    | BDLambda (x0, f, bd') -> BDLambda(x0,f, replace bd' x x' (n+1))
+    | BDApp (bd', bd'') -> BDApp(replace bd' x x' n, replace bd'' x x' n)
+    | BDAnd (bd', bd'') -> BDAnd(replace bd' x x' n, replace bd'' x x' n)
+    | BDProjL bd' -> BDProjL (replace bd' x x' n)
+    | BDProjR bd' -> BDProjR (replace bd' x x' n)
+    | BDOr (x0',f',bd',x'',f'',bd'',bd''') -> BDOr(x0', f', replace bd' x x' (n+1), x'', f'', replace bd'' x x' (n+1), replace bd''' x x' n)
+    | BDInjL bd' -> BDInjL (replace bd' x x' n)
+    | BDInjR bd' -> BDInjR (replace bd' x x' n)
+  in
+  let rec alpha_check x bd n =
+    match bd with
+    | BDVar (y,false,_) -> not (x = y)
+    | BDVar (y, true, n') -> if (x = y) then (n = n') else true
+    | BDLambda (x0, f, bd') -> alpha_check x bd' (n+1)
+    | BDApp (bd', bd'') -> (alpha_check x bd' n) && (alpha_check x bd'' n)
+    | BDAnd (bd', bd'') -> (alpha_check x bd' n) && (alpha_check x bd'' n)
+    | BDProjL bd' -> alpha_check x bd n
+    | BDProjR bd' -> alpha_check x bd n
+    | BDOr (x',f',bd',x'',f'',bd'',bd''') -> (alpha_check x bd' (n+1)) && (alpha_check x bd'' (n+1)) && (alpha_check x bd''' n)
+    | BDInjL bd' -> alpha_check x bd n
+    | BDInjR bd' -> alpha_check x bd n
+  in
+  let rec alpha_convert x bd n =
+    match n with
+    | None -> if alpha_check x bd 0 then (x,bd) else alpha_convert x bd (Some 0)
+    | Some n' ->
+       let x' = x ^ (string_of_int n') in
+       if alpha_check x' bd 0 then (x', replace bd x x' 0) else alpha_convert x bd (Some (n'+1))
+  in
   match bd with
   | BDVar (x,_,_) -> DVar x
-  | BDLambda (x, f, bd') -> DLambda (x, f, to_delta bd')
+  | BDLambda (x, f, bd') -> let (x',bd0) = alpha_convert x bd' None in DLambda (x', f, to_delta bd0)
   | BDApp (bd', bd'') -> DApp (to_delta bd', to_delta bd'')
   | BDAnd (bd', bd'') -> DAnd (to_delta bd', to_delta bd'')
   | BDProjL bd' -> DProjL (to_delta bd')
