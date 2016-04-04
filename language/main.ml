@@ -192,7 +192,7 @@ let rec load file ctx =
 
 (* main *)
 
-let main =
+let () =
   let rec main_loop lx ctx =
   begin
     print_string "> "; flush stdout;
@@ -225,6 +225,4 @@ let main =
     else
       main_loop lx (load (!initfile) (Sig ([], [], [])))
   end
-;;
 
-main
