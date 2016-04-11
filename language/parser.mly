@@ -6,6 +6,8 @@
 %token DOT
 %token COMMA
 %token COLON
+%token STAR
+%token OMEGA
 %token EQUAL
 %token SEMICOLON
 %token ARROW
@@ -74,6 +76,7 @@
 
       family:
     | ID { SAtom $1 }
+    | OMEGA { SOmega }
     | OPENP family CLOSP { $2 }
     | family ARROW family { SFc ($1, $3) }
     | family SAND family { SAnd ($1, $3) }
@@ -99,6 +102,7 @@
 	deltaterm4:
     | OPENP deltaterm CLOSP { $2 } /* highest precedence */
     | ID { DVar $1 }
+    | STAR { DStar }
     | LT deltaterm SAND deltaterm GT { DAnd ($2, $4) }
     | LT LAMBDA ID COLON family DOT deltaterm SOR LAMBDA ID COLON family DOT deltaterm SHARP deltaterm GT { DOr ($3, $5, $7, $10, $12, $14, $16) }
     ;

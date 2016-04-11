@@ -22,15 +22,16 @@ let rec is_wellformed d =
       | BApp (b', b'') -> BApp (update b' x n, update b'' x n)
     in
     match d with
-      | DVar x -> BVar(x, false, 0)
-      | DLambda (x, _, d') -> BLambda (update (to_bruijn d') x 0)
-      | DApp (d', d'') -> BApp (to_bruijn d', to_bruijn d'')
-      | DAnd (d', _) -> to_bruijn d'
-      | DProjL d' -> to_bruijn d'
-      | DProjR d' -> to_bruijn d'
-      | DOr (x, f, d', _, _, _, d'') -> apply (to_bruijn (DLambda (x, f, d'))) (to_bruijn d'')
-      | DInjL d' -> to_bruijn d'
-      | DInjR d' -> to_bruijn d'
+    | DVar x -> BVar(x, false, 0)
+    | DStar -> BVar("*", false, 0)
+    | DLambda (x, _, d') -> BLambda (update (to_bruijn d') x 0)
+    | DApp (d', d'') -> BApp (to_bruijn d', to_bruijn d'')
+    | DAnd (d', _) -> to_bruijn d'
+    | DProjL d' -> to_bruijn d'
+    | DProjR d' -> to_bruijn d'
+    | DOr (x, f, d', _, _, _, d'') -> apply (to_bruijn (DLambda (x, f, d'))) (to_bruijn d'')
+    | DInjL d' -> to_bruijn d'
+    | DInjR d' -> to_bruijn d'
   in
   let rec equal_bruijn b1 b2 =
     match (b1, b2) with
@@ -38,10 +39,13 @@ let rec is_wellformed d =
     | BVar (_, true, n), BVar(_, true, n') -> n = n' (* bound variables *)
     | BLambda b1', BLambda b2' -> equal_bruijn b1' b2'
     | BApp (b1', b1''), BApp (b2', b2'') -> equal_bruijn b1' b2' && equal_bruijn b1'' b2''
+    | BVar("*", false, 0), _ -> true (* star case *)
+    | _, BVar("*", false, 0) -> true (* star case *)
     | _, _ -> false
   in
   match d with
   | DVar x -> true
+  | DStar -> true
   | DLambda (x,f,d') -> is_wellformed d'
   | DApp (d', d'') -> (is_wellformed d') && (is_wellformed d'')
   | DAnd (d',d'') -> (is_wellformed d') && (is_wellformed d'') && (equal_bruijn (to_bruijn d') (to_bruijn d''))
@@ -78,6 +82,7 @@ let (inference, inferable) =
 		  (if find_cst x ctx then get_cst x ctx else
 		     (if find_def x ctx then let (_, f) = get_def x ctx in f else
 			failwith "the programmer should ensure this does not happen (use the inferable function)"))
+    | DStar -> SOmega
     | DLambda (x, f, d') -> SFc (f, inference' d' ((x,f)::gamma) ctx)
     | DApp (d', d'') ->
        let f1 = inference' d'' gamma ctx in
@@ -107,6 +112,7 @@ let (inference, inferable) =
     | DVar x -> if find x gamma then true else
 		  (if find_cst x ctx then true else
 		     find_def x ctx)
+    | DStar -> true
     | DLambda (x, f, d') -> inferable' d' ((x,f)::gamma) ctx
     | DApp (d', d'') ->
        if (inferable' d' gamma ctx && inferable' d'' gamma ctx) then

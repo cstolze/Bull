@@ -2,6 +2,7 @@ open Utils
 
 type bruijndelta =
   | BDVar of string * bool * int (* id * is_bound? * bruijn index *)
+  | BDStar
   | BDLambda of string * family * bruijndelta
   | BDApp of bruijndelta * bruijndelta
   | BDAnd of bruijndelta * bruijndelta
@@ -28,6 +29,7 @@ let to_bruijndelta delta ctx =
     | DVar x -> if find_env x env then BDVar (x, true, get_env x env 0) (* local variables shadow global ones *)
 		else if find_def x ctx then let (d', _) = get_def x ctx in foo d' [] (* definition-reduction *)
 		else BDVar(x, false, 0)
+    | DStar -> BDStar
     | DLambda (x, f, d') -> BDLambda (x, f, foo d' (x::env))
     | DApp (d', d'') -> BDApp (foo d' env, foo d'' env)
     | DAnd (d', d'') -> BDAnd (foo d' env, foo d'' env)
@@ -59,6 +61,7 @@ let rec to_delta bd =
     match bd with
     | BDVar (_,false,_) -> bd
     | BDVar (y, true, n') -> if (x = y) && (n = n') then BDVar(x', true, n') else bd
+    | BDStar -> bd
     | BDLambda (x0, f, bd') -> BDLambda(x0,f, replace bd' x x' (n+1))
     | BDApp (bd', bd'') -> BDApp(replace bd' x x' n, replace bd'' x x' n)
     | BDAnd (bd', bd'') -> BDAnd(replace bd' x x' n, replace bd'' x x' n)
@@ -72,6 +75,7 @@ let rec to_delta bd =
     match bd with
     | BDVar (y,false,_) -> not (x = y)
     | BDVar (y, true, n') -> if (x = y) then (n = n') else true
+    | BDStar -> true
     | BDLambda (x0, f, bd') -> alpha_check x bd' (n+1)
     | BDApp (bd', bd'') -> (alpha_check x bd' n) && (alpha_check x bd'' n)
     | BDAnd (bd', bd'') -> (alpha_check x bd' n) && (alpha_check x bd'' n)
@@ -90,6 +94,7 @@ let rec to_delta bd =
   in
   match bd with
   | BDVar (x,_,_) -> DVar x
+  | BDStar -> DStar
   | BDLambda (x, f, bd') -> let (x',bd0) = alpha_convert x bd' None in DLambda (x', f, to_delta bd0)
   | BDApp (bd', bd'') -> DApp (to_delta bd', to_delta bd'')
   | BDAnd (bd', bd'') -> DAnd (to_delta bd', to_delta bd'')
@@ -104,6 +109,7 @@ let compute delta ctx =
     match bd with
     | BDVar (_,false,_) -> bd
     | BDVar (x,true,n') -> BDVar(x,true,if n' < m then n' else n+n') (* we must verify whether the binding lies inside the current scope *)
+    | BDStar -> bd
     | BDLambda (x', f, bd') -> BDLambda (x', f, shift bd' n (m+1))
     | BDApp (bd', bd'') -> BDApp (shift bd' n m, shift bd'' n m)
     | BDAnd (bd', bd'') -> BDAnd (shift bd' n m, shift bd'' n m)
@@ -118,6 +124,7 @@ let compute delta ctx =
     | BDVar (_,false,_) -> bd
     | BDVar (x',true,n') -> if n = n' then shift x n 0 else
 			      if n < n' then BDVar (x',true, n'-1) else bd (* we must verify whether the binding lies inside the current scope *)
+    | BDStar -> bd
     | BDLambda (x', f, bd') -> BDLambda (x', f, replace bd' x (n+1))
     | BDApp (bd', bd'') -> BDApp (replace bd' x n, replace bd'' x n)
     | BDAnd (bd', bd'') -> BDAnd (replace bd' x n, replace bd'' x n)
@@ -130,6 +137,7 @@ let compute delta ctx =
   let rec compute' bd =
     match bd with
     | BDVar (_,_,_) -> bd
+    | BDStar -> bd
     | BDLambda (x, f, bd') -> BDLambda (x, f, compute' bd')
     | BDApp (bd', bd'') ->
        let bd1 = compute' bd' in

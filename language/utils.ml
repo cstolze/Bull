@@ -6,10 +6,12 @@ type family =
   | SAnd of family * family
   | SOr of family * family
   | SAtom of string
+  | SOmega
   | SAnything
 
 type delta =
   | DVar of string
+  | DStar
   | DLambda of string * family * delta
   | DApp of delta * delta
   | DAnd of delta * delta
@@ -66,6 +68,7 @@ let rec family_to_string f =
   let aux f =
     match f with
     | SAtom x -> x
+    | SOmega -> "$"
     | _ -> "(" ^ (family_to_string f) ^ ")"
   in
   match f with
@@ -73,18 +76,21 @@ let rec family_to_string f =
   | SAnd (f1, f2) -> (aux f1) ^ " & " ^ (aux f2)
   | SOr (f1, f2) -> (aux f1) ^ " | " ^ (aux f2)
   | SAtom id -> id
+  | SOmega -> "$"
   | SAnything -> "?"
 
 let rec delta_to_string d =
   let aux delta =
     match delta with
     | DVar i -> i
+    | DStar -> "*"
     | DAnd (_, _) -> delta_to_string delta
     | DOr (_, _, _, _, _, _, _) -> delta_to_string delta
     | _ -> "(" ^ (delta_to_string delta) ^ ")"
   in
   match d with
   | DVar i -> i
+  | DStar -> "*"
   | DLambda (i, s, d) ->
      let t = aux d in
      "\\" ^ i ^ " : " ^ (family_to_string s) ^ ". " ^ t
@@ -146,6 +152,7 @@ let rec is_family_sound f ctx = (* to use when the user declares a constant *)
   | SAnd (f', f'') -> (is_family_sound f' ctx) ^ (is_family_sound f'' ctx)
   | SOr (f', f'') -> (is_family_sound f' ctx) ^ (is_family_sound f'' ctx)
   | SAtom x -> if find_type x ctx then "" else "Error: the type " ^ x ^ " has not been declared yet.\n"
-  | SAnything -> "Error: type unknown.\n" (* should not happen *)
+  | SAnything -> "should not happen"
+  | SOmega -> ""
 
 											 (* todo : proof *)

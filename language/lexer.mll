@@ -16,6 +16,8 @@ rule read = parse
 	| "->" {ARROW}
 	| '&' {SAND}
 	| '|' {SOR}
+	| '*' {STAR}
+	| '$' {OMEGA}
 	| "var" {VAR}
 	| "intro" {INTRO}
 	| "elim" {ELIM}

@@ -27,12 +27,16 @@ Quit; 				     quit
 Syntax of types:
 type ::=
 | id
+| $
 | type -> type
 | type & type
 | type | type
 
+Note: '$' is omega, '&' is intersection, '|' is union
+
 term ::=
 | id
+| *
 | term term
 | \ id : type . term
 | < term & term >
