@@ -74,7 +74,7 @@ let rec to_delta bd =
   let rec alpha_check x bd n =
     match bd with
     | BDVar (y,false,_) -> not (x = y)
-    | BDVar (y, true, n') -> if (x = y) then (n = n') else true
+    | BDVar (y, true, n') -> if (x = y) then (n >= n') else true
     | BDStar -> true
     | BDLambda (x0, f, bd') -> alpha_check x bd' (n+1)
     | BDApp (bd', bd'') -> (alpha_check x bd' n) && (alpha_check x bd'' n)
@@ -138,6 +138,7 @@ let compute delta ctx =
     match bd with
     | BDVar (_,_,_) -> bd
     | BDStar -> bd
+    (*    | BDLambda (x, f, (BDApp (bd', BDVar(x, true, 0)) -> (* ETA-REDUCTION TO FINISH *) *)
     | BDLambda (x, f, bd') -> BDLambda (x, f, compute' bd')
     | BDApp (bd', bd'') ->
        let bd1 = compute' bd' in
