@@ -1,15 +1,19 @@
 type kind =
   | Type
-
-type family =
+  | KProd of string * family * kind
+and
+  family =
   | SFc of family * family
+  | SProd of string * family * family
+  | SLambda of string * family * family
+  | SApp of family * delta
   | SAnd of family * family
   | SOr of family * family
   | SAtom of string
   | SOmega
   | SAnything
-
-type delta =
+and
+  delta =
   | DVar of string
   | DStar
   | DLambda of string * family * delta
@@ -20,6 +24,34 @@ type delta =
   | DOr of string * family * delta * string * family * delta * delta
   | DInjL of delta
   | DInjR of delta
+
+
+type bkind =
+  | BType
+  | BKProd of string * bfamily * bkind
+and
+  bfamily =
+  | BSFc of bfamily * bfamily
+  | BSProd of string * bfamily * bfamily
+  | BSLambda of string * bfamily * bfamily
+  | BSApp of bfamily * bdelta
+  | BSAnd of bfamily * bfamily
+  | BSOr of bfamily * bfamily
+  | BSAtom of string
+  | BSOmega
+  | BSAnything
+and
+  bdelta =
+  | BDVar of (string * bool * int) (* id * is_bound? * bruijn index *)
+  | BDStar
+  | BDLambda of string * bfamily * bdelta
+  | BDApp of bdelta * bdelta
+  | BDAnd of bdelta * bdelta
+  | BDProjL of bdelta
+  | BDProjR of bdelta
+  | BDOr of string * bfamily * bdelta * string * bfamily * bdelta * bdelta
+  | BDInjL of bdelta
+  | BDInjR of bdelta
 
 type sentence =
   | Quit
@@ -63,8 +95,8 @@ type lambda_bruijn =
 let rec kind_to_string k =
   match k with
   | Type -> "Type"
-
-let rec family_to_string f =
+  | KProd (id, f, k) -> "!" ^ id ^ " : " ^ (family_to_string f) ^ ". " ^ (kind_to_string k)
+and family_to_string f =
   let aux f =
     match f with
     | SAtom x -> x
@@ -73,13 +105,15 @@ let rec family_to_string f =
   in
   match f with
   | SFc (f1, f2) -> (aux f1) ^ " -> " ^ (aux f2)
+  | SProd (id, f1, f2) -> "!" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
+  | SLambda (id, f1, f2) -> "\\" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
+  | SApp (f1, d) -> (aux f1) ^ " " ^ (delta_to_string d)
   | SAnd (f1, f2) -> (aux f1) ^ " & " ^ (aux f2)
   | SOr (f1, f2) -> (aux f1) ^ " | " ^ (aux f2)
   | SAtom id -> id
   | SOmega -> "$"
   | SAnything -> "?"
-
-let rec delta_to_string d =
+and delta_to_string d =
   let aux delta =
     match delta with
     | DVar i -> i
@@ -119,6 +153,110 @@ let rec delta_to_string d =
   | DInjR d ->
      let t = aux d in
      "inj_r " ^ t
+
+(* conversion functions bruijn <-> normal *)
+
+let (family_to_bruijn, delta_to_bruijn) =
+  let rec find_env x l =
+    match l with
+    | [] -> false
+    | y :: l' -> if x = y then true else find_env x l'
+  in
+  let rec get_env x l n =
+    match l with
+    | [] -> failwith "use find_env"
+    | y :: l' -> if x = y then n else get_env x l' (n+1)
+  in
+  let rec family_to_bruijn' f env =
+    match f with
+    | SFc (f1, f2) -> BSFc (family_to_bruijn f1 env, family_to_bruijn f2 env)
+    | SProd (id, f1, f2) -> BSProd (id, family_to_bruijn f1 env, family_to_bruijn f2 (id::env))
+    | SLambda (id, f1, f2) -> BSLambda (id, family_to_bruijn f1 env, family_to_bruijn f2 (id::env))
+    | SApp (f1, f2) -> BSApp (family_to_bruijn f1 env, family_to_bruijn f2 env)
+    | SAnd (f1, f2) -> BSAnd (family_to_bruijn f1 env, family_to_bruijn f2 env)
+    | SOr (f1, f2) -> BSOr (family_to_bruijn f1 env, family_to_bruijn f2 env)
+    | SAtom id -> BSAtom id
+    | SOmega -> BSOmega
+    | SAnything -> BSAnything
+    and
+      delta_to_bruijn' d env =
+      | DVar id -> if find_env x env then BDVar (x, true, get_env x env 0) (* local variables shadow global ones *)
+		   else BDVar(x, false, 0)
+      | DStar -> BStar
+      | DLambda (id, f1, d') -> BDLambda (x, family_to_bruijn' f1, delta_to_bruijn' d' (id::env))
+      | DApp (d1, d2) -> BDApp (delta_to_bruijn' d1 env, delta_to_bruijn' d2 env)
+      | DAnd (d1, d2) -> BDAnd (delta_to_bruijn' d1 env, delta_to_bruijn' d2 env)
+      | DProjL d' -> BDProjL (delta_to_bruijn' d' env)
+      | DProjR d' -> BDProjR (delta_to_bruijn' d' env)
+      | DOr (id', f', d', id'', f'', d'', d''') -> BDOr (id', family_to_bruijn' f' env, delta_to_bruijn' d' (id'::env), id'', family_to_bruijn' f'' env, delta_to_bruijn' d'' (id''::env), delta_to_bruijn' d''' env)
+      | DInjL d' -> BDInjL (delta_to_bruijn' d' env)
+      | DInjR d' -> BDInjR (delta_to_bruijn' d' env)
+  in (fun f -> family_to_bruijn' f [], fun d -> delta_to_bruijn' d [])
+
+let rec kind_to_bruijn k =
+  match k with
+  | Type -> BType
+  | KProd (id, f, k') -> BKProd (id, family_to_bruijn f, kind_to_bruijn k')
+
+let rec alpha_conv id b n check replace =
+  match n with
+  | None -> if check id b 0 then (id, b) else alpha_conv id b (Some 0) check replace
+  | Some n' ->
+     let id' = id ^ (string_of_int n') in
+     if check id' b 0 then (id', replace b id id' 0) else alpha_conv id b (Some (n'+1)) check replace
+
+let rec f_check id f n =
+  | BSFc (f1, f2) -> BSFc (fcheck id f1 n, fcheck id f2 n)
+  | BSProd (id, f1, f2) -> 
+  | BSLambda (id, f1, f2) -> 
+  | BSApp (f1, d2) -> BSApp (fcheck id f1 n, dcheck id d2 n)
+  | BSAnd (f1, f2) -> BSAnd (fcheck id f1 n, fcheck id f2 n)
+  | BSOr (f1, f2) -> BSOr (fcheck id f1 n, fcheck id f2 n)
+  | BSAtom id -> true
+  | BSOmega -> true
+  | BSAnything -> true
+  and
+    d_check id d n =
+    | BDVar (id', false, n') -> not (id = id')
+    | BDVar (id', true, n') -> if (id = id') then (n >= n') else true
+    | BDStar -> true
+    | BDLambda (id', f1, d') -> 
+    | BDApp (d1, d2) -> (d_check id d1 n) && (d_check id d2 n)
+    | BDAnd (d1, d2) -> (d_check id d1 n) && (d_check id d2 n)
+    | BDProjL d' -> d_check id d' n
+    | BDProjR d' -> d_check id d' n
+    | BDOr (id', f', d', id'', f'', d'', d''') -> 
+    | BDInjL d' -> d_check id d' n
+    | BDInjR d' -> d_check id d' n
+
+let rec bruijn_to_family f =
+  match f with
+  | BSFc (f1, f2) -> SFc (bruijn_to_family f1, bruijn_to_family f2)
+  | BSProd (id, f1, f2) -> let (id', f2') = alpha_conv id f2 None f_check f_replace in SProd (id', bruijn_to_family f1, bruijn_to_family f2')
+  | BSLambda (id, f1, f2) -> let (id', f2') = alpha_conv id f2 None f_check f_replace in SLambda (id', bruijn_to_family f1, bruijn_to_family f2')
+  | BSApp (f1, f2) -> SApp (bruijn_to_family f1, bruijn_to_family f2)
+  | BSAnd (f1, f2) -> SAnd (bruijn_to_family f1, bruijn_to_family f2)
+  | BSOr (f1, f2) -> SOr (bruijn_to_family f1, bruijn_to_family f2)
+  | BSAtom id -> SAtom
+  | BSOmega -> SOmega
+  | BSAnything -> SAnything
+  and
+    bruijn_to_delta d =
+  | BDVar (id, b, n) -> DVar id
+  | BDStar -> DStar
+  | BDLambda (id, f1, d') -> let (id', d'') = alpha_conv id d' None d_check d_replace in SLambda (id', bruijn_to_family f1, bruijn_to_delta d'')
+  | BDApp (d1, d2) -> DApp (bruijn_to_delta d1, bruijn_to_delta d2)
+  | BDAnd (d1, d2) -> DAnd (bruijn_to_delta d1, bruijn_to_delta d2)
+  | BDProjL d' -> DProjL (bruijn_to_delta d')
+  | BDProjR d' -> DProjR (bruijn_to_delta d')
+  | BDOr (id', f', d', id'', f'', d'', d''') -> 
+  | BDInjL d' -> DInjL (bruijn_to_delta d')
+  | BDInjR d' -> DInjR (bruijn_to_delta d')
+
+let rec bruijn_to_kind k =
+  match k with
+  | BType -> Type
+  | BKProd (id, f, k') -> let (id', k') = alpha_conv id k None k_check k_replace
 
 (* auxiliary functions for using signature *)
 
