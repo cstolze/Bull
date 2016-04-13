@@ -100,7 +100,10 @@ let rec to_delta bd =
   | BDAnd (bd', bd'') -> DAnd (to_delta bd', to_delta bd'')
   | BDProjL bd' -> DProjL (to_delta bd')
   | BDProjR bd' -> DProjR (to_delta bd')
-  | BDOr (x',f',bd',x'',f'',bd'',bd''') -> DOr (x',f',to_delta bd',x'',f'', to_delta bd'', to_delta bd''')
+  | BDOr (x',f',bd',x'',f'',bd'',bd''') ->
+     let (x'1, bd'1) = alpha_convert x' bd' None in
+     let (x''1, bd''1) = alpha_convert x'' bd'' None in
+     DOr (x'1,f',to_delta bd'1,x''1,f'', to_delta bd''1, to_delta bd''')
   | BDInjL bd' -> DInjL (to_delta bd')
   | BDInjR bd' -> DInjR (to_delta bd')
 
