@@ -8,6 +8,7 @@
 %token COLON
 %token STAR
 %token OMEGA
+%token PI
 %token EQUAL
 %token SEMICOLON
 %token ARROW
@@ -41,10 +42,6 @@
 %token <string> ID
 		%token EOF
 
-		%right ARROW
-		%right SOR
-		%right SAND
-
 		%start proof
 		%type <Utils.proofrule> proof
 
@@ -72,15 +69,31 @@
       kind:
     | OPENP kind CLOSP { $2 }
     | TYPE { Type }
+    | PI ID COLON family DOT kind { KProd ($2, $4, $6) }
     ;
 
       family:
+    | PI ID COLON family DOT family { SProd ($2, $4, $6) } /* lowest precedence */
+    | LAMBDA ID COLON family DOT family { SLambda ($2, $4, $6) }
+    | family2 { $1 }
+
+	family2:
+    | family3 ARROW family2 { SFc ($1, $3) } /* arrow is right-to-left */
+    | family3 { $1 }
+
+	family3:
+    | family4 SOR family3 { SOr ($1, $3) } /* sor is right-to-left */
+    | family4 { $1 }
+
+	family4:
+    | family5 SAND family4 { SAnd ($1, $3) } /* sand is right-to-left */
+    | family5 { $1 }
+
+	family5:
+    | family5 deltaterm3 { SApp ($1, $2) } /* highest precedence */ /* we choose deltaterm3 because it is like a deltaterm application, ie the deltaterm2 rule */
     | ID { SAtom $1 }
     | OMEGA { SOmega }
     | OPENP family CLOSP { $2 }
-    | family ARROW family { SFc ($1, $3) }
-    | family SAND family { SAnd ($1, $3) }
-    | family SOR family { SOr ($1, $3) }
     ;
 
       /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the "application operator" (which does not exist, haha) automatically */

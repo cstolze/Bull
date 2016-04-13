@@ -24,11 +24,19 @@ Print_all; 			     print all the signature (type constants, constants, definitio
 Compute name;			     normalize name and print the result
 Quit; 				     quit
 
+Syntax of kinds:
+kind ::=
+| Type
+| ! x : type. kind
+
 Syntax of types:
 type ::=
 | id
 | $
 | type -> type
+| ! x : type. type
+| \ x : type. type
+| type term
 | type & type
 | type | type
 
