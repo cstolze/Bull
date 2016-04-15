@@ -1,57 +1,56 @@
 type kind =
   | Type
   | KProd of string * family * kind
-and
-  family =
-  | SFc of family * family
-  | SProd of string * family * family
-  | SLambda of string * family * family
-  | SApp of family * delta
-  | SAnd of family * family
-  | SOr of family * family
-  | SAtom of string
-  | SOmega
-  | SAnything
-and
-  delta =
-  | DVar of string
-  | DStar
-  | DLambda of string * family * delta
-  | DApp of delta * delta
-  | DAnd of delta * delta
-  | DProjL of delta
-  | DProjR of delta
-  | DOr of string * family * delta * string * family * delta * delta
-  | DInjL of delta
-  | DInjR of delta
-
+   and
+     family =
+     | SFc of family * family
+     | SProd of string * family * family
+     | SLambda of string * family * family
+     | SApp of family * delta
+     | SAnd of family * family
+     | SOr of family * family
+     | SAtom of string
+     | SOmega
+     | SAnything
+   and
+     delta =
+     | DVar of string
+     | DStar
+     | DLambda of string * family * delta
+     | DApp of delta * delta
+     | DAnd of delta * delta
+     | DProjL of delta
+     | DProjR of delta
+     | DOr of string * family * delta * string * family * delta * delta
+     | DInjL of delta
+     | DInjR of delta
 
 type bkind =
   | BType
   | BKProd of string * bfamily * bkind
-and
-  bfamily =
-  | BSFc of bfamily * bfamily
-  | BSProd of string * bfamily * bfamily
-  | BSLambda of string * bfamily * bfamily
-  | BSApp of bfamily * bdelta
-  | BSAnd of bfamily * bfamily
-  | BSOr of bfamily * bfamily
-  | BSAtom of string
-  | BSOmega
-  | BSAnything
-and
-  bdelta =
-  | BDVar of (string * bool * int) (* id * is_bound? * bruijn index *)
-  | BDStar
-  | BDLambda of string * bfamily * bdelta
-  | BDApp of bdelta * bdelta
-  | BDAnd of bdelta * bdelta
-  | BDProjL of bdelta
-  | BDProjR of bdelta
-  | BDOr of string * bfamily * bdelta * string * bfamily * bdelta * bdelta
-  | BDInjL of bdelta
-  | BDInjR of bdelta
+   and
+     bfamily =
+     | BSFc of bfamily * bfamily
+     | BSProd of string * bfamily * bfamily
+     | BSLambda of string * bfamily * bfamily
+     | BSApp of bfamily * bdelta
+     | BSAnd of bfamily * bfamily
+     | BSOr of bfamily * bfamily
+     | BSAtom of string
+     | BSOmega
+     | BSAnything
+   and
+     bdelta =
+     | BDVar of (string * bool * int) (* id * is_bound? * bruijn index *)
+     | BDStar
+     | BDLambda of string * bfamily * bdelta
+     | BDApp of bdelta * bdelta
+     | BDAnd of bdelta * bdelta
+     | BDProjL of bdelta
+     | BDProjR of bdelta
+     | BDOr of string * bfamily * bdelta * string * bfamily * bdelta * bdelta
+     | BDInjL of bdelta
+     | BDInjR of bdelta
 
 type sentence =
   | Quit
@@ -131,11 +130,11 @@ and delta_to_string d =
   | DApp (d1, d2) ->
      let t1 = aux d1
      in let t2 = aux d2 in
-     t1 ^ " " ^ t2
+	t1 ^ " " ^ t2
   | DAnd (d1, d2) ->
      let t1 = aux d1
      in let t2 = aux d2 in
-     "< " ^ t1 ^ " & " ^ t2 ^ " >"
+	"< " ^ t1 ^ " & " ^ t2 ^ " >"
   | DProjL d ->
      let t = aux d in
      "proj_l " ^ t
@@ -145,8 +144,8 @@ and delta_to_string d =
   | DOr (x1, f1, d1, x2, f2, d2, d3) ->
      let t1 = delta_to_string (DLambda (x1,f1,d1))
      in let t2 = delta_to_string (DLambda (x2,f2,d2))
-     in let t3 = delta_to_string d3 in
-     "< " ^ t1 ^  " | " ^ t2 ^ " # " ^ t3 ^ " >"
+	in let t3 = delta_to_string d3 in
+	   "< " ^ t1 ^  " | " ^ t2 ^ " # " ^ t3 ^ " >"
   | DInjL d ->
      let t = aux d in
      "inj_l " ^ t
@@ -333,10 +332,9 @@ let find_def id ctx = let Sig (a,b,c) = ctx in find id c
 let get_def id ctx = let Sig (a,b,c) = ctx in get id c (* we suppose id has already been found *)
 let find_all id ctx = find_type id ctx || find_cst id ctx || find_def id ctx
 
-
 let typecst_to_string id t = id ^ " : " ^ (kind_to_string (bruijn_to_kind t)) ^ "\n"
 let cst_to_string id t = "Constant " ^ id ^ " : " ^ (family_to_string (bruijn_to_family t)) ^ "\n"
 let def_to_string id t = let (a,b) = t in
 			 id ^ " = " ^ (delta_to_string (bruijn_to_delta a)) ^ " : " ^ (family_to_string (bruijn_to_family b)) ^ "\n"
 
-															      (* todo : inference, proof *)
+																  (* todo : inference, proof *)
