@@ -1,5 +1,61 @@
 open Utils
 
+let rec wellformed_family f =
+  match f with
+  | BSFc (f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
+  | BSProd (id, f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
+  | BSLambda (id, f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
+  | BSApp (f1, d2) -> (wellformed_family f1) && (wellformed_delta d2)
+  | BSAnd (f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
+  | BSOr (f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
+  | BSAtom id -> true
+  | BSOmega -> true
+  | BSAnything -> true
+and wellformed_delta d =
+  let rec essence_eq d1 d2 = (* d1 and d2 are supposed to be well-formed *)
+    match (d1, d2) with
+    | (BDVar (id, b, n), BDVar (id', b', n')) -> b = b' && (if b = true then n = n' else id = id')
+    | (BDStar, _) -> true
+    | (_, BDStar) -> true
+    | (BDLambda (id', f1', d2'), BDLambda (id'', f1'', d2'')) -> essence_eq d2' d2''
+    | (BDApp (d1', d2'), BDApp (d1'', d2'')) -> (essence_eq d1' d1'') && (essence_eq d2' d2'')
+    | (BDAnd (d1', d2'), _) -> essence_eq d1' d2
+    | (_, BDAnd (d1', d2') -> essence_eq d1 d1'
+    | (BDProjL d', _) -> essence_eq d' d2
+    | (_, BDProjL d') -> essence_eq d1 d'
+    | (BDProjR d', _) -> essence_eq d' d2
+    | (_, BDProjR d') -> essence_eq d1 d'
+    | (BDOr (id1, f1, d1', id2, f2, d2', d3), _) ->
+    | (_, BDOr (id1, f1, d1', id2, f2, d2', d3)) ->
+    | (BDInjL d', _) -> essence_eq d' d2
+    | (_, BDInjL d') -> essence_eq d1 d'
+    | (BDInjR d', _) -> essence_eq d' d2
+    | (_, BDInjR d') -> essence_eq d1 d'
+    | (_, _) -> false
+  in
+  match d with
+  | BDVar (id, b, n) -> true
+  | BDStar -> true
+  | BDLambda (id, f1, d2) -> (wellformed_family f1) && (wellformed_delta d2)
+  | BDApp (d1, d2) -> (wellformed_delta d1) && (wellformed_delta d2)
+  | BDAnd (d1, d2) -> (wellformed_delta d1) && (wellformed_delta d2) && (essence_eq d1 d2)
+  | BDProjL d' -> wellformed_delta d'
+  | BDProjR d' -> wellformed_delta d'
+  | BDOr (id1, f1, d1, id2, f2, d2, d3) ->
+     (wellformed_delta d1) &&
+       (wellformed_delta d2) &&
+	 (wellformed_family f1) &&
+	   (wellformed_family f2) &&
+	     (wellformed_delta d3) &&
+	       (essence_eq d1 d2)
+  | BDInjL d' -> wellformed_delta d'
+  | BDInjR d' -> wellformed_delta d'
+
+let rec wellformed_kind k =
+  match k with
+  | BType -> true
+  | BKProd (id, f, k) ->
+
 let rec is_wellformed d =
   let apply b b' =
     let rec replace b b' n =
