@@ -102,11 +102,19 @@ and family_to_string f =
     | SOmega -> "$"
     | _ -> "(" ^ (family_to_string f) ^ ")"
   in
+  let aux2 delta =
+    match delta with
+    | DVar i -> i
+    | DStar -> "*"
+    | DAnd (_, _) -> delta_to_string delta
+    | DOr (_, _, _, _, _, _, _) -> delta_to_string delta
+    | _ -> "(" ^ (delta_to_string delta) ^ ")"
+  in
   match f with
   | SFc (f1, f2) -> (aux f1) ^ " -> " ^ (aux f2)
   | SProd (id, f1, f2) -> "!" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
   | SLambda (id, f1, f2) -> "\\" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
-  | SApp (f1, d) -> (aux f1) ^ " " ^ (delta_to_string d)
+  | SApp (f1, d) -> (aux f1) ^ " " ^ (aux2 d)
   | SAnd (f1, f2) -> (aux f1) ^ " & " ^ (aux f2)
   | SOr (f1, f2) -> (aux f1) ^ " | " ^ (aux f2)
   | SAtom id -> id
@@ -310,7 +318,7 @@ let rec bruijn_to_kind k =
   in
   match k with
   | BType -> Type
-  | BKProd (id, f, k') -> let (id', k') = alpha_conv id k None k_check k_replace in KProd (id', bruijn_to_family f, bruijn_to_kind k')
+  | BKProd (id, f, k') -> let (id', k'') = alpha_conv id k' None k_check k_replace in KProd (id', bruijn_to_family f, bruijn_to_kind k'')
 
 (* auxiliary functions for using signature *)
 

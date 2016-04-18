@@ -64,8 +64,8 @@ let rec deltaequal d1 d2 ctx =
   | (BDVar (id, true,n), BDVar (id', true, n')) -> n = n'
   | (BDStar, BDStar) -> true
   | (BDLambda (id, f, d1'), BDLambda (id', f', d2')) -> unifiable f f' ctx && deltaequal d1' d2' ctx
-  | (BDApp (d1', d1''), BDApp (d2', d2'')) -> deltaequal d1' d2' ctx && deltaequal d2' d2'' ctx
-  | (BDAnd (d1', d1''), BDAnd (d2', d2'')) -> deltaequal d1' d2' ctx && deltaequal d2' d2'' ctx
+  | (BDApp (d1', d1''), BDApp (d2', d2'')) -> deltaequal d1' d2' ctx && deltaequal d1'' d2'' ctx
+  | (BDAnd (d1', d1''), BDAnd (d2', d2'')) -> deltaequal d1' d2' ctx && deltaequal d1'' d2'' ctx
   | (BDProjL d1', BDProjL d2') -> deltaequal d1' d2' ctx
   | (BDProjR d1', BDProjR d2') -> deltaequal d1' d2' ctx
   | (BDOr (id1', f1', d1', id1'', f1'', d1'', d1'''), BDOr (id2', f2', d2', id2'', f2'', d2'', d2''')) -> unifiable f1' f2' ctx && deltaequal d1' d2' ctx && unifiable f1'' f2'' ctx && deltaequal d1'' d2'' ctx && deltaequal d1''' d2''' ctx
@@ -167,7 +167,7 @@ and deltainfer d gamma ctx =
   | BDApp (d', d'') ->
      (match deltainfer d' gamma ctx with
       | BSFc (f', f'') -> f''
-      | BSProd (x, f', f'') -> family_apply 0 f'' d
+      | BSProd (x, f', f'') -> family_apply 0 f'' d''
       | _ -> failwith "error: use deltacheck")
   | BDAnd (d', d'') -> BSAnd (deltainfer d' gamma ctx, deltainfer d'' gamma ctx)
   | BDProjL d' ->
@@ -302,7 +302,7 @@ and deltacheck d gamma ctx =
      if err = "" then
        let err = deltacheck d'' ((x'',f'')::gamma) ctx in
        if err = "" then
-	 let f3' = deltacheck d''' gamma ctx in
+	 let err = deltacheck d''' gamma ctx in
 	 if err = "" then
 	   let f1 = deltainfer d' ((x',f')::gamma) ctx in
 	   let f2 = deltainfer d'' ((x'',f'')::gamma) ctx in

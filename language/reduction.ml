@@ -18,8 +18,8 @@ let rec to_string bd = (* for debugging purposes *)
 let rec  family_apply n f1 d2 = (* replace the nth variable in f1 by d2 *)
   match f1 with
   | BSFc (f1', f2) -> BSFc (family_apply n f1' d2, family_apply n f2 d2)
-  | BSProd (id, f1', f2) -> BSProd (id, family_apply n f1' d2, family_apply n f2 d2)
-  | BSLambda (id, f1', f2) -> BSLambda (id, family_apply n f1' d2, family_apply n f2 d2)
+  | BSProd (id, f1', f2) -> BSProd (id, family_apply n f1' d2, family_apply (n+1) f2 d2)
+  | BSLambda (id, f1', f2) -> BSLambda (id, family_apply n f1' d2, family_apply (n+1) f2 d2)
   | BSApp (f1', d2') -> BSApp (family_apply n f1' d2, delta_apply n d2' d2)
   | BSAnd (f1', f2) -> BSAnd (family_apply n f1' d2, family_apply n f2 d2)
   | BSOr (f1', f2) -> BSOr (family_apply n f1' d2, family_apply n f2 d2)
@@ -78,7 +78,7 @@ and delta_apply n d1 d2 = (* replace the nth variable in d1 by d2 *)
 let rec kind_apply n k d =
   match k with
   | BType -> k
-  | BKProd (id, f, k') -> BKProd (id, family_apply n f d, kind_apply (n+1) k d)
+  | BKProd (id, f, k') -> BKProd (id, family_apply n f d, kind_apply (n+1) k' d)
 
 (* in the _compute functions, the terms are supposed to be well-typed and therefore they strongly normalize *)
 let rec family_compute f ctx =
@@ -95,8 +95,8 @@ let rec family_compute f ctx =
   and
     delta_compute d ctx =
     match d with
-    | BDVar (id, true,_) -> if find_def id ctx then let (a,_) = get_def id ctx in delta_compute a ctx else d
-    | BDVar (_,false,_) -> d
+    | BDVar (id, false,_) -> if find_def id ctx then let (a,_) = get_def id ctx in delta_compute a ctx else d
+    | BDVar (_, true,_) -> d
     | BDStar -> d
     | BDLambda (x, f, d') -> let d'' = delta_compute d' ctx in
 			     (match d'' with

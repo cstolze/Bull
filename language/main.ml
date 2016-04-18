@@ -68,34 +68,30 @@ let print_all ctx =
   print_endline ((all_typecst a) ^ (all_cst b) ^ (all_def c))
 
 let typecst id k ctx =
-  if find_all id ctx then
-    begin
-      prerr_endline ("Error: " ^ id ^ " already exists.\n");
-      ctx
-    end
-  else
+  let err = Inference.typecstcheck id k ctx in
+  if err = "" then
     match ctx with
     | Sig (a,b,c) -> Sig ((id,k) :: a , b, c)
-
-let cst id f ctx =
-  if find_all id ctx then
+  else
     begin
-      prerr_endline ("Error: " ^ id ^ " already exists.\n");
+      prerr_endline err;
       ctx
     end
+
+let cst id f ctx =
+  let err = Inference.cstcheck id f ctx in
+  if err = "" then
+    match ctx with
+    | Sig (a,b,c) -> Sig (a , (id,f) :: b, c)
   else
-    let Sig (a,b,c) = ctx in
-    let error = is_family_sound f ctx in
-    if error = "" then Sig (a, (id,f) :: b, c)
-    else
-      begin
-	prerr_endline error; (* the type may be unsound (ie it relies on undeclared basic types *)
-	ctx
-      end
+    begin
+      prerr_endline err;
+      ctx
+    end
 
 let proof id f ctx = print_string "Not implemented yet\n"; ctx
 
-let typecheck id d f ctx verb =
+let typecheck id d f ctx verb = (* TO CORRECT *)
   if find_all id ctx then
     begin
       prerr_endline ("Error: " ^ id ^ " already exists.\n");
@@ -103,29 +99,31 @@ let typecheck id d f ctx verb =
     end
   else
     let Sig (a,b,c) = ctx in
-    if Inference.is_wellformed d then
-      (if Inference.inferable d ctx then
-	 let f' = Inference.inference d ctx in
-	 (if Inference.unifiable f f' then
+    if Inference.wellformed_delta d then
+      (let err = Inference.deltacheck d [] ctx in
+       if err = "" then
+	 let f' = Inference.deltainfer d [] ctx in
+	 (if Inference.unifiable f f' ctx then
+	    let f'' = Inference.unify f' f in (* the order of the parameters is important, here the unify function "prefers" f' to f *)
 	    (begin
-		(if verb then print_endline (def_to_string id (d,Inference.unify f f')) else ());
-		Sig (a, b, (id,(d,f)):: c)
+		(if verb then print_endline (def_to_string id (d,f'')) else ());
+		Sig (a, b, (id,(d,f'')) :: c)
 	      end)
 	  else
 	    begin
-	      prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ " (its type should be " ^ (family_to_string f') ^ ").\n");
+	      prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ " (its type should be " ^ (family_to_string (bruijn_to_family f')) ^ ").\n");
 	      ctx
 	    end
 	 )
        else
 	 begin
-	   prerr_endline ("Error: type not inferable for " ^ (delta_to_string d) ^ ".\n");
+	   prerr_endline err;
 	   ctx
 	 end
       )
     else
       begin
-	prerr_endline ("Error: " ^ (delta_to_string d) ^ " is ill-formed.\n");
+	prerr_endline ("Error: " ^ (delta_to_string (bruijn_to_delta d)) ^ " is ill-formed.\n");
 	ctx
       end
 
@@ -137,29 +135,30 @@ let typeinfer id d ctx verb =
     end
   else
     let Sig (a,b,c) = ctx in
-    if Inference.is_wellformed d then
-      (if Inference.inferable d ctx then
-	 let f = Inference.inference d ctx in
+    if Inference.wellformed_delta d then
+      (let err = Inference.deltacheck d [] ctx in
+       if err = "" then
+	 let f = Inference.deltainfer d [] ctx in
 	 (begin
 	     (if verb then print_endline (def_to_string id (d,f)) else ());
 	     Sig (a, b, (id,(d,f)):: c)
 	   end)
        else
 	 begin
-	   prerr_endline ("Error: type not inferable for " ^ (delta_to_string d) ^ ".\n");
+	   prerr_endline err;
 	   ctx
 	 end
       )
     else
       begin
-	prerr_endline ("Error: " ^ (delta_to_string d) ^ " is ill-formed.\n");
+	prerr_endline ("Error: " ^ (delta_to_string (bruijn_to_delta d)) ^ " is ill-formed.\n");
 	ctx
       end
 
 let normalize id ctx =
   if find_def id ctx then
-    let (d,_) = get_def id ctx in
-    print_endline ((delta_to_string (Reduction.compute d ctx)) ^ "\n")
+    let (d,f) = get_def id ctx in
+    print_endline ((delta_to_string (bruijn_to_delta (Reduction.delta_compute d ctx))) ^ " : " ^ (family_to_string (bruijn_to_family (Reduction.family_compute f ctx))) ^ "\n")
   else
     prerr_endline (id ^ " has not been declared yet.\n")
 
@@ -170,11 +169,11 @@ let rec load file ctx =
 	match Parser.s Lexer.read lx with
 	| Quit -> ctx
 	| Load id -> load_loop lx (load id ctx)
-	| Proof (id, f) -> load_loop lx (proof id f ctx)
-	| Typecst (id, k) -> load_loop lx (typecst id k ctx)
-	| Cst (id, f) -> load_loop lx (cst id f ctx)
-	| Typecheck (id, d, f) -> load_loop lx (typecheck id d f ctx false)
-	| Typeinfer (id, d) -> load_loop lx (typeinfer id d ctx false)
+	| Proof (id, f) -> load_loop lx (proof id (family_to_bruijn f) ctx)
+	| Typecst (id, k) -> load_loop lx (typecst id (kind_to_bruijn k) ctx)
+	| Cst (id, f) -> load_loop lx (cst id (family_to_bruijn f) ctx)
+	| Typecheck (id, d, f) -> load_loop lx (typecheck id (delta_to_bruijn d) (family_to_bruijn f) ctx false)
+	| Typeinfer (id, d) -> load_loop lx (typeinfer id (delta_to_bruijn d) ctx false)
 	| Print id -> print id ctx; load_loop lx ctx
 	| Print_all -> print_all ctx; load_loop lx ctx
 	| Compute id -> normalize id ctx; load_loop lx ctx
@@ -200,11 +199,11 @@ let () =
       match Parser.s Lexer.read lx with
       | Quit -> ()
       | Load id -> main_loop lx (load id ctx)
-      | Proof (id, f) -> main_loop lx (proof id f ctx)
-      | Typecst (id, k) -> main_loop lx (typecst id k ctx)
-      | Cst (id, f) -> main_loop lx (cst id f ctx)
-      | Typecheck (id, d, f) -> main_loop lx (typecheck id d f ctx true)
-      | Typeinfer (id, d) -> main_loop lx (typeinfer id d ctx true)
+      | Proof (id, f) -> main_loop lx (proof id (family_to_bruijn f) ctx)
+      | Typecst (id, k) -> main_loop lx (typecst id (kind_to_bruijn k) ctx)
+      | Cst (id, f) -> main_loop lx (cst id (family_to_bruijn f) ctx)
+      | Typecheck (id, d, f) -> main_loop lx (typecheck id (delta_to_bruijn d) (family_to_bruijn f) ctx true)
+      | Typeinfer (id, d) -> main_loop lx (typeinfer id (delta_to_bruijn d) ctx true)
       | Print id -> print id ctx; main_loop lx ctx
       | Print_all -> print_all ctx; main_loop lx ctx
       | Compute id -> normalize id ctx; main_loop lx ctx
@@ -225,4 +224,3 @@ let () =
     else
       main_loop lx (load (!initfile) (Sig ([], [], [])))
   end
-
