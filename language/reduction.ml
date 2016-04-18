@@ -53,11 +53,11 @@ and delta_apply n d1 d2 = (* replace the nth variable in d1 by d2 *)
       | BDInjL d' -> BDInjL (delta_shift d' n m)
       | BDInjR d' -> BDInjR (delta_shift d' n m)
   in
-    match d1 with
-    | BDVar (id, b, n') -> if b then
-			     if n = n' then delta_shift d2 n 0 else
-			       if n < n' then BDVar (id, b, n'-1) else d1 (* we must verify whether the binding lies inside the current scope *)
-			   else d1
+  match d1 with
+  | BDVar (id, b, n') -> if b then
+			   if n = n' then delta_shift d2 n 0 else
+			     if n < n' then BDVar (id, b, n'-1) else d1 (* we must verify whether the binding lies inside the current scope *)
+			 else d1
   | BDStar -> d1
   | BDLambda (id, f1, d2') -> BDLambda (id, family_apply n f1 d2, delta_apply (n+1) d2' d2)
   | BDApp (d1', d2') -> BDApp (delta_apply n d1' d2, delta_apply n d2' d2)
@@ -127,8 +127,8 @@ let rec family_compute f ctx =
        let d1 = delta_compute d' ctx in
        let d2 = delta_compute d'' ctx in
        (match (d1, d2) with
-       | (BDProjL d1', BDProjR d2') -> if eq d1' d2' then d1' else BDAnd(d1,d2)
-       | (_,_) -> BDAnd (d1, d2))
+	| (BDProjL d1', BDProjR d2') -> if eq d1' d2' then d1' else BDAnd(d1,d2)
+	| (_,_) -> BDAnd (d1, d2))
     | BDProjL d' ->
        let d1 = delta_compute d' ctx in
        (match d1 with
@@ -182,3 +182,8 @@ let rec family_compute f ctx =
        )
     | BDInjL d' -> BDInjL (delta_compute d' ctx)
     | BDInjR d' -> BDInjR (delta_compute d' ctx)
+
+let rec kind_compute k ctx =
+  match k with
+  | BType -> BType
+  | BKProd (id, f, k') -> BKProd (id, family_compute f ctx, kind_compute k' ctx)
