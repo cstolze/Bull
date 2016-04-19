@@ -103,7 +103,7 @@ let typecst id k ctx =
 
 let proof id f ctx = print_string "Not implemented yet\n"; ctx
 
-let typecheck id d f ctx verb = (* TO CORRECT *)
+let typecheck id d f ctx verb =
   if find_all id ctx then
     begin
       prerr_endline ("Error: " ^ id ^ " already exists.\n");
@@ -114,19 +114,25 @@ let typecheck id d f ctx verb = (* TO CORRECT *)
     if Inference.wellformed_delta d then
       (let err = Inference.deltacheck d [] ctx in
        if err = "" then
-	 let f' = Inference.deltainfer d [] ctx in
-	 (if Inference.unifiable f f' ctx then
-	    let f'' = Inference.unify f' f in (* the order of the parameters is important, here the unify function "prefers" f' to f *)
-	    (begin
-		(if verb then print_endline (def_to_string id (d,f'')) else ());
-		Sig (a, b, (id,(d,f'')) :: c)
-	      end)
-	  else
-	    begin
-	      prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ " (its type should be " ^ (family_to_string (bruijn_to_family f')) ^ ").\n");
-	      ctx
-	    end
-	 )
+	 if Inference.wellformed_family f then
+	   let f' = Inference.deltainfer d [] ctx in
+	   (if Inference.unifiable f f' ctx then
+	      let f'' = Inference.unify f' f in (* the order of the parameters is important, here the unify function "prefers" f' to f *)
+	      (begin
+		  (if verb then print_endline (def_to_string id (d,f'')) else ());
+		  Sig (a, b, (id,(d,f'')) :: c)
+		end)
+	    else
+	      begin
+		prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ " (its type should be " ^ (family_to_string (bruijn_to_family f')) ^ ").\n");
+		ctx
+	      end
+	   )
+	 else
+	   begin
+	     prerr_endline ("Error: " ^ (family_to_string (bruijn_to_family f)) ^ " is ill-formed.\n");
+	     ctx
+	   end
        else
 	 begin
 	   prerr_endline err;
