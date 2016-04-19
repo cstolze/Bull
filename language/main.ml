@@ -68,24 +68,36 @@ let print_all ctx =
   print_endline ((all_typecst a) ^ (all_cst b) ^ (all_def c))
 
 let typecst id k ctx =
-  let err = Inference.typecstcheck id k ctx in
-  if err = "" then
-    match ctx with
-    | Sig (a,b,c) -> Sig ((id,k) :: a , b, c)
+  if Inference.wellformed_kind k then
+    let err = Inference.typecstcheck id k ctx in
+    if err = "" then
+      match ctx with
+      | Sig (a,b,c) -> Sig ((id,k) :: a , b, c)
+    else
+      begin
+	prerr_endline err;
+	ctx
+      end
   else
     begin
-      prerr_endline err;
+      prerr_endline ("Error: " ^ (kind_to_string (bruijn_to_kind k)) ^ " is ill-formed.\n");
       ctx
     end
 
-let cst id f ctx =
-  let err = Inference.cstcheck id f ctx in
-  if err = "" then
-    match ctx with
-    | Sig (a,b,c) -> Sig (a , (id,f) :: b, c)
-  else
+  let cst id f ctx =
+    if Inference.wellformed_family f then
+      let err = Inference.cstcheck id f ctx in
+      if err = "" then
+	match ctx with
+	| Sig (a,b,c) -> Sig (a , (id,f) :: b, c)
+      else
+	begin
+	  prerr_endline err;
+	  ctx
+	end
+    else
     begin
-      prerr_endline err;
+      prerr_endline ("Error: " ^ (family_to_string (bruijn_to_family f)) ^ " is ill-formed.\n");
       ctx
     end
 
