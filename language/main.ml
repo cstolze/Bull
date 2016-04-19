@@ -52,17 +52,17 @@ let print_all ctx =
   let rec all_typecst l =
     match l with
     | [] -> ""
-    | (x,y) :: l' -> (typecst_to_string x y) ^ (all_typecst l')
+    | (x,y) :: l' -> (all_typecst l') ^ (typecst_to_string x y)
   in
   let rec all_cst l =
     match l with
     | [] -> ""
-    | (x,y) :: l' -> (cst_to_string x y) ^ (all_cst l')
+    | (x,y) :: l' -> (all_cst l') ^ (cst_to_string x y)
   in
   let rec all_def l =
     match l with
     | [] -> ""
-    | (x,y) :: l' -> (def_to_string x y) ^ (all_def l')
+    | (x,y) :: l' -> (all_def l') ^ (def_to_string x y)
   in
   let Sig (a,b,c) = ctx in
   print_endline ((all_typecst a) ^ (all_cst b) ^ (all_def c))
