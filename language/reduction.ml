@@ -1,46 +1,5 @@
 open Utils
 
-type bruijndelta =
-  | BDVar of string * bool * int (* id * is_bound? * bruijn index *)
-  | BDStar
-  | BDLambda of string * family * bruijndelta
-  | BDApp of bruijndelta * bruijndelta
-  | BDAnd of bruijndelta * bruijndelta
-  | BDProjL of bruijndelta
-  | BDProjR of bruijndelta
-  | BDOr of string * family * bruijndelta * string * family * bruijndelta * bruijndelta
-  | BDInjL of bruijndelta
-  | BDInjR of bruijndelta
-
-
-let to_bruijndelta delta ctx =
-  let rec foo d env =
-    let rec find_env x l =
-      match l with
-      | [] -> false
-      | y :: l' -> if x = y then true else find_env x l'
-    in
-    let rec get_env x l n =
-      match l with
-      | [] -> failwith "use find_env"
-      | y :: l' -> if x = y then n else get_env x l' (n+1)
-    in
-    match d with
-    | DVar x -> if find_env x env then BDVar (x, true, get_env x env 0) (* local variables shadow global ones *)
-		else if find_def x ctx then let (d', _) = get_def x ctx in foo d' [] (* definition-reduction *)
-		else BDVar(x, false, 0)
-    | DStar -> BDStar
-    | DLambda (x, f, d') -> BDLambda (x, f, foo d' (x::env))
-    | DApp (d', d'') -> BDApp (foo d' env, foo d'' env)
-    | DAnd (d', d'') -> BDAnd (foo d' env, foo d'' env)
-    | DProjL d' -> BDProjL (foo d' env)
-    | DProjR d' -> BDProjR (foo d' env)
-    | DOr (x', f', d', x'', f'', d'', d''') -> BDOr (x', f', foo d' (x'::env), x'', f'', foo d'' (x''::env), foo d''' env)
-    | DInjL d' -> BDInjL (foo d' env)
-    | DInjR d' -> BDInjR (foo d' env)
-  in
-  foo delta []
-
 (*
 let rec to_string bd = (* for debugging purposes *)
   match bd with
@@ -56,119 +15,175 @@ let rec to_string bd = (* for debugging purposes *)
   | BDInjR bd' -> "(inj_r " ^ (to_string bd') ^ ")"
  *)
 
-let rec to_delta bd =
-  let rec replace bd x x' n = (* replace x (with n as a de Bruijn) index by x' in bd *)
-    match bd with
-    | BDVar (_,false,_) -> bd
-    | BDVar (y, true, n') -> if (x = y) && (n = n') then BDVar(x', true, n') else bd
-    | BDStar -> bd
-    | BDLambda (x0, f, bd') -> BDLambda(x0,f, replace bd' x x' (n+1))
-    | BDApp (bd', bd'') -> BDApp(replace bd' x x' n, replace bd'' x x' n)
-    | BDAnd (bd', bd'') -> BDAnd(replace bd' x x' n, replace bd'' x x' n)
-    | BDProjL bd' -> BDProjL (replace bd' x x' n)
-    | BDProjR bd' -> BDProjR (replace bd' x x' n)
-    | BDOr (x0',f',bd',x'',f'',bd'',bd''') -> BDOr(x0', f', replace bd' x x' (n+1), x'', f'', replace bd'' x x' (n+1), replace bd''' x x' n)
-    | BDInjL bd' -> BDInjL (replace bd' x x' n)
-    | BDInjR bd' -> BDInjR (replace bd' x x' n)
+let rec  family_apply n f1 d2 = (* replace the nth variable in f1 by d2 *)
+  match f1 with
+  | BSFc (f1', f2) -> BSFc (family_apply n f1' d2, family_apply n f2 d2)
+  | BSProd (id, f1', f2) -> BSProd (id, family_apply n f1' d2, family_apply (n+1) f2 d2)
+  | BSLambda (id, f1', f2) -> BSLambda (id, family_apply n f1' d2, family_apply (n+1) f2 d2)
+  | BSApp (f1', d2') -> BSApp (family_apply n f1' d2, delta_apply n d2' d2)
+  | BSAnd (f1', f2) -> BSAnd (family_apply n f1' d2, family_apply n f2 d2)
+  | BSOr (f1', f2) -> BSOr (family_apply n f1' d2, family_apply n f2 d2)
+  | BSAtom id -> f1
+  | BSOmega -> f1
+  | BSAnything -> f1
+and delta_apply n d1 d2 = (* replace the nth variable in d1 by d2 *)
+  let rec family_shift f n m =
+    match f with
+    | BSFc (f1', f2) -> BSFc (family_shift f1' n m, family_shift f2 n m)
+    | BSProd (id, f1', f2) -> BSProd (id, family_shift f1' n m, family_shift f2 n (m+1))
+    | BSLambda (id, f1', f2) -> BSLambda (id, family_shift f1' n m, family_shift f2 n (m+1))
+    | BSApp (f1', d2') -> BSApp (family_shift f1' n m, delta_shift d2 n m)
+    | BSAnd (f1', f2) -> BSAnd (family_shift f1' n m, family_shift f2 n m)
+    | BSOr (f1', f2) -> BSOr (family_shift f1' n m, family_shift f2 n m)
+    | BSAtom id -> f
+    | BSOmega -> f
+    | BSAnything -> f
+    and
+      delta_shift d n m =
+      match d with
+      | BDVar (_,false,_) -> d
+      | BDVar (x,true,n') -> BDVar(x,true,if n' < m then n' else n+n') (* we must verify whether the binding lies inside the current scope *)
+      | BDStar -> d
+      | BDLambda (x', f, d') -> BDLambda (x', family_shift f n m, delta_shift d' n (m+1))
+      | BDApp (d', d'') -> BDApp (delta_shift d' n m, delta_shift d'' n m)
+      | BDAnd (d', d'') -> BDAnd (delta_shift d' n m, delta_shift d'' n m)
+      | BDProjL d' -> BDProjL (delta_shift d' n m)
+      | BDProjR d' -> BDProjR (delta_shift d' n m)
+      | BDOr (x',f',d',x'',f'',d'',d''') -> BDOr(x', family_shift f' n m, delta_shift d' n (m+1), x'', family_shift f'' n m, delta_shift d'' n (m+1), delta_shift d''' n m)
+      | BDInjL d' -> BDInjL (delta_shift d' n m)
+      | BDInjR d' -> BDInjR (delta_shift d' n m)
   in
-  let rec alpha_check x bd n =
-    match bd with
-    | BDVar (y,false,_) -> not (x = y)
-    | BDVar (y, true, n') -> if (x = y) then (n >= n') else true
-    | BDStar -> true
-    | BDLambda (x0, f, bd') -> alpha_check x bd' (n+1)
-    | BDApp (bd', bd'') -> (alpha_check x bd' n) && (alpha_check x bd'' n)
-    | BDAnd (bd', bd'') -> (alpha_check x bd' n) && (alpha_check x bd'' n)
-    | BDProjL bd' -> alpha_check x bd n
-    | BDProjR bd' -> alpha_check x bd n
-    | BDOr (x',f',bd',x'',f'',bd'',bd''') -> (alpha_check x bd' (n+1)) && (alpha_check x bd'' (n+1)) && (alpha_check x bd''' n)
-    | BDInjL bd' -> alpha_check x bd n
-    | BDInjR bd' -> alpha_check x bd n
-  in
-  let rec alpha_convert x bd n =
-    match n with
-    | None -> if alpha_check x bd 0 then (x,bd) else alpha_convert x bd (Some 0)
-    | Some n' ->
-       let x' = x ^ (string_of_int n') in
-       if alpha_check x' bd 0 then (x', replace bd x x' 0) else alpha_convert x bd (Some (n'+1))
-  in
-  match bd with
-  | BDVar (x,_,_) -> DVar x
-  | BDStar -> DStar
-  | BDLambda (x, f, bd') -> let (x',bd0) = alpha_convert x bd' None in DLambda (x', f, to_delta bd0)
-  | BDApp (bd', bd'') -> DApp (to_delta bd', to_delta bd'')
-  | BDAnd (bd', bd'') -> DAnd (to_delta bd', to_delta bd'')
-  | BDProjL bd' -> DProjL (to_delta bd')
-  | BDProjR bd' -> DProjR (to_delta bd')
-  | BDOr (x',f',bd',x'',f'',bd'',bd''') ->
-     let (x'1, bd'1) = alpha_convert x' bd' None in
-     let (x''1, bd''1) = alpha_convert x'' bd'' None in
-     DOr (x'1,f',to_delta bd'1,x''1,f'', to_delta bd''1, to_delta bd''')
-  | BDInjL bd' -> DInjL (to_delta bd')
-  | BDInjR bd' -> DInjR (to_delta bd')
+  match d1 with
+  | BDVar (id, b, n') -> if b then
+			   if n = n' then delta_shift d2 n 0 else
+			     if n < n' then BDVar (id, b, n'-1) else d1 (* we must verify whether the binding lies inside the current scope *)
+			 else d1
+  | BDStar -> d1
+  | BDLambda (id, f1, d2') -> BDLambda (id, family_apply n f1 d2, delta_apply (n+1) d2' d2)
+  | BDApp (d1', d2') -> BDApp (delta_apply n d1' d2, delta_apply n d2' d2)
+  | BDAnd (d1', d2') -> BDAnd (delta_apply n d1' d2, delta_apply n d2' d2)
+  | BDProjL d' -> BDProjL (delta_apply n d' d2)
+  | BDProjR d' -> BDProjR (delta_apply n d' d2)
+  | BDOr (id1, f1, d1', id2, f2, d2', d3) ->
+     BDOr (id1,
+	   family_apply n f1 d2,
+	   delta_apply (n+1) d1' d2,
+	   id2,
+	   family_apply n f2 d2,
+	   delta_apply (n+1) d2' d2,
+	   delta_apply n d3 d2)
+  | BDInjL d' -> BDInjL (delta_apply n d' d2)
+  | BDInjR d' -> BDInjR (delta_apply n d' d2)
 
-let compute delta ctx =
-  let rec shift bd n m =
-    match bd with
-    | BDVar (_,false,_) -> bd
-    | BDVar (x,true,n') -> BDVar(x,true,if n' < m then n' else n+n') (* we must verify whether the binding lies inside the current scope *)
-    | BDStar -> bd
-    | BDLambda (x', f, bd') -> BDLambda (x', f, shift bd' n (m+1))
-    | BDApp (bd', bd'') -> BDApp (shift bd' n m, shift bd'' n m)
-    | BDAnd (bd', bd'') -> BDAnd (shift bd' n m, shift bd'' n m)
-    | BDProjL bd' -> BDProjL (shift bd' n m)
-    | BDProjR bd' -> BDProjR (shift bd' n m)
-    | BDOr (x',f',bd',x'',f'',bd'',bd''') -> BDOr(x', f', shift bd' n (m+1), x'', f'', shift bd'' n (m+1), shift bd''' n m)
-    | BDInjL bd' -> BDInjL (shift bd' n m)
-    | BDInjR bd' -> BDInjR (shift bd' n m)
-  in
-  let rec replace bd x n =
-    match bd with
-    | BDVar (_,false,_) -> bd
-    | BDVar (x',true,n') -> if n = n' then shift x n 0 else
-			      if n < n' then BDVar (x',true, n'-1) else bd (* we must verify whether the binding lies inside the current scope *)
-    | BDStar -> bd
-    | BDLambda (x', f, bd') -> BDLambda (x', f, replace bd' x (n+1))
-    | BDApp (bd', bd'') -> BDApp (replace bd' x n, replace bd'' x n)
-    | BDAnd (bd', bd'') -> BDAnd (replace bd' x n, replace bd'' x n)
-    | BDProjL bd' -> BDProjL (replace bd' x n)
-    | BDProjR bd' -> BDProjR (replace bd' x n)
-    | BDOr (x',f',bd',x'',f'',bd'',bd''') -> BDOr(x', f', replace bd' x (n+1), x'', f'', replace bd'' x (n+1), replace bd''' x n)
-    | BDInjL bd' -> BDInjL (replace bd' x n)
-    | BDInjR bd' -> BDInjR (replace bd' x n)
-  in
-  let rec compute' bd =
-    match bd with
-    | BDVar (_,_,_) -> bd
-    | BDStar -> bd
-    (*    | BDLambda (x, f, (BDApp (bd', BDVar(x, true, 0)) -> (* ETA-REDUCTION TO FINISH *) *)
-    | BDLambda (x, f, bd') -> BDLambda (x, f, compute' bd')
-    | BDApp (bd', bd'') ->
-       let bd1 = compute' bd' in
-       let bd2 = compute' bd'' in
-       (match bd1 with
-	| BDLambda (_,_,bd1') -> compute' (replace bd1' bd2 0)
-	| _ -> BDApp (bd1, bd2))
-    | BDAnd (bd', bd'') -> BDAnd (compute' bd', compute' bd'')
-    | BDProjL bd' ->
-       let bd1 = compute' bd' in
-       (match bd1 with
-       | BDAnd (bd1', _) -> bd1'
-       | _ -> BDProjL bd1)
-    | BDProjR bd' ->
-       let bd1 = compute' bd' in
-       (match bd1 with
-	| BDAnd (_, bd1') -> bd1'
-	| _ -> BDProjR bd1)
-    | BDOr (x',f',bd',x'',f'',bd'',bd''') ->
-       let bd1 = compute' bd''' in
-       (match bd1 with
-       | BDInjL bd1' -> compute' (replace bd' bd1' 0)
-       | BDInjR bd1' -> compute' (replace bd'' bd1' 0)
-       | _ -> BDOr(x', f', compute' bd', x'', f'', compute' bd'', bd1)
+let rec kind_apply n k d =
+  match k with
+  | BType -> k
+  | BKProd (id, f, k') -> BKProd (id, family_apply n f d, kind_apply (n+1) k' d)
+
+(* in the _compute functions, the terms are supposed to be well-typed and therefore they strongly normalize *)
+let rec family_compute f ctx =
+  match f with
+  | BSFc (f1, f2) -> BSFc (family_compute f1 ctx, family_compute f2 ctx)
+  | BSProd (id, f1, f2) -> BSProd (id, family_compute f1 ctx, family_compute f2 ctx)
+  | BSLambda (id, f1, f2) -> BSLambda (id, family_compute f1 ctx, family_compute f2 ctx)
+  | BSApp (f1, d2) -> BSApp (family_compute f1 ctx, delta_compute d2 ctx)
+  | BSAnd (f1, f2) -> BSAnd (family_compute f1 ctx, family_compute f2 ctx)
+  | BSOr (f1, f2) -> BSOr (family_compute f1 ctx, family_compute f2 ctx)
+  | BSAtom id -> f
+  | BSOmega -> f
+  | BSAnything -> f
+  and
+    delta_compute d ctx =
+    match d with
+    | BDVar (id, false,_) -> if find_def id ctx then let (a,_) = get_def id ctx in delta_compute a ctx else d
+    | BDVar (_, true,_) -> d
+    | BDStar -> d
+    | BDLambda (x, f, d') -> let d'' = delta_compute d' ctx in
+			     (match d'' with
+			      | BDApp (d''', BDVar(x',true, 0)) -> d''' (* eta-reduction *)
+			      | _ -> BDLambda (x, family_compute f ctx, d''))
+    | BDApp (d', d'') ->
+       let d1 = delta_compute d' ctx in
+       let d2 = delta_compute d'' ctx in
+       (match d1 with
+	| BDLambda (_,_,d1') -> delta_compute (delta_apply 0 d1' d2) ctx
+	| _ -> BDApp (d1, d2))
+    | BDAnd (d', d'') ->
+       let rec eq d1 d2 =
+	 match (d1, d2) with
+	 | (BDVar (id1,false,_), BDVar(id2,false,_)) -> id1 = id2
+	 | (BDVar (_,true,n1), BDVar(_,true,n2)) -> n1 = n2
+	 | (BDStar, BDStar) -> true
+	 | (BDLambda (_, _, d'), BDLambda (_, _, d'')) -> eq d' d''
+	 | (BDApp (d', d''), BDApp (d_', d_'')) -> (eq d' d_') && (eq d'' d_'')
+	 | (BDAnd (d', d''), BDAnd (d_', d_'')) -> (eq d' d_') && (eq d'' d_'')
+	 | (BDProjL d', BDProjL d'') -> eq d' d''
+	 | (BDProjR d', BDProjR d'') -> eq d' d''
+	 | (BDOr (_,_,d',_,_,d'',d'''), BDOr (_,_,d_',_,_,d_'',d_''')) -> (eq d' d_') && (eq d'' d_'') && (eq d''' d_''')
+	 | (BDInjL d', BDInjL d'') -> eq d' d''
+	 | (BDInjR d', BDInjR d'') -> eq d' d''
+	 | (_,_) -> false
+       in
+       let d1 = delta_compute d' ctx in
+       let d2 = delta_compute d'' ctx in
+       (match (d1, d2) with
+	| (BDProjL d1', BDProjR d2') -> if eq d1' d2' then d1' else BDAnd(d1,d2)
+	| (_,_) -> BDAnd (d1, d2))
+    | BDProjL d' ->
+       let d1 = delta_compute d' ctx in
+       (match d1 with
+	| BDAnd (d1', _) -> d1'
+	| _ -> BDProjL d1)
+    | BDProjR d' ->
+       let d1 = delta_compute d' ctx in
+       (match d1 with
+	| BDAnd (_, d1') -> d1'
+	| _ -> BDProjR d1)
+    | BDOr (x',f',d',x'',f'',d'',d''') ->
+       let d1 = delta_compute d''' ctx in
+       (match d1 with
+	| BDInjL d1' -> delta_compute (delta_apply 0 d' d1') ctx
+	| BDInjR d1' -> delta_compute (delta_apply 0 d'' d1') ctx
+	| _ ->
+	   let rec eq d1 d2 n =
+	     match (d1, d2) with
+	     | (BDVar (id1,false,_), BDVar(id2,false,_)) -> id1 = id2
+	     | (BDVar (_,true,n1), BDVar(_,true,n2)) -> n1 = n2 && not (n1 = n)
+	     | (BDStar, BDStar) -> true
+	     | (BDLambda (_, _, d'), BDLambda (_, _, d'')) -> eq d' d'' (n+1)
+	     | (BDApp (d', d''), BDApp (d_', d_'')) -> (eq d' d_' n) && (eq d'' d_'' n)
+	     | (BDAnd (d', d''), BDAnd (d_', d_'')) -> (eq d' d_' n) && (eq d'' d_'' n)
+	     | (BDProjL d', BDProjL d'') -> eq d' d'' n
+	     | (BDProjR d', BDProjR d'') -> eq d' d'' n
+	     | (BDOr (_,_,d',_,_,d'',d'''), BDOr (_,_,d_',_,_,d_'',d_''')) -> (eq d' d_' (n+1)) && (eq d'' d_'' (n+1)) && (eq d''' d_''' n)
+	     | (BDInjL d', BDInjL d'') -> eq d' d'' n
+	     | (BDInjR d', BDInjR d'') -> eq d' d'' n
+	     | (BDInjL (BDVar(_,true,n1)), BDInjR (BDVar (_,true,n2))) -> n1 = n2 && n1 = n
+	     | (_,_) -> false
+	   in
+	   let rec get_delta d n =
+	     match d with
+	     | BDVar (_,_,_) -> d
+	     | BDStar -> d
+	     | BDLambda (x', f, d') -> BDLambda (x', f, get_delta d' (n+1))
+	     | BDApp (d', d'') -> BDApp (get_delta d' n, get_delta d'' n)
+	     | BDAnd (d', d'') -> BDAnd (get_delta d' n, get_delta d'' n)
+	     | BDProjL d' -> BDProjL (get_delta d' n)
+	     | BDProjR d' -> BDProjR (get_delta d' n)
+	     | BDOr (x',f',d',x'',f'',d'',d''') -> BDOr(x', f', get_delta d' (n+1), x'', f'', get_delta d'' (n+1), get_delta d''' n)
+	     | BDInjL (BDVar (id,true, n)) -> BDVar (id, true, n)
+	     | BDInjL d' -> BDInjL (get_delta d' n)
+	     | BDInjR d' -> BDInjR (get_delta d' n)
+	   in
+	   let d2 = delta_compute d' ctx in
+	   let d3 = delta_compute d'' ctx in
+	   if eq d2 d3 0 then delta_compute (delta_apply 0 (get_delta d2 0) d1) ctx (* <\x. M[inj_l x/x] | \x. M[inj_r x/x] # N > --> M[N/x] *)
+	   else BDOr(x', family_compute f' ctx, d2, x'', family_compute f'' ctx, d3, d1)
        )
-    | BDInjL bd' -> BDInjL (compute' bd')
-    | BDInjR bd' -> BDInjR (compute' bd')
-  in
-  to_delta (compute' (to_bruijndelta delta ctx))
+    | BDInjL d' -> BDInjL (delta_compute d' ctx)
+    | BDInjR d' -> BDInjR (delta_compute d' ctx)
 
+let rec kind_compute k ctx =
+  match k with
+  | BType -> BType
+  | BKProd (id, f, k') -> BKProd (id, family_compute f ctx, kind_compute k' ctx)

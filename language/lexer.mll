@@ -18,6 +18,7 @@ rule read = parse
 	| '|' {SOR}
 	| '*' {STAR}
 	| '$' {OMEGA}
+	| '!' {PI}
 	| "var" {VAR}
 	| "intro" {INTRO}
 	| "elim" {ELIM}
