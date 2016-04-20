@@ -178,12 +178,9 @@ and deltainfer d gamma ctx =
      (match deltainfer d' gamma ctx with
       | BSAnd (_, f') -> f'
       | _ -> failwith "error: use deltacheck")
-  | BDOr (x', f', d', x'', f'', d'', d''') ->
-     BSOr (deltainfer d' gamma ctx, deltainfer d'' gamma ctx)
+  | BDOr (x', f', d', x'', f'', d'', d''') -> unify (deltainfer d' ((x',f') :: gamma) ctx) (deltainfer d'' ((x'',f'') :: gamma) ctx)
   | BDInjL d' -> BSOr(deltainfer d' gamma ctx, BSAnything)
   | BDInjR d' -> BSOr(BSAnything, deltainfer d' gamma ctx)
-
-(* everything under this line is WRONG *)
 
 let rec gammacheck gamma ctx =
   match gamma with
@@ -225,9 +222,10 @@ and familycheck f gamma ctx =
 		     if err = "" then
 		       let err = deltacheck d gamma ctx in
 		       if err = "" then
-			 match (familyinfer f1 gamma ctx, deltainfer d gamma ctx) with
-			 | (BKProd (id, f1, k), f2) -> if unifiable f1 f2 ctx then "" else "Error: type application " ^ (family_to_string (bruijn_to_family f1)) ^ " : " ^ (kind_to_string (bruijn_to_kind k)) ^ " cannot be applied to " ^ (delta_to_string (bruijn_to_delta d)) ^ " : " ^ (family_to_string (bruijn_to_family f2)) ^ ".\n"
-			 | (k,f2) -> "Error: type application " ^ (family_to_string (bruijn_to_family f1)) ^ " : " ^ (kind_to_string (bruijn_to_kind k)) ^ " cannot be applied to " ^ (delta_to_string (bruijn_to_delta d)) ^ " : " ^ (family_to_string (bruijn_to_family f2)) ^ ".\n"
+			 let (k, f2) = (familyinfer f1 gamma ctx, deltainfer d gamma ctx) in
+			 match k with
+			 | BKProd (id, f1', k') -> if unifiable f1' f2 ctx then "" else "Error: type application " ^ (family_to_string (bruijn_to_family f1)) ^ " : " ^ (kind_to_string (bruijn_to_kind k)) ^ " cannot be applied to " ^ (delta_to_string (bruijn_to_delta d)) ^ " : " ^ (family_to_string (bruijn_to_family f2)) ^ ".\n"
+			 | _ -> "Error: type application " ^ (family_to_string (bruijn_to_family f1)) ^ " : " ^ (kind_to_string (bruijn_to_kind k)) ^ " cannot be applied to " ^ (delta_to_string (bruijn_to_delta d)) ^ " : " ^ (family_to_string (bruijn_to_family f2)) ^ ".\n"
 		       else err
 		     else err
   | BSAnd (f1, f2) -> let err = familycheck f1 gamma ctx in
