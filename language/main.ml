@@ -68,7 +68,7 @@ let print_all ctx =
   print_endline ((all_typecst a) ^ (all_cst b) ^ (all_def c))
 
 let typecst id k ctx =
-  if Inference.wellformed_kind k then
+  if Inference.wellformed_kind k ctx then
     let err = Inference.typecstcheck id k ctx in
     if err = "" then
       match ctx with
@@ -85,7 +85,7 @@ let typecst id k ctx =
     end
 
   let cst id f ctx =
-    if Inference.wellformed_family f then
+    if Inference.wellformed_family f ctx then
       let err = Inference.cstcheck id f ctx in
       if err = "" then
 	match ctx with
@@ -111,10 +111,10 @@ let typecheck id d f ctx verb =
     end
   else
     let Sig (a,b,c) = ctx in
-    if Inference.wellformed_delta d then
+    if Inference.wellformed_delta d ctx then
       (let err = Inference.deltacheck d [] ctx in
        if err = "" then
-	 if Inference.wellformed_family f then
+	 if Inference.wellformed_family f ctx then
 	   let f' = Inference.deltainfer d [] ctx in
 	   (if Inference.unifiable f f' ctx then
 	      let f'' = Inference.unify f' f in (* the order of the parameters is important, here the unify function "prefers" f' to f *)
@@ -153,7 +153,7 @@ let typeinfer id d ctx verb =
     end
   else
     let Sig (a,b,c) = ctx in
-    if Inference.wellformed_delta d then
+    if Inference.wellformed_delta d ctx then
       (let err = Inference.deltacheck d [] ctx in
        if err = "" then
 	 let f = Inference.deltainfer d [] ctx in

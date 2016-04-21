@@ -2,21 +2,32 @@ open Utils
 open Reduction
 
 (* wellformed__ x returns true iff x's essence exists *)
-let rec wellformed_family f =
+let rec wellformed_family f ctx =
   match f with
-  | BSFc (f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
-  | BSProd (id, f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
-  | BSLambda (id, f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
-  | BSApp (f1, d2) -> (wellformed_family f1) && (wellformed_delta d2)
-  | BSAnd (f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
-  | BSOr (f1, f2) -> (wellformed_family f1) && (wellformed_family f2)
+  | BSFc (f1, f2) -> (wellformed_family f1 ctx) && (wellformed_family f2 ctx)
+  | BSProd (id, f1, f2) -> (wellformed_family f1 ctx) && (wellformed_family f2 ctx)
+  | BSLambda (id, f1, f2) -> (wellformed_family f1 ctx) && (wellformed_family f2 ctx)
+  | BSApp (f1, d2) -> (wellformed_family f1 ctx) && (wellformed_delta d2 ctx)
+  | BSAnd (f1, f2) -> (wellformed_family f1 ctx) && (wellformed_family f2 ctx)
+  | BSOr (f1, f2) -> (wellformed_family f1 ctx) && (wellformed_family f2 ctx)
   | BSAtom id -> true
   | BSOmega -> true
   | BSAnything -> true
-and wellformed_delta d =
+and wellformed_delta d ctx =
   let rec essence_eq d1 d2 = (* d1 and d2 are supposed to be well-formed *)
     match (d1, d2) with
-    | (BDVar (id, b, n), BDVar (id', b', n')) -> b = b' && (if b = true then n = n' else id = id')
+    | (BDVar (id, false,_), BDVar (id', false, _)) -> if find_def id ctx then
+							let (d, _) = get_def id ctx in essence_eq d d2
+						      else if find_def id' ctx then
+							let (d', _) = get_def id' ctx in essence_eq d1 d'
+						      else id = id'
+    | (BDVar (id, false,_), _) -> if find_def id ctx then
+				    let (d, _) = get_def id ctx in essence_eq d d2
+				  else false
+    | (_, BDVar (id', false,_)) -> if find_def id' ctx then
+				     let (d', _) = get_def id' ctx in essence_eq d1 d'
+				   else false
+    | (BDVar (_, true, n), BDVar (_, true, n')) -> n = n'
     | (BDStar, _) -> true
     | (_, BDStar) -> true
     | (BDLambda (id', f1', d2'), BDLambda (id'', f1'', d2'')) -> essence_eq d2' d2''
@@ -38,25 +49,25 @@ and wellformed_delta d =
   match d with
   | BDVar (id, b, n) -> true
   | BDStar -> true
-  | BDLambda (id, f1, d2) -> (wellformed_family f1) && (wellformed_delta d2)
-  | BDApp (d1, d2) -> (wellformed_delta d1) && (wellformed_delta d2)
-  | BDAnd (d1, d2) -> (wellformed_delta d1) && (wellformed_delta d2) && (essence_eq d1 d2)
-  | BDProjL d' -> wellformed_delta d'
-  | BDProjR d' -> wellformed_delta d'
+  | BDLambda (id, f1, d2) -> (wellformed_family f1 ctx) && (wellformed_delta d2 ctx)
+  | BDApp (d1, d2) -> (wellformed_delta d1 ctx) && (wellformed_delta d2 ctx)
+  | BDAnd (d1, d2) -> (wellformed_delta d1 ctx) && (wellformed_delta d2 ctx) && (essence_eq d1 d2)
+  | BDProjL d' -> wellformed_delta d' ctx
+  | BDProjR d' -> wellformed_delta d' ctx
   | BDOr (id1, f1, d1, id2, f2, d2, d3) ->
-     (wellformed_delta d1) &&
-       (wellformed_delta d2) &&
-	 (wellformed_family f1) &&
-	   (wellformed_family f2) &&
-	     (wellformed_delta d3) &&
+     (wellformed_delta d1 ctx) &&
+       (wellformed_delta d2 ctx) &&
+	 (wellformed_family f1 ctx) &&
+	   (wellformed_family f2 ctx) &&
+	     (wellformed_delta d3 ctx) &&
 	       (essence_eq d1 d2)
-  | BDInjL d' -> wellformed_delta d'
-  | BDInjR d' -> wellformed_delta d'
+  | BDInjL d' -> wellformed_delta d' ctx
+  | BDInjR d' -> wellformed_delta d' ctx
 
-let rec wellformed_kind k =
+let rec wellformed_kind k ctx =
   match k with
   | BType -> true
-  | BKProd (id, f, k') -> (wellformed_family f) && (wellformed_kind k')
+  | BKProd (id, f, k') -> (wellformed_family f ctx) && (wellformed_kind k' ctx)
 
 let rec deltaequal d1 d2 ctx =
   match (d1, d2) with
