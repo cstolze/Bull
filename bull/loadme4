@@ -1,0 +1,20 @@
+Type a : Type;
+Type b : Type;
+Definition d'15 = \ x : b.x;
+Definition d'14 = \x : b -> b. x;
+Definition d'11 = d'14 d'15;
+Definition d'13 = \x : b -> b. x;
+Definition d'12 = \x : (b->b) -> (b-> b).x;
+Definition d'10 = d'12 d'13;
+Definition d9 = <d'10 & d'11>;
+Definition d15 = \x : a. x;
+Definition d14 = \x : a -> a. x;
+Definition d11 = d14 d15;
+Definition d13 = \x : a -> a. x;
+Definition d12 = \x : (a -> a) -> (a -> a). x;
+Definition d10 = d12 d13;
+Definition d8 = <d10 & d11>;
+Definition d2 = <d8 & d9>;
+Definition d1 = \x : (((a -> a) -> a -> a) & (a -> a)) & (((b -> b) -> b -> b) & (b -> b)). <(proj_l proj_l x) (proj_r proj_l x) & (proj_l proj_r x) (proj_r proj_r x)>;
+
+Definition d = d1 d2;
