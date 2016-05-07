@@ -86,7 +86,12 @@ let rec family_compute f ctx =
   | BSFc (f1, f2) -> BSFc (family_compute f1 ctx, family_compute f2 ctx)
   | BSProd (id, f1, f2) -> BSProd (id, family_compute f1 ctx, family_compute f2 ctx)
   | BSLambda (id, f1, f2) -> BSLambda (id, family_compute f1 ctx, family_compute f2 ctx)
-  | BSApp (f1, d2) -> BSApp (family_compute f1 ctx, delta_compute d2 ctx)
+  | BSApp (f1, d2) ->
+     let f' = family_compute f1 ctx in
+     let d'' = delta_compute d2 ctx in
+     (match f1 with
+      | BSLambda (_,_,f2) -> family_compute (family_apply 0 f2 d'') ctx
+      | _ -> BSApp (f', d''))
   | BSAnd (f1, f2) -> BSAnd (family_compute f1 ctx, family_compute f2 ctx)
   | BSOr (f1, f2) -> BSOr (family_compute f1 ctx, family_compute f2 ctx)
   | BSAtom id -> f

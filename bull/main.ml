@@ -1,5 +1,5 @@
 (*
-    <one line to give the program's name and a brief idea of what it does.> :-D
+    Bull, a theorem prover based on intersection types and Curry-Howard isomorphism.
     Copyright (C) 2016 Claude Stolze, ENS Rennes, UPMC, INRIA
 
     This program is free software: you can redistribute it and/or modify
@@ -33,7 +33,7 @@ let options = ("-v", Arg.Unit (version), versiondoc) :: []
 
 (* commands *)
 
-let help () = print_endline "List of commands:\nHelp;\t\t\t\t\tshow this help\nLoad file;\t\t\t\tload a script file\nType typename : kind;\t\t\tdefine a type constant in the signature\nConstant cstname : type;\t\tdefine a constant in the signature\nProof proofname : type;\t\t\tstart an interactive proof\nDefinition name = deltaterm [: type];\tdefine a delta-term\nPrint name;\t\t\t\tprint the definition of name\nPrint_all;\t\t\t\tprint the signature\nCompute name;\t\t\t\tprint the normalized form of name\nQuit;\t\t\t\t\tquit\n"
+let help () = print_endline "List of commands:\nHelp;\t\t\t\t\tshow this help\nLoad FILE;\t\t\t\tload a script file\nType NAME : KIND;\t\t\tdeclare a type constant\nConstant NAME : TYPE;\t\t\tdeclare a constant\nProof NAME : TYPE;\t\t\tstart an interactive proof\nDefinition NAME = DELTATERM [: TYPE];\tdefine a delta-term\nPrint NAME;\t\t\t\tprint the definition of NAME\nPrint_all;\t\t\t\tprint all the terms declared or defined during this session\nCompute NAME;\t\t\t\tprint the normalized form of NAME\nQuit;\t\t\t\t\tquit\n"
 
 let print id ctx = if find_type id ctx then
 		     print_endline (typecst_to_string id (get_type id ctx))
@@ -116,8 +116,8 @@ let typecheck id d f ctx verb =
        if err = "" then
 	 if Inference.wellformed_family f ctx then
 	   let f' = Inference.deltainfer d [] ctx in
-	   (if Inference.unifiable f f' ctx then
-	      let f'' = Inference.unify f' f in (* the order of the parameters is important, here the unify function "prefers" f' to f *)
+	   (if Inference.unifiable (Reduction.family_compute f ctx) f' ctx then
+	      let f'' = Inference.unify (Reduction.family_compute f ctx) f' in (* the order of the parameters is important, here the unify function "prefers" f to f' *)
 	      (begin
 		  (if verb then print_endline (def_to_string id (d,f'')) else ());
 		  Sig (a, b, (id,(d,f'')) :: c)

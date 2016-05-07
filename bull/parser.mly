@@ -42,8 +42,8 @@
 %token <string> ID
 		%token EOF
 
-		%start proof
-		%type <Utils.proofrule> proof
+//		%start proof
+//		%type <Utils.proofrule> proof
 
 %start s
 %type <Utils.sentence> s
@@ -120,8 +120,8 @@
     | LT LAMBDA ID COLON family DOT deltaterm SOR LAMBDA ID COLON family DOT deltaterm SHARP deltaterm GT { DOr ($3, $5, $7, $10, $12, $14, $16) }
     ;
 
-      proof:
-    | VAR SEMICOLON { PVar }
+/*      proof:
+    | VAR ID SEMICOLON { PVar ID }
     | ABORT SEMICOLON { PAbort }
     | INTRO SEMICOLON { PIntro }
     | ELIM family SEMICOLON { PElim $2 }
@@ -135,3 +135,4 @@
     | CHANGERULE SEMICOLON { PChangerule }
     | error SEMICOLON { PError }
     ;
+*/

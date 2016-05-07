@@ -27,7 +27,7 @@ Quit; 				     quit
 Syntax of kinds:
 kind ::=
 | Type
-| ! x : type. kind
+| ! x : type. kind					# for dependent types
 
 Syntax of types:
 type ::=

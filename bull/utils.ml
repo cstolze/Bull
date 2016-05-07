@@ -67,19 +67,38 @@ type sentence =
   | Error
 
 type proofrule =
-  | PVar
-  | PAbort
-  | PIntro
-  | PElim of family
-  | PSconj
-  | PProjL of family
-  | PProjR of family
-  | PInjL
-  | PInjR
-  | PSdisj of family * family
+  (* syntax directed *)
+  | POmega
+  | PVar of string
+  | PIntro of string
+  | PDependentIntro
+  | PAnd
+  | PInjL of bfamily
+  | PInjR of bfamily
+  (* non syntax directed *)
+  | PElim of bfamily
+  | PDependentElim of bfamily * bdelta
+  | PProjL of bfamily
+  | PProjR of bfamily
+  | POr of string * bfamily * bfamily
+  (* essence *)
+  | PPop
+  | PBreak
+  (* control flow *)
   | PBacktrack
-  | PChangerule
-  | PError
+  | PAbort
+  | PSwitch
+
+type proofnode =
+    PN of (int * int list * ((string * bfamily) list) * bfamily * proofrule option * int)
+(* parent ptr, children ptr list, gamma, rule, essence ptr *)
+
+type essencerule = EApp | EAbstr | EVar
+type essencenode =
+    EN of (int list * essencerule option * int list)
+(* children ptr list, rule, proof ptr list *)
+
+type proofgraph = PG of ((int * proofnode) list * (int * essencenode) list)
 
 type signature =
     Sig of ((string * bkind) list) * ((string * bfamily) list) * ((string * (bdelta * bfamily)) list) (* type constants, constants, definitions *)
