@@ -15,7 +15,7 @@ let rec to_string bd = (* for debugging purposes *)
   | BDInjR bd' -> "(inj_r " ^ (to_string bd') ^ ")"
  *)
 
-let rec  family_apply n f1 d2 = (* replace the nth variable in f1 by d2 *)
+let rec family_apply n f1 d2 = (* replace the nth variable in f1 by d2 *)
   match f1 with
   | BSFc (f1', f2) -> BSFc (family_apply n f1' d2, family_apply n f2 d2)
   | BSProd (id, f1', f2) -> BSProd (id, family_apply n f1' d2, family_apply (n+1) f2 d2)
@@ -105,7 +105,36 @@ let rec family_compute f ctx =
     | BDStar -> d
     | BDLambda (x, f, d') -> let d'' = delta_compute d' ctx in
 			     (match d'' with
-			      | BDApp (d''', BDVar(x',true, 0)) -> d''' (* eta-reduction *)
+			      | BDApp (d''', BDVar(x',true, 0)) -> (* eta-reduction *)
+				 let rec familycheck f n =
+				   match f with
+				       | BSFc (f1, f2) -> familycheck f1 n && familycheck f2 n
+				       | BSProd (id, f1, f2) -> familycheck f1 n && familycheck f2 (n+1)
+				       | BSLambda (id, f1, f2) -> familycheck f1 n && familycheck f2 (n+1)
+				       | BSApp (f1, d2) -> familycheck f1 n && deltacheck d2 n
+				       | BSAnd (f1, f2) -> familycheck f1 n && familycheck f2 n
+				       | BSOr (f1, f2) -> familycheck f1 n && familycheck f2 n
+				       | BSAtom id -> true
+				       | BSOmega -> true
+				       | BSAnything -> true
+				 and deltacheck d n =
+				   match d with
+				   | BDVar (_,b,n) -> if b then n <> 0 else true
+				   | BDStar -> true
+				   | BDLambda (x', f, d') -> familycheck f n && deltacheck d' (n+1)
+				   | BDApp (d', d'') -> deltacheck d' n && deltacheck d'' n
+				   | BDAnd (d', d'') -> deltacheck d' n && deltacheck d'' n
+				   | BDProjL d' -> deltacheck d' n
+				   | BDProjR d' -> deltacheck d' n
+				   | BDOr (x',f',d',x'',f'',d'',d''') ->
+				      familycheck f' n && deltacheck d' (n+1)
+				      && familycheck f'' n && deltacheck d'' (n+1)
+				      && deltacheck d''' n
+				   | BDInjL d' -> deltacheck d' n
+				   | BDInjR d' -> deltacheck d' n
+				 in if deltacheck d''' 0 (* verify whether x is _not_ free in d''' *)
+				    then delta_apply 0 d''' BDStar (* trick to decrement the variable indexes in d''' *)
+				    else BDLambda (x, family_compute f ctx, d'')
 			      | _ -> BDLambda (x, family_compute f ctx, d''))
     | BDApp (d', d'') ->
        let d1 = delta_compute d' ctx in
