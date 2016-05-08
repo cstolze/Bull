@@ -84,18 +84,18 @@ let typecst id k ctx =
       ctx
     end
 
-  let cst id f ctx =
-    if Inference.wellformed_family f ctx then
-      let err = Inference.cstcheck id f ctx in
-      if err = "" then
-	match ctx with
-	| Sig (a,b,c) -> Sig (a , (id,f) :: b, c)
-      else
-	begin
-	  prerr_endline err;
-	  ctx
-	end
+let cst id f ctx =
+  if Inference.wellformed_family f ctx then
+    let err = Inference.cstcheck id f ctx in
+    if err = "" then
+      match ctx with
+      | Sig (a,b,c) -> Sig (a , (id,f) :: b, c)
     else
+      begin
+	prerr_endline err;
+	ctx
+      end
+  else
     begin
       prerr_endline ("Error: " ^ (family_to_string (bruijn_to_family f)) ^ " is ill-formed.\n");
       ctx
@@ -110,38 +110,42 @@ let typecheck id d f ctx verb =
       ctx
     end
   else
-    let Sig (a,b,c) = ctx in
-    if Inference.wellformed_delta d ctx then
-      (let err = Inference.deltacheck d [] ctx in
-       if err = "" then
-	 if Inference.wellformed_family f ctx then
-	   let f' = Inference.deltainfer d [] ctx in
-	   (if Inference.unifiable (Reduction.family_compute f ctx) f' ctx then
-	      let f'' = Inference.unify (Reduction.family_compute f ctx) f' in (* the order of the parameters is important, here the unify function "prefers" f to f' *)
-	      (begin
-		  (if verb then print_endline (def_to_string id (d,f'')) else ());
-		  Sig (a, b, (id,(d,f'')) :: c)
-		end)
+    let err = Inference.familycheck f [] ctx in
+    if err = "" then
+      let Sig (a,b,c) = ctx in
+      if Inference.wellformed_delta d ctx then
+	let err = Inference.deltacheck d [] ctx in
+	if err = "" then
+	  if Inference.wellformed_family f ctx then
+	    let f' = Inference.deltainfer d [] ctx in
+	    if Inference.unifiable f f' ctx then
+	      begin
+		(if verb then print_endline (def_to_string id (d,f)) else ());
+		Sig (a, b, (id,(d,f)) :: c)
+	      end
 	    else
 	      begin
 		prerr_endline ("Error: type-checking failed for " ^ (def_to_string id (d,f)) ^ " (its type should be " ^ (family_to_string (bruijn_to_family f')) ^ ").\n");
 		ctx
 	      end
-	   )
-	 else
-	   begin
-	     prerr_endline ("Error: " ^ (family_to_string (bruijn_to_family f)) ^ " is ill-formed.\n");
-	     ctx
-	   end
-       else
-	 begin
-	   prerr_endline err;
-	   ctx
-	 end
-      )
+	  else
+	    begin
+	      prerr_endline ("Error: " ^ (family_to_string (bruijn_to_family f)) ^ " is ill-formed.\n");
+	      ctx
+	    end
+	else
+	  begin
+	    prerr_endline err;
+	    ctx
+	  end
+      else
+	begin
+	  prerr_endline ("Error: " ^ (delta_to_string (bruijn_to_delta d)) ^ " is ill-formed.\n");
+	  ctx
+	end
     else
       begin
-	prerr_endline ("Error: " ^ (delta_to_string (bruijn_to_delta d)) ^ " is ill-formed.\n");
+	prerr_endline err;
 	ctx
       end
 
@@ -211,26 +215,26 @@ let rec load file ctx =
 
 let () =
   let rec main_loop lx ctx =
-  begin
-    print_string "> "; flush stdout;
-    try
-      match Parser.s Lexer.read lx with
-      | Quit -> ()
-      | Load id -> main_loop lx (load id ctx)
-      | Proof (id, f) -> main_loop lx (proof id (family_to_bruijn f) ctx)
-      | Typecst (id, k) -> main_loop lx (typecst id (kind_to_bruijn k) ctx)
-      | Cst (id, f) -> main_loop lx (cst id (family_to_bruijn f) ctx)
-      | Typecheck (id, d, f) -> main_loop lx (typecheck id (delta_to_bruijn d) (family_to_bruijn f) ctx true)
-      | Typeinfer (id, d) -> main_loop lx (typeinfer id (delta_to_bruijn d) ctx true)
-      | Print id -> print id ctx; main_loop lx ctx
-      | Print_all -> print_all ctx; main_loop lx ctx
-      | Compute id -> normalize id ctx; main_loop lx ctx
-      | Help -> help (); main_loop lx ctx
-      | Error -> prerr_endline "Syntax error.\n"; main_loop lx ctx
-    with
-    | Failure a -> Lexing.flush_input lx; prerr_endline ("Error: " ^ a ^ ".\n"); main_loop lx ctx
-    | _ -> Lexing.flush_input lx; prerr_endline ("Error.\n"); main_loop lx ctx
-  end
+    begin
+      print_string "> "; flush stdout;
+      try
+	match Parser.s Lexer.read lx with
+	| Quit -> ()
+	| Load id -> main_loop lx (load id ctx)
+	| Proof (id, f) -> main_loop lx (proof id (family_to_bruijn f) ctx)
+	| Typecst (id, k) -> main_loop lx (typecst id (kind_to_bruijn k) ctx)
+	| Cst (id, f) -> main_loop lx (cst id (family_to_bruijn f) ctx)
+	| Typecheck (id, d, f) -> main_loop lx (typecheck id (delta_to_bruijn d) (family_to_bruijn f) ctx true)
+	| Typeinfer (id, d) -> main_loop lx (typeinfer id (delta_to_bruijn d) ctx true)
+	| Print id -> print id ctx; main_loop lx ctx
+	| Print_all -> print_all ctx; main_loop lx ctx
+	| Compute id -> normalize id ctx; main_loop lx ctx
+	| Help -> help (); main_loop lx ctx
+	| Error -> prerr_endline "Syntax error.\n"; main_loop lx ctx
+      with
+      | Failure a -> Lexing.flush_input lx; prerr_endline ("Error: " ^ a ^ ".\n"); main_loop lx ctx
+      | _ -> Lexing.flush_input lx; prerr_endline ("Error.\n"); main_loop lx ctx
+    end
   in
   let lx = Lexing.from_channel stdin
   in

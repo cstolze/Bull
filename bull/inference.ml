@@ -92,6 +92,8 @@ and unifiable f1 f2 ctx =
   | (BSFc(a,b), BSProd (id, a', b')) -> unifiable a a' ctx && unifiable b b' ctx
   | (BSProd (id, a, b), BSProd (id', a', b')) -> unifiable a a' ctx && unifiable b b' ctx
   | (BSLambda (id, a, b), BSLambda (id', a', b')) -> unifiable a a' ctx && unifiable b b' ctx
+  | (BSApp (BSLambda (id, a, b), c), d) -> unifiable (family_apply 0 b c) d ctx
+  | (d, BSApp (BSLambda (id, a, b), c)) -> unifiable d (family_apply 0 b c) ctx
   | (BSApp (a,b), BSApp (a',b')) -> unifiable a a' ctx && deltaequal (delta_compute b ctx) (delta_compute b' ctx) ctx
   | (BSAnd (a,b), BSAnd(a',b')) -> unifiable a a' ctx && unifiable b b' ctx
   | (BSOr (a,b), BSOr(a',b')) -> unifiable a a' ctx && unifiable b b' ctx
@@ -108,6 +110,8 @@ let rec unify f1 f2 =
   | (BSFc(a,b), BSProd (id, a', b')) -> BSFc (unify a a', unify b b')
   | (BSProd (id, a, b), BSProd (id', a', b')) -> BSProd (id, unify a a', unify b b')
   | (BSLambda (id, a, b), BSLambda (id', a', b')) -> BSLambda (id, unify a a', unify b b')
+  | (BSApp (BSLambda (id, a, b), c), d) -> unify (family_apply 0 b c) d
+  | (d, BSApp (BSLambda (id, a, b), c)) -> unify d (family_apply 0 b c)
   | (BSApp (a,b), BSApp (a',b')) -> BSApp (unify a a', b)
   | (BSAnd (a,b), BSAnd(a',b')) -> BSAnd (unify a a', unify b b')
   | (BSOr (a,b), BSOr(a',b')) -> BSOr (unify a a', unify b b')
