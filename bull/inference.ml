@@ -16,6 +16,8 @@ let rec wellformed_family f ctx =
 and wellformed_delta d ctx =
   let rec essence_eq d1 d2 = (* d1 and d2 are supposed to be well-formed *)
     match (d1, d2) with
+    | (BDStar, _) -> true
+    | (_, BDStar) -> true
     | (BDVar (id, false,_), BDVar (id', false, _)) -> if find_def id ctx then
 							let (d, _) = get_def id ctx in essence_eq d d2
 						      else if find_def id' ctx then
@@ -28,8 +30,6 @@ and wellformed_delta d ctx =
 				     let (d', _) = get_def id' ctx in essence_eq d1 d'
 				   else false
     | (BDVar (_, true, n), BDVar (_, true, n')) -> n = n'
-    | (BDStar, _) -> true
-    | (_, BDStar) -> true
     | (BDLambda (id', f1', d2'), BDLambda (id'', f1'', d2'')) -> essence_eq d2' d2''
     | (BDApp (d1', d2'), BDApp (d1'', d2'')) -> (essence_eq d1' d1'') && (essence_eq d2' d2'')
     | (BDAnd (d1', d2'), _) -> essence_eq d1' d2
