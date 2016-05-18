@@ -1,7 +1,0 @@
-Type a : Type;
-Constant bot : a;
-Constant 0 : a -> a;
-Constant 1 : a -> a;
-Type eq : ! x : a & a. Type;
-Constant eq_cons : ! x : a & a. eq x;
-Definition foo = eq_cons < (1 (0 (1 (1 proj_l <(0 (1 (1 (0 bot)))) & (0 (1 ( 1 (0 bot))))>)))) & <\x : a. 1 (0 (1 x)) | \x : a. 1 (0 (1 x)) # inj_l (1 (0 (1 (1 (0 bot)))))> >;
