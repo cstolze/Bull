@@ -73,8 +73,8 @@ type proofrule =
   | PIntro of string
   | PDependentIntro
   | PAnd
-  | PInjL of bfamily
-  | PInjR of bfamily
+  | PInjL
+  | PInjR
   (* non syntax directed *)
   | PElim of bfamily
   | PDependentElim of bfamily * bdelta
@@ -82,7 +82,7 @@ type proofrule =
   | PProjR of bfamily
   | POr of string * bfamily * bfamily
   (* essence *)
-  | PPop
+  (* | PPop : too complicated *)
   | PBreak
   (* control flow *)
   | PBacktrack
@@ -93,12 +93,13 @@ type proofnode =
     PN of (int * int list * ((string * bfamily) list) * bfamily * proofrule option * int)
 (* parent ptr, children ptr list, gamma, rule, essence ptr *)
 
-type essencerule = EApp | EAbstr | EVar
+type essencerule = EApp | EAbstr | EVar of int
 type essencenode =
     EN of (int list * essencerule option * int list)
 (* children ptr list, rule, proof ptr list *)
 
-type proofgraph = PG of ((int * proofnode) list * (int * essencenode) list)
+type proofgraph = PG of ((int * proofnode) list * (int * essencenode) list * int * int list)
+(* derivation tree, essence tree, goal, remaining goals *)
 
 type signature =
     Sig of ((string * bkind) list) * ((string * bfamily) list) * ((string * (bdelta * bfamily)) list) (* type constants, constants, definitions *)
