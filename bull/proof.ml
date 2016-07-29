@@ -184,7 +184,7 @@ let proofstep p rule ctx =
 	      | _ -> failwith "Error: the goal should be like `s | t`.\n"
 	     )
   | PInjR -> (match goal with
-	      | BSOr (g, f) -> (update tree path (BDInjL (BDVar ("", false, 0))), (f, path, gamma) :: rest)
+	      | BSOr (g, f) -> (update tree path (BDInjR (BDVar ("", false, 0))), (f, path, gamma) :: rest)
 	      | _ -> failwith "Error: the goal should be like `s | t`.\n"
 	     )
   | _ -> failwith "should not happen"
