@@ -121,7 +121,7 @@ let proof id f lx ctx verb =
       in
       begin
 	(if verb then
-	   (print_string ("----------\nGoal to prove : " ^ (family_to_string (bruijn_to_family goal)) ^ "\nHypotheses:\n" ^ (gamma_to_string gamma) ^ "End of hypotheses.\n" ^ id ^ ">>> "); flush stdout;)
+	   (print_string ("Goal to prove : " ^ (family_to_string (bruijn_to_family goal)) ^ "\nHypotheses:\n" ^ (gamma_to_string gamma) ^ "End of hypotheses.\n" ^ id ^ ">>> "); flush stdout;)
 	 else ());
 	try
 	  match Parser.proof Lexer.read lx with
