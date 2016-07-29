@@ -19,18 +19,17 @@ rule read = parse
 	| '*' {STAR}
 	| '$' {OMEGA}
 	| '!' {PI}
-	| "var" {VAR}
+	| "abort" {ABORT}
+	| "backtrack" {BACKTRACK}
 	| "intro" {INTRO}
-	| "elim" {ELIM}
-	| "sconj" {SCONJ}
-	| "proj_l" {PROJLEFT}
-	| "proj_r" {PROJRIGHT}
+	| "exact" {EXACT}
+	| "inter" {SCONJ}
 	| "inj_l" {INJLEFT}
 	| "inj_r" {INJRIGHT}
-	| "sdisj" {SDISJ}
-	| "backtrack" {BACKTRACK}
+	| "union" {SDISJ}
+	| "proj_l" {PROJLEFT}
+	| "proj_r" {PROJRIGHT}
 	| "changerule" {CHANGERULE}
-	| "abort" {ABORT}
 	| "Quit" {QUIT}
 	| "Load" {LOAD}
 	| "Proof" {PROOF}

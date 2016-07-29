@@ -1,0 +1,24 @@
+Type False : Type;
+
+Type int : Type;
+Type equal : ! x : int. ! y : int. Type;
+Constant eq : ! x : int. equal x x;
+Constant eq_refl : ! x : int. ! y : int. equal x y -> equal y x;
+Constant eq_trans : ! x : int. ! y : int. ! z : int. equal x y -> equal y z -> equal x z;
+Constant 0 : int;
+Constant S : int -> int;
+Constant add : int -> int -> int;
+Constant mul : int -> int -> int;
+
+Constant 0min : ! x : int. (equal (S x) 0) -> False;
+Constant predx : ! x : int. (! y : int. (((equal x 0) -> False) -> equal (S y) x) -> False) -> False;
+Constant succeq : ! x : int. ! y : int. equal (S x) (S y) -> equal x y;
+Constant eqsucc : ! x : int. ! y : int. equal x y -> equal (S x) (S y);
+Constant add1 : ! x : int. equal (add x 0) x;
+Constant add2 : ! x : int. ! y : int. equal (add x (S y)) (S(add x y));
+Constant mul1 : ! x : int. equal (mul x 0) 0;
+Constant mul2 : ! x : int. ! y : int. equal (mul x (S y)) (add (mul x y) x);
+
+Definition 1 = S 0;
+Definition 2 = S (S 0);
+Definition 1plus1is2 = eq_trans (add 1 1) (S (add 1 0)) 2 (add2 1 0) (eqsucc (add 1 0) 1 (add1 1))

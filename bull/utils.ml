@@ -67,6 +67,23 @@ type sentence =
   | Error
 
 type proofrule =
+  | PError
+  | PAbort
+  | PBacktrack
+  | PExact of delta (* ; __ ; *)
+  | PAbst1 (* dependent case *)
+  | PAbst2 of string (* non-dependent case (the user has to input a variable name *)
+  | PSConj
+  | PSDisj of string * bfamily * bfamily
+  | PProjL of bfamily
+  | PProjR of bfamily
+  | PInjL
+  | PInjR
+
+type path = Left | Middle | Right
+
+      (*
+type proofrule =
   (* syntax directed *)
   | POmega
   | PVar of string
@@ -88,7 +105,9 @@ type proofrule =
   | PBacktrack
   | PAbort
   | PSwitch
+       *)
 
+(*
 type proofnode =
     PN of (int * int list * ((string * bfamily) list) * bfamily * proofrule option * int)
 (* parent ptr, children ptr list, gamma, rule, essence ptr *)
@@ -100,6 +119,7 @@ type essencenode =
 
 type proofgraph = PG of ((int * proofnode) list * (int * essencenode) list * int * int list)
 (* derivation tree, essence tree, goal, remaining goals *)
+       *)
 
 type signature =
     Sig of ((string * bkind) list) * ((string * bfamily) list) * ((string * (bdelta * bfamily)) list) (* type constants, constants, definitions *)
@@ -183,7 +203,7 @@ and delta_to_string d =
 
 (* conversion functions bruijn <-> normal *)
 
-let (family_to_bruijn, delta_to_bruijn) =
+let (family_to_bruijn, delta_to_bruijn, delta_gamma) =
   let rec find_env x l =
     match l with
     | [] -> false
@@ -219,7 +239,7 @@ let (family_to_bruijn, delta_to_bruijn) =
       | DOr (id', f', d', id'', f'', d'', d''') -> BDOr (id', family_to_bruijn' f' env, delta_to_bruijn' d' (id'::env), id'', family_to_bruijn' f'' env, delta_to_bruijn' d'' (id''::env), delta_to_bruijn' d''' env)
       | DInjL d' -> BDInjL (delta_to_bruijn' d' env)
       | DInjR d' -> BDInjR (delta_to_bruijn' d' env)
-  in ((fun f -> family_to_bruijn' f []), (fun d -> delta_to_bruijn' d []))
+  in ((fun f -> family_to_bruijn' f []), (fun d -> delta_to_bruijn' d []), (fun d -> fun g -> delta_to_bruijn' d g))
 
 let rec kind_to_bruijn k =
   match k with

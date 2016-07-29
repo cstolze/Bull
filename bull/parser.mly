@@ -14,10 +14,9 @@
 %token ARROW
 %token SOR
 %token SAND
-%token VAR
-%token INTRO
-%token ELIM
 %token SCONJ
+%token INTRO
+%token EXACT
 %token PROJLEFT
 %token PROJRIGHT
 %token INJLEFT
@@ -42,8 +41,8 @@
 %token <string> ID
 		%token EOF
 
-//		%start proof
-//		%type <Utils.proofrule> proof
+		%start proof
+		%type <Utils.proofrule> proof
 
 %start s
 %type <Utils.sentence> s
@@ -120,19 +119,18 @@
     | LT LAMBDA ID COLON family DOT deltaterm SOR LAMBDA ID COLON family DOT deltaterm SHARP deltaterm GT { DOr ($3, $5, $7, $10, $12, $14, $16) }
     ;
 
-/*      proof:
-    | VAR ID SEMICOLON { PVar ID }
+      proof:
     | ABORT SEMICOLON { PAbort }
-    | INTRO SEMICOLON { PIntro }
-    | ELIM family SEMICOLON { PElim $2 }
-    | SCONJ SEMICOLON { PSconj }
-    | PROJLEFT family SEMICOLON { PProjL $2 }
-    | PROJRIGHT family SEMICOLON { PProjR $2 }
+    | BACKTRACK SEMICOLON { PBacktrack }
+    | INTRO SEMICOLON { PAbst1 }
+    | EXACT deltaterm SEMICOLON { PExact $2 }
+    | INTRO ID SEMICOLON { PAbst2 $2 }
+    | SCONJ SEMICOLON { PSConj }
+    | SDISJ ID COMMA family COMMA family SEMICOLON { PSDisj ($2, family_to_bruijn ($4), family_to_bruijn ($6)) }
+    | PROJLEFT family SEMICOLON { PProjL (family_to_bruijn $2) }
+    | PROJRIGHT family SEMICOLON { PProjR (family_to_bruijn $2) }
     | INJLEFT SEMICOLON { PInjL }
     | INJRIGHT SEMICOLON { PInjR }
-    | SDISJ family COMMA family SEMICOLON { PSdisj ($2, $4) }
-    | BACKTRACK SEMICOLON { PBacktrack }
-    | CHANGERULE SEMICOLON { PChangerule }
     | error SEMICOLON { PError }
     ;
-*/
+

@@ -101,7 +101,58 @@ let cst id f ctx =
       ctx
     end
 
-let proof id f ctx = print_string "Not implemented yet\n"; ctx
+let proof id f lx ctx verb =
+  if find_all id ctx then
+    begin
+      prerr_endline ("Error: " ^ id ^ " already exists.\n");
+      ctx
+    end
+  else
+    let rec gamma_to_string gamma =
+      match gamma with
+      | [] -> ""
+      | (id, f) :: gamma' -> (gamma_to_string gamma') ^ (cst_to_string id f)
+    in
+    let rec proofloop pr past =
+      let (goal, gamma) =
+	match pr with
+	| (_,[]) -> failwith "should not happen"
+	| (_, (g, _, g') :: _) -> (g, g')
+      in
+      begin
+	(if verb then
+	   (print_string ("Goal to prove : " ^ (family_to_string (bruijn_to_family goal)) ^ "\nHypotheses:\n" ^ (gamma_to_string gamma) ^ "End of hypotheses.\n" ^ id ^ ">>> "); flush stdout;)
+	 else ());
+	try
+	  match Parser.proof Lexer.read lx with
+	  | PError -> prerr_endline "Syntax error.\n"; proofloop pr past
+	  | PAbort -> ctx
+	  | PBacktrack -> (match past with
+			   | [] -> proofloop pr past
+			   | x :: l -> proofloop x l
+			  )
+	  | rule -> (try
+			let (tree, goal') = Proof.proofstep pr rule ctx in
+			(if (Proof.essence_trick tree ctx) then
+			      match goal' with
+			      | [] -> let Sig (a, b, c) = ctx in
+				      begin
+					(if verb then print_endline (def_to_string id (tree,f)) else ());
+					Sig (a, b, (id, (tree, f)) :: c) (* Proof completed *)
+				      end
+			      | _ -> proofloop (tree, goal') (pr :: past)
+			    else
+			      failwith "essence error")
+		      with
+		      | Failure err -> prerr_endline err; proofloop pr past
+		      | _ -> failwith "oops"
+		    )
+	with
+	| Failure a -> Lexing.flush_input lx; prerr_endline ("Error: " ^ a ^ ".\n"); proofloop pr past
+	| _ -> Lexing.flush_input lx; prerr_endline ("Error.\n"); proofloop pr past
+      end
+    in
+    proofloop (Proof.newproof f) []
 
 let typecheck id d f ctx verb =
   if find_all id ctx then
@@ -191,7 +242,7 @@ let rec load file ctx =
 	match Parser.s Lexer.read lx with
 	| Quit -> ctx
 	| Load id -> load_loop lx (load id ctx)
-	| Proof (id, f) -> load_loop lx (proof id (family_to_bruijn f) ctx)
+	| Proof (id, f) -> load_loop lx (proof id (family_to_bruijn f) lx ctx false)
 	| Typecst (id, k) -> load_loop lx (typecst id (kind_to_bruijn k) ctx)
 	| Cst (id, f) -> load_loop lx (cst id (family_to_bruijn f) ctx)
 	| Typecheck (id, d, f) -> load_loop lx (typecheck id (delta_to_bruijn d) (family_to_bruijn f) ctx false)
@@ -221,7 +272,7 @@ let () =
 	match Parser.s Lexer.read lx with
 	| Quit -> ()
 	| Load id -> main_loop lx (load id ctx)
-	| Proof (id, f) -> main_loop lx (proof id (family_to_bruijn f) ctx)
+	| Proof (id, f) -> main_loop lx (proof id (family_to_bruijn f) lx ctx true)
 	| Typecst (id, k) -> main_loop lx (typecst id (kind_to_bruijn k) ctx)
 	| Cst (id, f) -> main_loop lx (cst id (family_to_bruijn f) ctx)
 	| Typecheck (id, d, f) -> main_loop lx (typecheck id (delta_to_bruijn d) (family_to_bruijn f) ctx true)
