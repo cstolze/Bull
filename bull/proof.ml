@@ -143,14 +143,14 @@ let proofstep p rule ctx =
   match rule with
   | PExact d' -> (
     let d = delta_gamma d' (strip gamma) in
-    let err = Inference.familycheck goal gamma ctx in
+    let err = familycheck goal gamma ctx in
     if err = "" then
-      if Inference.wellformed_delta d ctx then
-	let err = Inference.deltacheck d gamma ctx in
+      if wellformed_delta d ctx then
+	let err = deltacheck d gamma ctx in
 	if err = "" then
-	  if Inference.wellformed_family goal ctx then
-	    let f' = Inference.deltainfer d gamma ctx in
-	    if Inference.unifiable goal f' ctx then
+	  if wellformed_family goal ctx then
+	    let f' = deltainfer d gamma ctx in
+	    if unifiable goal f' ctx then
 	      let d = update tree path d in (d, rest)
 	    else
 	      failwith ("Error: type-checking failed for " ^ (def_to_string "user input" (d,goal)) ^ " (its type should be " ^ (family_to_string (bruijn_to_family f')) ^ ").\n")

@@ -23,12 +23,6 @@ and wellformed_delta d ctx =
 						      else if find_def id' ctx then
 							let (d', _) = get_def id' ctx in essence_eq d1 d'
 						      else id = id'
-    | (BDVar (id, false,_), _) -> if find_def id ctx then
-				    let (d, _) = get_def id ctx in essence_eq d d2
-				  else false
-    | (_, BDVar (id', false,_)) -> if find_def id' ctx then
-				     let (d', _) = get_def id' ctx in essence_eq d1 d'
-				   else false
     | (BDVar (_, true, n), BDVar (_, true, n')) -> n = n'
     | (BDLambda (id', f1', d2'), BDLambda (id'', f1'', d2'')) -> essence_eq d2' d2''
     | (BDApp (d1', d2'), BDApp (d1'', d2'')) -> (essence_eq d1' d1'') && (essence_eq d2' d2'')
@@ -44,6 +38,12 @@ and wellformed_delta d ctx =
     | (_, BDInjL d') -> essence_eq d1 d'
     | (BDInjR d', _) -> essence_eq d' d2
     | (_, BDInjR d') -> essence_eq d1 d'
+    | (BDVar (id, false,_), _) -> if find_def id ctx then
+				    let (d, _) = get_def id ctx in essence_eq d d2
+				  else false
+    | (_, BDVar (id', false,_)) -> if find_def id' ctx then
+				     let (d', _) = get_def id' ctx in essence_eq d1 d'
+				   else false
     | (_, _) -> false
   in
   match d with
