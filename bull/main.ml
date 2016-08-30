@@ -113,7 +113,7 @@ let proof id f lx ctx verb =
       | [] -> ""
       | (id, f) :: gamma' -> (gamma_to_string gamma') ^ (cst_to_string id f)
     in
-    let rec proofloop pr past =
+    let rec proofloop pr past lx verb =
       let (goal, gamma) =
 	match pr with
 	| (_,[]) -> failwith "should not happen"
@@ -125,11 +125,12 @@ let proof id f lx ctx verb =
 	 else ());
 	try
 	  match Parser.proof Lexer.read lx with
-	  | PError -> prerr_endline "Syntax error.\n"; proofloop pr past
+	  | PQuit -> proofloop pr past (Lexing.from_channel stdin) true
+	  | PError -> prerr_endline "Syntax error.\n"; proofloop pr past lx verb
 	  | PAbort -> ctx
 	  | PBacktrack -> (match past with
-			   | [] -> proofloop pr past
-			   | x :: l -> proofloop x l
+			   | [] -> proofloop pr past lx verb
+			   | x :: l -> proofloop x l lx verb
 			  )
 	  | rule -> (try
 			let (tree, goal') = Proof.proofstep pr rule ctx in
@@ -140,19 +141,19 @@ let proof id f lx ctx verb =
 					(if verb then print_endline (def_to_string id (tree,f)) else ());
 					Sig (a, b, (id, (tree, f)) :: c) (* Proof completed *)
 				      end
-			      | _ -> proofloop (tree, goal') (pr :: past)
+			      | _ -> proofloop (tree, goal') (pr :: past) lx verb
 			    else
 			      failwith "essence error")
 		      with
-		      | Failure err -> prerr_endline err; proofloop pr past
+		      | Failure err -> prerr_endline err; proofloop pr past lx verb
 		      | _ -> failwith "oops"
 		    )
 	with
-	| Failure a -> Lexing.flush_input lx; prerr_endline ("Error: " ^ a ^ ".\n"); proofloop pr past
-	| _ -> Lexing.flush_input lx; prerr_endline ("Error.\n"); proofloop pr past
+	| Failure a -> Lexing.flush_input lx; prerr_endline ("Error: " ^ a ^ ".\n"); proofloop pr past lx verb
+	| _ -> Lexing.flush_input lx; prerr_endline ("Error.\n"); proofloop pr past lx verb
       end
     in
-    proofloop (Proof.newproof f) []
+    proofloop (Proof.newproof f) [] lx verb
 
 let typecheck id d f ctx verb =
   if find_all id ctx then

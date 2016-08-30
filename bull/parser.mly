@@ -132,5 +132,5 @@
     | INJLEFT SEMICOLON { PInjL }
     | INJRIGHT SEMICOLON { PInjR }
     | error SEMICOLON { PError }
+    | EOF { PQuit }
     ;
-

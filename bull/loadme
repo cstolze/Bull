@@ -1,33 +1,18 @@
-Type int : Type;
-Type float : Type;
-Type True : Type;
-Type False : Type;
+Type a : Type;
+Type b : Type;
 
-Constant true : True;
-Constant false : False;
-Constant 0 : int;
-Constant S : int -> int;
 
-Definition church2 = < \f : int -> int. \ x : int. f (f x) & \ m : (int -> int) -> (int -> int). \ s : int -> int . m (m s) >;
-Definition church3 = < \f : int -> int. \ x : int. f (f (f x)) & \ m : (int -> int) -> (int -> int). \ s : int -> int . m (m (m s)) >;
 
-Definition add = \m : (int -> int) -> (int -> int). \n : (int -> int) -> (int -> int). \f : int -> int. \x : int. m f (n f x);
-Definition mul = \m : (int -> int) -> (int -> int) . \n : (int -> int) -> (int -> int) . \f : int -> int . m (n f);
-Definition exp = \m : (int -> int) -> (int -> int). \n : ((int -> int) -> (int -> int)) -> ((int -> int) -> (int -> int)). n m;
+Proof commutativity : (a | b) -> (b | a);
 
-Definition churchtrue = \ t : (True | False). \ f : (True | False). t;
-Definition churchfalse = \ t : (True | False). \ f : (True | False). f;
+intro x;
 
-Definition and = \ x : (True | False) -> ((True | False) -> (True | False)). \ y : (True | False) -> ((True | False) -> (True | False)). \ t : (True | False). \ f : (True | False). x (y t f) f;
+union y, a, b;
 
-Definition or = \ x : (True | False) -> ((True | False) -> (True | False)). \ y : (True | False) -> ((True | False) -> (True | False)). \ t : (True | False). \ f : (True | False). x t (y t f);
+inj_r;
+exact y;
 
-Definition not = \ x : (True | False) -> ((True | False) -> (True | False)). \ t : (True | False). \ f : (True | False). x f t;
+inj_l;
+exact y;
 
-Definition xor = \ x : (True | False) -> ((True | False) -> (True | False)). \ y : (True | False) -> ((True | False) -> (True | False)). and (or x y) (not (and x y));
-
-Definition 5 = add proj_l church2 proj_l church3 S 0;
-Definition 10 = mul (add proj_l church2 proj_l church3) proj_l church2 S 0;
-Definition 8 = exp proj_l church2 proj_r church3 S 0;
-
-Definition test = xor churchtrue churchfalse inj_l true inj_r false;
+exact x;

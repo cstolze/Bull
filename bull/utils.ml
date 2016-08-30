@@ -68,6 +68,7 @@ type sentence =
 
 type proofrule =
   | PError
+  | PQuit
   | PAbort
   | PBacktrack
   | PExact of delta (* ; __ ; *)

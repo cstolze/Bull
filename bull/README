@@ -2,6 +2,8 @@
 
 $ ocamlbuild main.native
 
+----------------------------------------------------------------------------------------------------
+
 - How to run this program:
 
 Preferably:
@@ -11,11 +13,13 @@ $ rlwrap ./main.native [initfile]
 Or:
 $ ./main.native [initfile]
 
+----------------------------------------------------------------------------------------------------
+
 - How to use this program:
 
 Help;				     for a list of commands
 Load file;		      	     for loading a script file
-Type typename : Type;	    	     define a type constant
+Type typename : kind;	    	     define a type constant
 Constant cstname : type;       	     define a constant
 Proof proofname : type;        	     start an interactive proof (not implemented yet)
 Definition name = term [: type];     define a term
@@ -56,6 +60,26 @@ term ::=
 
 The file "loadme" is an example of script/init file.
 
+The commands of the interactive prover are:
+- abort; abort the current proof
+- backtrack; go one step back in the proof flow
+- intro x; if the goal is "a -> b", introduce a variable x of type "a", the remaining goal is "b"
+- intro; if the goal is "! x : a. b", introduce a variable x of type "a", the remaining goal is "b"
+- exact term; solves the goal in one step by giving a term that typechecks to it.
+- inter; transforms a goal "a & b" into two goals "a" and "b"
+- union x,a,b; creates three goals:
+  1. same goal, but with a variable x of type "a".
+  2. same goal, but with a variable x of type "b".
+  3. goal is "a | b".
+- proj_l a; changes a goal "b" into "b & a"
+- proj_r a; changes a goal "b" into "a & b"
+- inj_l; changes a goal "a | b" into "a"
+- inj_r; changes a goal "a | b" into "b"
+
+Each time you enter a command, the software output the current goal and the local variables.
+
+----------------------------------------------------------------------------------------------------
+
 Example of user session:
 $ rlwrap ./main.native
 Type "Help;" for help.
@@ -74,3 +98,14 @@ g = \x : a. < \y : a. ((proj_l f) y) | \z : b. ((proj_r f) z) # inj_l x > : a ->
 \$x : a. cst
 
 > Quit;
+
+----------------------------------------------------------------------------------------------------
+
+Source code:
+
+main.ml describes the REPL
+lexer.mll and parser.mly describes the lexer and the parser
+utils.ml describes the types
+reduction.ml describes the normalization algorithm
+inference.ml describes the reconstruction algorithm
+proof.ml describes the proof-related functions
