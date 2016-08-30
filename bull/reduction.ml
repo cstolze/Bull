@@ -17,7 +17,7 @@ let rec to_string bd = (* for debugging purposes *)
 
 let rec family_apply n f1 d2 = (* replace the nth variable in f1 by d2 *)
   match f1 with
-  | BSFc (f1', f2) -> BSFc (family_apply n f1' d2, family_apply n f2 d2)
+  | BSFc (f1', f2) -> BSFc (family_apply n f1' d2, family_apply (n+1) f2 d2)
   | BSProd (id, f1', f2) -> BSProd (id, family_apply n f1' d2, family_apply (n+1) f2 d2)
   | BSLambda (id, f1', f2) -> BSLambda (id, family_apply n f1' d2, family_apply (n+1) f2 d2)
   | BSApp (f1', d2') -> BSApp (family_apply n f1' d2, delta_apply n d2' d2)
@@ -29,7 +29,7 @@ let rec family_apply n f1 d2 = (* replace the nth variable in f1 by d2 *)
 and delta_apply n d1 d2 = (* replace the nth variable in d1 by d2 *)
   let rec family_shift f n m =
     match f with
-    | BSFc (f1', f2) -> BSFc (family_shift f1' n m, family_shift f2 n m)
+    | BSFc (f1', f2) -> BSFc (family_shift f1' n m, family_shift f2 n (m+1))
     | BSProd (id, f1', f2) -> BSProd (id, family_shift f1' n m, family_shift f2 n (m+1))
     | BSLambda (id, f1', f2) -> BSLambda (id, family_shift f1' n m, family_shift f2 n (m+1))
     | BSApp (f1', d2') -> BSApp (family_shift f1' n m, delta_shift d2 n m)
@@ -108,7 +108,7 @@ let rec family_compute f ctx =
 			      | BDApp (d''', BDVar(x',true, 0)) -> (* eta-reduction *)
 				 let rec familycheck f n =
 				   match f with
-				       | BSFc (f1, f2) -> familycheck f1 n && familycheck f2 n
+				       | BSFc (f1, f2) -> familycheck f1 n && familycheck f2 (n+1)
 				       | BSProd (id, f1, f2) -> familycheck f1 n && familycheck f2 (n+1)
 				       | BSLambda (id, f1, f2) -> familycheck f1 n && familycheck f2 (n+1)
 				       | BSApp (f1, d2) -> familycheck f1 n && deltacheck d2 n

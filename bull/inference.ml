@@ -1,6 +1,43 @@
 open Utils
 open Reduction
 
+(* increments the de Bruijn indexes everywhere in gamma *)
+let rec inc gamma =
+  let rec family_inc f =
+    match f with
+    | BSFc (f1, f2) -> BSFc (family_inc f1, family_inc f2)
+    | BSProd (id, f1, f2) -> BSProd (id, family_inc f1, family_inc f2)
+    | BSLambda (id, f1, f2) -> BSLambda (id, family_inc f1, family_inc f2)
+    | BSApp (f1, d2) -> BSApp (family_inc f1, delta_inc d2)
+    | BSAnd (f1, f2) -> BSAnd (family_inc f1, family_inc f2)
+    | BSOr (f1, f2) -> BSOr (family_inc f1, family_inc f2)
+    | BSAtom id -> f
+    | BSOmega -> f
+    | BSAnything -> f
+  and delta_inc d =
+    match d with
+    | BDVar (id, b, n) -> if b then BDVar(id, b, n+1) else d
+    | BDStar -> d
+    | BDLambda (id, f1, d2) -> BDLambda (id, family_inc f1, delta_inc d2)
+    | BDApp (d1, d2) -> BDApp (delta_inc d1, delta_inc d2)
+    | BDAnd (d1, d2) -> BDAnd (delta_inc d1, delta_inc d2)
+    | BDProjL d' -> BDProjL (delta_inc d')
+    | BDProjR d' -> BDProjR (delta_inc d')
+    | BDOr (id1, f1, d1, id2, f2, d2, d3) ->
+       BDOr (id1,
+	   family_inc f1,
+	   delta_inc d1,
+	   id2,
+	   family_inc f2,
+	   delta_inc d2,
+	   delta_inc d3)
+    | BDInjL d' -> BDInjL (delta_inc d')
+    | BDInjR d' -> BDInjR (delta_inc d')
+  in
+  match gamma with
+  | [] -> []
+  | (x, f) :: gamma' -> (x, family_inc f) :: (inc gamma')
+
 (* wellformed__ x returns true iff x's essence exists *)
 let rec wellformed_family f ctx =
   match f with
@@ -127,7 +164,7 @@ let rec familyinfer f gamma ctx =
   match f with
   | BSFc (f1, f2) -> BType
   | BSProd (id, f1, f2) -> BType
-  | BSLambda (id, f1, f2) -> BKProd(id, f1, familyinfer f2 ((id,f1) :: gamma) ctx)
+  | BSLambda (id, f1, f2) -> BKProd(id, f1, familyinfer f2 (inc ((id,f1) :: gamma)) ctx)
   | BSApp (f1, d) ->
      (match (familyinfer f1 gamma ctx, deltainfer d gamma ctx) with
       | (BKProd (id, f1, k), f2) -> kind_apply 0 k d
@@ -142,7 +179,7 @@ let rec familyinfer f gamma ctx =
 and deltainfer d gamma ctx =
   let rec isindependentfamily f n =
     match f with
-    | BSFc (f1, f2) -> (isindependentfamily f1 n) && (isindependentfamily f2 n)
+    | BSFc (f1, f2) -> (isindependentfamily f1 n) && (isindependentfamily f2 (n+1))
     | BSProd (id, f1, f2) -> (isindependentfamily f1 n) && (isindependentfamily f2 (n+1))
     | BSLambda (id, f1, f2) -> (isindependentfamily f1 n) && (isindependentfamily f2 (n+1))
     | BSApp (f1, d) -> (isindependentfamily f1 n) && (isindependentdelta d n)
@@ -175,13 +212,13 @@ and deltainfer d gamma ctx =
 			   if find_def x ctx then let (a, b) = get_def x ctx in b else
 			     failwith "error: use deltacheck"
   | BDStar -> BSOmega
-  | BDLambda (x, f, d') -> let f' = deltainfer d' ((x,f)::gamma) ctx in
+  | BDLambda (x, f, d') -> let f' = deltainfer d' (inc ((x,f):: gamma)) ctx in
 			   if isindependentfamily f' 0 then
 			     BSFc(f,f')
-			   else BSProd(x, f, deltainfer d' ((x,f)::gamma) ctx)
+			   else BSProd(x, f, deltainfer d' (inc ((x,f)::gamma)) ctx)
   | BDApp (d', d'') ->
      (match deltainfer d' gamma ctx with
-      | BSFc (f', f'') -> f''
+      | BSFc (f', f'') -> family_apply 0 f'' d''
       | BSProd (x, f', f'') -> family_apply 0 f'' d''
       | _ -> failwith "error: use deltacheck")
   | BDAnd (d', d'') -> BSAnd (deltainfer d' gamma ctx, deltainfer d'' gamma ctx)
@@ -193,7 +230,7 @@ and deltainfer d gamma ctx =
      (match deltainfer d' gamma ctx with
       | BSAnd (_, f') -> f'
       | _ -> failwith "error: use deltacheck")
-  | BDOr (x', f', d', x'', f'', d'', d''') -> unify (deltainfer d' ((x',f') :: gamma) ctx) (deltainfer d'' ((x'',f'') :: gamma) ctx)
+  | BDOr (x', f', d', x'', f'', d'', d''') -> unify (deltainfer d' (inc ((x',f') :: gamma)) ctx) (deltainfer d'' (inc ((x'',f'') :: gamma)) ctx)
   | BDInjL d' -> BSOr(deltainfer d' gamma ctx, BSAnything)
   | BDInjR d' -> BSOr(BSAnything, deltainfer d' gamma ctx)
 
@@ -215,24 +252,24 @@ let rec gammacheck gamma ctx =
 and kindcheck k gamma ctx =
   match k with
   | BType -> gammacheck gamma ctx
-  | BKProd (id, f, k') -> kindcheck k' ((id,f) :: gamma) ctx
+  | BKProd (id, f, k') -> kindcheck k' (inc ((id,f) :: gamma)) ctx
 
 
 and familycheck f gamma ctx =
   match f with
-  | BSFc (f1, f2) -> let err = familycheck f2 (("",f1) :: gamma) ctx in (* independent product is a dependent product whose variable has an empty name *)
+  | BSFc (f1, f2) -> let err = familycheck f2 (inc (("",f1) :: gamma)) ctx in (* independent product is a dependent product whose variable has an empty name *)
 		     if err = "" then
-		       match familyinfer f2 (("",f1) :: gamma) ctx with
+		       match familyinfer f2 (inc (("",f1) :: gamma)) ctx with
 		       | BType -> ""
 		       | k -> "Error: " ^ (family_to_string (bruijn_to_family f2)) ^ " has kind " ^ (kind_to_string (bruijn_to_kind k)) ^ " (should be Type).\n"
 		     else err
-  | BSProd (id, f1, f2) -> let err = familycheck f2 ((id,f1) :: gamma) ctx in
+  | BSProd (id, f1, f2) -> let err = familycheck f2 (inc ((id,f1) :: gamma)) ctx in
 			   if err = "" then
-			     match familyinfer f2 ((id,f1) :: gamma) ctx with
+			     match familyinfer f2 (inc ((id,f1) :: gamma)) ctx with
 			     | BType -> ""
 			     | k -> "Error: " ^ (family_to_string (bruijn_to_family f2)) ^ " has kind " ^ (kind_to_string (bruijn_to_kind k)) ^ " (should be Type).\n"
 			   else err
-  | BSLambda (id, f1, f2) -> familycheck f2 ((id, f1) :: gamma) ctx
+  | BSLambda (id, f1, f2) -> familycheck f2 (inc ((id, f1) :: gamma)) ctx
   | BSApp (f1, d) -> let err = familycheck f1 gamma ctx in
 		     if err = "" then
 		       let err = deltacheck d gamma ctx in
@@ -280,7 +317,7 @@ and deltacheck d gamma ctx =
 			 if (find_def x ctx) then "" else
 			   "Error: " ^ x ^ " has not been declared yet.\n"
   | BDStar -> gammacheck gamma ctx
-  | BDLambda (x, f, d') -> deltacheck d' ((x,f)::gamma) ctx
+  | BDLambda (x, f, d') -> deltacheck d' (inc ((x,f)::gamma)) ctx
   | BDApp (d', d'') ->
      let err = deltacheck d' gamma ctx in
      if err = "" then
@@ -311,14 +348,14 @@ and deltacheck d gamma ctx =
 		    | _ -> "Error: " ^ (delta_to_string (bruijn_to_delta d')) ^ " has type " ^ (family_to_string (bruijn_to_family f)) ^ " (should be an intersection).\n"
 		  else err
   | BDOr (x', f', d', x'', f'', d'', d''') ->
-     let err = deltacheck d' ((x',f')::gamma) ctx in
+     let err = deltacheck d' (inc ((x',f')::gamma)) ctx in
      if err = "" then
-       let err = deltacheck d'' ((x'',f'')::gamma) ctx in
+       let err = deltacheck d'' (inc ((x'',f''):: gamma)) ctx in
        if err = "" then
 	 let err = deltacheck d''' gamma ctx in
 	 if err = "" then
-	   let f1 = deltainfer d' ((x',f')::gamma) ctx in
-	   let f2 = deltainfer d'' ((x'',f'')::gamma) ctx in
+	   let f1 = deltainfer d' (inc ((x',f'):: gamma)) ctx in
+	   let f2 = deltainfer d'' (inc ((x'',f''):: gamma)) ctx in
 	   let f3 = deltainfer d''' gamma ctx in
 	   if (unifiable f1 f2 ctx) && (unifiable (BSOr(f',f'')) f3 ctx) then "" else "Error: cannot type " ^ (delta_to_string (bruijn_to_delta d)) ^ ".\n"
 	 else err

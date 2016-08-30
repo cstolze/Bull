@@ -217,7 +217,7 @@ let (family_to_bruijn, delta_to_bruijn, delta_gamma) =
   in
   let rec family_to_bruijn' f env =
     match f with
-    | SFc (f1, f2) -> BSFc (family_to_bruijn' f1 env, family_to_bruijn' f2 env)
+    | SFc (f1, f2) -> BSFc (family_to_bruijn' f1 env, family_to_bruijn' f2 ("" :: env))
     | SProd (id, f1, f2) -> BSProd (id, family_to_bruijn' f1 env, family_to_bruijn' f2 (id::env))
     | SLambda (id, f1, f2) -> BSLambda (id, family_to_bruijn' f1 env, family_to_bruijn' f2 (id::env))
     | SApp (f1, d2) -> BSApp (family_to_bruijn' f1 env, delta_to_bruijn' d2 env)
@@ -256,7 +256,7 @@ let rec alpha_conv id b n check replace =
 
 let rec f_check id f n =
   match f with
-  | BSFc (f1, f2) -> (f_check id f1 n) && (f_check id f2 n)
+  | BSFc (f1, f2) -> (f_check id f1 n) && (f_check id f2 (n+1))
   | BSProd (id', f1, f2) -> (f_check id f1 n) && (f_check id f2 (n+1))
   | BSLambda (id', f1, f2) -> (f_check id f1 n) && (f_check id f2 (n+1))
   | BSApp (f1, d2) -> (f_check id f1 n) && (d_check id d2 n)
@@ -287,7 +287,7 @@ let rec f_check id f n =
 
 let rec f_replace f id n =
   match f with
-  | BSFc (f1, f2) -> BSFc (f_replace f1 id n, f_replace f2 id n)
+  | BSFc (f1, f2) -> BSFc (f_replace f1 id n, f_replace f2 id (n+1))
   | BSProd (id', f1, f2) -> BSProd (id', f_replace f1 id n, f_replace f2 id (n+1))
   | BSLambda (id', f1, f2) -> BSLambda (id', f_replace f1 id n, f_replace f2 id (n+1))
   | BSApp (f1, d2) -> BSApp (f_replace f1 id n, d_replace d2 id n)

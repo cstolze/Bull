@@ -164,11 +164,11 @@ let proofstep p rule ctx =
       failwith err
   )
   | PAbst1 -> (match goal with
-	       | BSProd (x, f, g) -> (update tree path (BDLambda (x,f,BDVar("",false,0))), (g, path, (x, f) :: gamma) :: rest)
+	       | BSProd (x, f, g) -> (update tree path (BDLambda (x,f,BDVar("",false,0))), (g, path, inc ((x, f) :: gamma)) :: rest)
 	       | _ -> failwith "Error: the goal should be like `! x : s. t`.\n"
 	      )
   | PAbst2 x -> (match goal with
-	       | BSFc (f, g) -> (update tree path (BDLambda (x,f,BDVar("",false,0))), (g, path, (x, f) :: gamma) :: rest)
+	       | BSFc (f, g) -> (update tree path (BDLambda (x,f,BDVar("",false,0))), (g, path, inc((x, f) :: gamma)) :: rest)
 	       | _ -> failwith "Error: the goal should be like `s -> t`.\n"
 	      )
   | PSConj -> (match goal with
@@ -176,7 +176,7 @@ let proofstep p rule ctx =
 	       | _ -> failwith "Error: the goal should be like `! x : s. t`.\n"
 	      )
   | PSDisj (id, f, f') ->
-     (update tree path (BDOr(id,f,BDVar("",false,0),id,f',BDVar("",false,0),BDVar("",false,0))), (goal, append path Left, (id, f) :: gamma) :: (goal, append path Middle, (id, f') :: gamma) :: (BSOr(f,f'), append path Right, gamma) :: rest)
+     (update tree path (BDOr(id,f,BDVar("",false,0),id,f',BDVar("",false,0),BDVar("",false,0))), (goal, append path Left, inc((id, f) :: gamma)) :: (goal, append path Middle, inc((id, f') :: gamma)) :: (BSOr(f,f'), append path Right, gamma) :: rest)
   | PProjL f -> (update tree path (BDProjL (BDVar("",false,0))), (BSAnd (goal, f), path, gamma) :: rest)
   | PProjR f -> (update tree path (BDProjR (BDVar("",false,0))), (BSAnd (f, goal), path, gamma) :: rest)
   | PInjL -> (match goal with

@@ -4,3 +4,4 @@
 *.pdf
 _build/
 main.native
+main.byte
