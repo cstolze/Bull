@@ -1,0 +1,48 @@
+
+(* Define our types *)
+Axiom o : Type.
+Axiom omegatype : o.
+Axioms (arrow inter union : o -> o -> o).
+
+(* Transform our types into LF types *)
+Axiom OK : o -> Type.
+
+(* Define the essence equality as an equivalence relation *)
+Axiom Eq : forall (s t : o), OK s -> OK t -> Type.
+Axiom Eqrefl : forall (s : o) (M : OK s), Eq s s M M.
+Axiom Eqsymm : forall (s t : o) (M : OK s) (N : OK t), Eq s t M N -> Eq t s N M.
+Axiom Eqtrans : forall (s t u : o) (M : OK s) (N : OK t) (O : OK u), Eq s t M N -> Eq t u N O -> Eq s u M O.
+
+(* constructors for arrow (->I and ->E) *)
+Axiom Abst : forall (s t : o), ((OK s) -> (OK t)) -> OK (arrow s t).
+Axiom App : forall (s t : o), OK (arrow s t) -> OK s -> OK t.
+
+(* constructors for intersection *)
+Axiom Pair : forall (s t : o) (M : OK s) (N : OK t), Eq s t M N -> OK (inter s t).
+Axiom Proj_l : forall (s t : o) (M : OK (inter s t)), OK s.
+Axiom Proj_r : forall (s t : o) (M : OK (inter s t)), OK t.
+
+(* constructors for union *)
+Axiom Inj_l : forall (s t : o) (M : OK s), OK (union s t).
+Axiom Inj_r : forall (s t : o) (M : OK t), OK (union s t).
+Axiom Copair : forall (s t u : o) (X : OK (arrow s u)) (Y : OK (arrow t u)), OK (union s t) -> Eq (arrow s u) (arrow t u) X Y -> OK u.
+
+(* omega *)
+Axiom star : OK omegatype.
+
+(* define equality wrt arrow constructors *)
+Axiom Eqabst : forall (s t s' t' : o) (M : OK s -> OK t) (N : OK s' -> OK t'), (forall (x : OK s) (y : OK s'), Eq s s' x y -> Eq t t' (M x) (N y)) -> Eq (arrow s t) (arrow s' t') (Abst s t M) (Abst s' t' N).
+Axiom Eqapp : forall (s t s' t' : o) (M : OK (arrow s t)) (N : OK s) (M' : OK (arrow s' t')) (N' : OK s'), Eq (arrow s t) (arrow s' t') M M' -> Eq s s' N N' -> Eq t t' (App s t M N) (App s' t' M' N').
+
+(* define equality wrt intersection constructors *)
+Axiom Eqpair : forall (s t s' t' : o) (M : OK s) (N : OK t) (Z : Eq s t M N) (M' : OK s') (N' : OK t') (Z' : Eq s' t' M' N'), Eq s s' M M' -> Eq (inter s t) (inter s' t') (Pair s t M N Z) (Pair s' t' M' N' Z'). (* note that Eq s s' M M' could have been replace by Eq t t' N N', it does not matter because Eq is an equivalence relation *)
+Axiom Eqproj_l : forall (s t u : o) (M : OK (inter s t)) (N : OK u), Eq (inter s t) u M N -> Eq s u (Proj_l s t M) N.
+Axiom Eqproj_r : forall (s t u : o) (M : OK (inter s t)) (N : OK u), Eq (inter s t) u M N -> Eq t u (Proj_r s t M) N.
+
+(* define equality wrt union *)
+Axiom Eqinj_l : forall (s t u : o) (M : OK s) (N : OK u), Eq s u M N -> Eq (union s t) u (Inj_l s t M) N.
+Axiom Eqinj_r : forall (s t u : o) (M : OK t) (N : OK u), Eq t u M N -> Eq (union s t) u (Inj_r s t M) N.
+Axiom Eqcopair : forall (s t u v : o) (A : OK (arrow s u)) (B : OK (arrow t u)) (C : OK (union s t)) (Z : Eq (arrow s u) (arrow t u) A B) (N : OK v), (forall (x : OK s), Eq s (union s t) x C -> Eq u v (App s u A x) N) -> Eq u v (Copair s t u A B C Z) N. (* If you look closely at the Eqapp rule (knowing that Eq is an equivalence), you can infer that the hypothesis (forall (y : OK t), Eq t (union s t) y C -> Eq u v (App t u B y) N) is useless *)
+
+(* define equality wrt omega *)
+Axiom Eqstar : forall (s : o) (M : OK s), Eq omegatype s star M.
