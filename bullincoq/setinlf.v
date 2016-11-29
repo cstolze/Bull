@@ -1,7 +1,7 @@
 
 (* Define our types *)
 Axiom o : Type.
-Axiom omegatype : o.
+(* Axiom omegatype : o. *)
 Axioms (arrow inter union : o -> o -> o).
 
 (* Transform our types into LF types *)
@@ -45,8 +45,7 @@ Axiom Eqinj_r : forall (s t u : o) (M : OK t) (N : OK u), Eq t u M N -> Eq (unio
 Axiom Eqcopair : forall (s t u v : o) (A : OK (arrow s u)) (B : OK (arrow t u)) (C : OK (union s t)) (Z : Eq (arrow s u) (arrow t u) A B) (N : OK v), (forall (x : OK s), Eq s (union s t) x C -> Eq u v (App s u A x) N) -> Eq u v (Copair s t u A B C Z) N. (* If you look closely at the Eqapp rule (knowing that Eq is an equivalence), you can infer that the hypothesis (forall (y : OK t), Eq t (union s t) y C -> Eq u v (App t u B y) N) is useless *)
 
 (* define equality wrt omega *)
-Axiom Eqstar : forall (s : o) (M : OK s), Eq omegatype s star M.
-
+(* Axiom Eqstar : forall (s : o) (M : OK s), Eq omegatype s star M. (* OH GOD IT BREAKS THE TRANSITIVITY *) *)
 
 (****************************************************************************************************)
 (********************************************* EXAMPLES *********************************************)
