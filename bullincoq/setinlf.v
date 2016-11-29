@@ -46,3 +46,25 @@ Axiom Eqcopair : forall (s t u v : o) (A : OK (arrow s u)) (B : OK (arrow t u)) 
 
 (* define equality wrt omega *)
 Axiom Eqstar : forall (s : o) (M : OK s), Eq omegatype s star M.
+
+
+(****************************************************************************************************)
+(********************************************* EXAMPLES *********************************************)
+(****************************************************************************************************)
+
+Section Examples.
+  Hypotheses s t : o.
+
+  (* lambda x. x x : (sigma inter (sigma -> tau)) -> tau *)
+  Definition autoapp : OK (arrow (inter s (arrow s t)) t) :=
+    Abst (inter s (arrow s t)) t (fun x : OK (inter s (arrow s t)) => App s t (Proj_r s (arrow s t) x) (Proj_l s (arrow s t) x)).
+  
+  (* lambda x. x : (sigma -> sigma) inter (tau -> tau) *)
+  Definition id1 : OK (inter (arrow s s) (arrow t t)) :=
+    Pair (arrow s s) (arrow t t) (Abst s s (fun x : OK s => x)) (Abst t t (fun x : OK t => x)) (Eqabst s s t t (fun x : OK s => x) (fun x : OK t => x) (fun (x : OK s) (y : OK t) (Z : Eq s t x y) => Z)).
+
+  (* lambda x. x : (sigma union tau) -> (tau union sigma) *)
+  Definition id2 : OK (arrow (union s t) (union t s)) :=
+    Abst (union s t) (union t s) (fun x : OK (union s t) => Copair s t (union t s) (Abst s (union t s) (fun y : OK s => Inj_r t s y)) (Abst t (union t s) (fun y : OK t => Inj_l t s y)) x (Eqabst s (union t s) t (union t s) (fun y : OK s => Inj_r t s y) (fun y : OK t => Inj_l t s y) (fun (x : OK s) (y : OK t) (Z : Eq s t x y) => Eqtrans (union t s) s (union t s) (Inj_r t s x) x (Inj_l t s y) (Eqinj_r t s s x x (Eqrefl s x)) (Eqtrans s t (union t s) x y (Inj_l t s y) Z (Eqsymm (union t s) t (Inj_l t s y) y (Eqinj_l t s t y y (Eqrefl t y))))))).
+
+End Examples.
