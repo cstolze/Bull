@@ -109,3 +109,10 @@ utils.ml describes the types
 reduction.ml describes the normalization algorithm
 inference.ml describes the reconstruction algorithm
 proof.ml describes the proof-related functions
+
+----------------------------------------------------------------------------------------------------
+
+TODO:
+
+Fix the proof system
+Implement subtyping
