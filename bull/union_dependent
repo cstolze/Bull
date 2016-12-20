@@ -1,0 +1,9 @@
+Type a : Type;
+Type b : Type;
+Type ab : ! x : a | b. Type;
+
+Constant abc : (! x : a. ab (inj_l x)) & (! x : b. ab (inj_r x));
+Definition foo = \ x : a | b. <\ y : a. proj_l abc y | \ y : b. proj_r abc y # x >;
+
+Proof bugpleasefixme : !x : a | b. ab x;
+abort;
