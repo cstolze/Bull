@@ -175,6 +175,39 @@ let rec familyinfer f gamma ctx =
   | BSOmega -> BType
   | BSAnything -> BType
 
+and deleteinj_family n b f = (* replace inj_? (x,_,n) by (x,_,n) *)
+  match f with
+  | BSFc (f1', f2) -> BSFc (deleteinj_family n b f1', deleteinj_family (n+1) b f2)
+  | BSProd (id, f1', f2) -> BSProd (id, deleteinj_family n b f1', deleteinj_family (n+1) b f2)
+  | BSLambda (id, f1', f2) -> BSLambda (id, deleteinj_family n b f1', deleteinj_family (n+1) b f2)
+  | BSApp (f1', d2') -> BSApp (deleteinj_family n b f1', deleteinj_delta n b d2')
+  | BSAnd (f1', f2) -> BSAnd (deleteinj_family n b f1', deleteinj_family n b f2)
+  | BSOr (f1', f2) -> BSOr (deleteinj_family n b f1', deleteinj_family n b f2)
+  | BSAtom id -> f
+  | BSOmega -> f
+  | BSAnything -> f
+and deleteinj_delta n b d =
+  match d with
+  | BDVar (id, b, n') -> d
+  | BDStar -> d
+  | BDLambda (id, f1, d2') -> BDLambda (id, deleteinj_family n b f1, deleteinj_delta (n+1) b d2')
+  | BDApp (d1', d2') -> BDApp (deleteinj_delta n b d1', deleteinj_delta n b d2')
+  | BDAnd (d1', d2') -> BDAnd (deleteinj_delta n b d1', deleteinj_delta n b d2')
+  | BDProjL d' -> BDProjL (deleteinj_delta n b d')
+  | BDProjR d' -> BDProjR (deleteinj_delta n b d')
+  | BDOr (id1, f1, d1', id2, f2, d2', d3) ->
+     BDOr (id1,
+	   deleteinj_family n b f1,
+	   deleteinj_delta (n+1) b d1',
+	   id2,
+	   deleteinj_family n b f2,
+	   deleteinj_delta (n+1) b d2',
+	   deleteinj_delta n b d3)
+  | BDInjL (BDVar (x, b', n')) -> if (not b) && b' && n = n' then BDVar (x, b', n') else d
+  | BDInjR (BDVar (x, b', n')) -> if b && b' && n = n' then BDVar (x, b', n') else d
+  | BDInjL d' -> BDInjL (deleteinj_delta n b d')
+  | BDInjR d' -> BDInjR (deleteinj_delta n b d')
+
 (* we suppose d is typable (ie deltacheck d gamma ctx = "") *)
 and deltainfer d gamma ctx =
   let rec isindependentfamily f n =
@@ -230,7 +263,9 @@ and deltainfer d gamma ctx =
      (match deltainfer d' gamma ctx with
       | BSAnd (_, f') -> f'
       | _ -> failwith "error: use deltacheck")
-  | BDOr (x', f', d', x'', f'', d'', d''') -> unify (deltainfer d' (inc ((x',f') :: gamma)) ctx) (deltainfer d'' (inc ((x'',f'') :: gamma)) ctx)
+  | BDOr (x', f', d', x'', f'', d'', d''') ->
+     let foo b f = family_apply 0 (deleteinj_family 0 b f) d''' in
+     unify (foo false (deltainfer d' (inc ((x',f') :: gamma)) ctx)) (foo true (deltainfer d'' (inc ((x'',f'') :: gamma)) ctx))
   | BDInjL d' -> BSOr(deltainfer d' gamma ctx, BSAnything)
   | BDInjR d' -> BSOr(BSAnything, deltainfer d' gamma ctx)
 
@@ -357,7 +392,8 @@ and deltacheck d gamma ctx =
 	   let f1 = deltainfer d' (inc ((x',f'):: gamma)) ctx in
 	   let f2 = deltainfer d'' (inc ((x'',f''):: gamma)) ctx in
 	   let f3 = deltainfer d''' gamma ctx in
-	   if (unifiable f1 f2 ctx) && (unifiable (BSOr(f',f'')) f3 ctx) then "" else "Error: cannot type " ^ (delta_to_string (bruijn_to_delta d)) ^ ".\n"
+	   let foo b f = family_apply 0 (deleteinj_family 0 b f) d''' in
+	   if (unifiable (foo false f1) (foo true f2) ctx) && (unifiable (BSOr(f',f'')) f3 ctx) then "" else "Error: cannot type " ^ (delta_to_string (bruijn_to_delta d)) ^ ".\n"
 	 else err
        else err
      else err
