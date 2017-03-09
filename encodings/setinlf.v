@@ -1,4 +1,5 @@
 
+
 (* Define our types *)
 Axiom o : Type.
 (* Axiom omegatype : o. *)
