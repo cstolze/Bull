@@ -1,4 +1,5 @@
 
+
 (* Define our types *)
 Axiom o : Set.
 (* Axiom omegatype : o. *)
@@ -57,7 +58,7 @@ Section Examples.
   (* lambda x. x x : (sigma inter (sigma -> tau)) -> tau *)
   Definition autoapp : OK (arrow (inter s (arrow s t)) t) :=
     Abst (inter s (arrow s t)) t (fun x : OK (inter s (arrow s t)) => App s t (Proj_r s (arrow s t) x) (Proj_l s (arrow s t) x)).
-  
+
   (* lambda x. x : (sigma -> sigma) inter (tau -> tau) *)
   Definition id1 : OK (inter (arrow s s) (arrow t t)) :=
     Pair (arrow s s) (arrow t t) (Abst s s (fun x : OK s => x)) (Abst t t (fun x : OK t => x)) (Eqabst s s t t (fun x : OK s => x) (fun x : OK t => x) (fun (x : OK s) (y : OK t) (Z : Eq s t x y) => Z)).
