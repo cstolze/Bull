@@ -1,57 +1,48 @@
+type bruijn_index =
+  Bruijn of (string * int) (* id * bruijn index *)
+
+type essence =
+  | EVar of bruijn_index
+  | EAbs of string * essence
+  | EApp of essence * essence
+
 type kind =
   | Type
   | KProd of string * family * kind
-   and
-     family =
-     | SFc of family * family
-     | SProd of string * family * family
-     | SLambda of string * family * family
-     | SApp of family * delta
-     | SAnd of family * family
-     | SOr of family * family
-     | SAtom of string
-     | SOmega
-     | SAnything
-   and
-     delta =
-     | DVar of string
-     | DStar
-     | DLambda of string * family * delta
-     | DApp of delta * delta
-     | DAnd of delta * delta
-     | DProjL of delta
-     | DProjR of delta
-     | DOr of string * family * delta * string * family * delta * delta
-     | DInjL of delta
-     | DInjR of delta
 
-type bkind =
-  | BType
-  | BKProd of string * bfamily * bkind
-   and
-     bfamily =
-     | BSFc of bfamily * bfamily
-     | BSProd of string * bfamily * bfamily
-     | BSLambda of string * bfamily * bfamily
-     | BSApp of bfamily * bdelta
-     | BSAnd of bfamily * bfamily
-     | BSOr of bfamily * bfamily
-     | BSAtom of string
-     | BSOmega
-     | BSAnything
-   and
-     bdelta =
-     | BDVar of (string * bool * int) (* id * is_bound? * bruijn index *)
-     | BDStar
-     | BDLambda of string * bfamily * bdelta
-     | BDApp of bdelta * bdelta
-     | BDAnd of bdelta * bdelta
-     | BDProjL of bdelta
-     | BDProjR of bdelta
-     | BDOr of string * bfamily * bdelta * string * bfamily * bdelta * bdelta
-     | BDInjL of bdelta
-     | BDInjR of bdelta
+ and family =
+   | FProd of string * family * family
+   | FAbs of string * family * family
+   | FApp of family * delta
+   | FInter of family * family
+   | FUnion of family * family
+   | FAtom of string
+   | FOmega
+   | FAny
 
+ and delta =
+   | DVar of bruijn_index
+   | DStar
+   | DAbs of string * family * delta
+   | DApp of delta * delta
+   | DInter of delta * delta
+   | DPrLeft of delta
+   | DPrRight of delta
+   | DUnion of string * family * delta
+	       * string * family * delta
+	       * delta
+   | DInLeft of delta
+   | DInRight of delta
+
+type declaration =
+  | DefType of kind
+  | DefConst of family
+  | DefDelta of delta * family
+
+type sigma =
+  Sigma of (string * declaration) list
+
+(* Commands from the REPL *)
 type sentence =
   | Quit
   | Load of string
@@ -66,6 +57,7 @@ type sentence =
   | Help
   | Error
 
+(* The proof module should be rewritten from scratch *)
 type proofrule =
   | PError
   | PQuit
@@ -83,54 +75,8 @@ type proofrule =
 
 type path = Left | Middle | Right
 
-      (*
-type proofrule =
-  (* syntax directed *)
-  | POmega
-  | PVar of string
-  | PIntro of string
-  | PDependentIntro
-  | PAnd
-  | PInjL
-  | PInjR
-  (* non syntax directed *)
-  | PElim of bfamily
-  | PDependentElim of bfamily * bdelta
-  | PProjL of bfamily
-  | PProjR of bfamily
-  | POr of string * bfamily * bfamily
-  (* essence *)
-  (* | PPop : too complicated *)
-  | PBreak
-  (* control flow *)
-  | PBacktrack
-  | PAbort
-  | PSwitch
-       *)
-
-(*
-type proofnode =
-    PN of (int * int list * ((string * bfamily) list) * bfamily * proofrule option * int)
-(* parent ptr, children ptr list, gamma, rule, essence ptr *)
-
-type essencerule = EApp | EAbstr | EVar of int
-type essencenode =
-    EN of (int list * essencerule option * int list)
-(* children ptr list, rule, proof ptr list *)
-
-type proofgraph = PG of ((int * proofnode) list * (int * essencenode) list * int * int list)
-(* derivation tree, essence tree, goal, remaining goals *)
-       *)
-
-type signature =
-    Sig of ((string * bkind) list) * ((string * bfamily) list) * ((string * (bdelta * bfamily)) list) (* type constants, constants, definitions *)
-
-type lambda_bruijn =
-  | BVar of string * bool * int (* name * is it bound? * bruijn index *)
-  | BLambda of lambda_bruijn
-  | BApp of lambda_bruijn * lambda_bruijn
-
 (* to_string functions *)
+(* TODO: move to a pretty-printer module *)
 
 let rec kind_to_string k =
   match k with
@@ -385,5 +331,3 @@ let typecst_to_string id t = id ^ " : " ^ (kind_to_string (bruijn_to_kind t)) ^ 
 let cst_to_string id t = "Constant " ^ id ^ " : " ^ (family_to_string (bruijn_to_family t)) ^ "\n"
 let def_to_string id t = let (a,b) = t in
 			 id ^ " = " ^ (delta_to_string (bruijn_to_delta a)) ^ " : " ^ (family_to_string (bruijn_to_family b)) ^ "\n"
-
-																  (* todo : inference, proof *)
