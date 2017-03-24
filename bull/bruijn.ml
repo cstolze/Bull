@@ -1,3 +1,5 @@
+open Utils
+
 (* conversion functions bruijn <-> normal *)
 (* TO FIX *)
 
@@ -10,7 +12,69 @@ fix_id => if the ids are wrong and the index are correct (after beta-conversion)
 also function for fixing Gamma
  *)
 
-let (family_to_bruijn, delta_to_bruijn, delta_gamma) =
+(* Map iterators *)
+(* inc modifies the counter k each time we add a level of abstraction *)
+(* f is a function that maps De Bruijn indexes to delta-terms *)
+let rec map_family inc k f fam =
+  let aux_d k d = map_delta inc k f d in
+  let rec aux k fam =
+  match fam with
+  | FProd (id1, f1, f2) -> FProd(id1, aux k f1, aux (inc k) f2)
+  | FAbs (id1, f1, f2) -> FAbs (id1, aux k f1, aux (inc k) f2)
+  | FApp (f1, d1) -> FApp (aux k fam, aux_d k d1)
+  | FInter (f1, f2) -> FInter (aux k f1, aux k f2)
+  | FUnion (f1, f2) -> FUnion (aux k f1, aux k f2)
+  | _ -> fam
+  in aux k fam
+
+and map_delta inc k f d =
+  let aux_f k fam = map_family inc k f fam in
+  let rec aux k d =
+    match d with
+    | DVar b1 -> f k b1
+    | DStar -> d
+    | DAbs (id1, f1, d1) -> DAbs (id1, aux_f k f1, aux (inc k) d1)
+    | DApp (d1, d2) -> DApp (aux k d1, aux k d2)
+    | DInter (d1, d2) -> DInter (aux k d1, aux k d2)
+    | DPrLeft d1 -> DPrLeft (aux k d1)
+    | DPrRight d1 -> DPrRight (aux k d1)
+    | DUnion (id1, f1, d1, id2, f2, d2, d3)
+      -> DUnion (id1, aux_f k f1, aux (inc k) d1, id2, aux_f k f2,
+		 aux (inc k) d2, aux k d3)
+    | DInLeft d1 -> DInLeft (aux k d1)
+    | DInRight d1 -> DInRight (aux k d1)
+  in aux k d
+
+(* k is the index from which the context is changed *)
+(* n is the shift *)
+let lift_family k n =
+  map_family (fun k -> k+1) k
+	     (fun _ b -> match b with
+			 | Bruijn (id, m)
+			   -> if m < k then DVar b
+			      else DVar(Bruijn (id, m+n)))
+
+let lift_delta k n =
+  map_delta (fun k -> k+1) k
+	    (fun _ b -> match b with
+			| Bruijn (id, m)
+			  -> if m < k then DVar b
+			     else DVar(Bruijn (id, m+n)))
+
+
+(* If we map this function in the subexpression M of (lambda x. M) d *)
+(* then the result correspond to the beta-reduction M[d/x] *)
+let beta_redex_map d k b =
+  match b with
+  | Bruijn (id, m)
+    -> if m < k then DVar b (* bound variable *)
+       else if m = k then (* x *)
+	 lift_delta 0 k d
+       else (* we change the index as the enclosing lambda goes away *)
+	 DVar (Bruijn (id, m-1))
+
+     (* !!!!!!!!!!!!!!!!!!!!!!!!! *)
+let (fix_index_family, fix_index_delta, fix_index_gamma) =
   let rec find_env x l =
     match l with
     | [] -> false

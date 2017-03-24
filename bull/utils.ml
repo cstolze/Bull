@@ -10,19 +10,15 @@ type essence =
   | EApp of essence * essence
 
 (* Core types *)
-type kind =
-  | Type
-  | KProd of string * family * kind
-
- and family =
-   | FProd of string * family * family
-   | FAbs of string * family * family
-   | FApp of family * delta
-   | FInter of family * family
-   | FUnion of family * family
-   | FAtom of string
-   | FOmega
-   | FAny
+type family =
+  | FProd of string * family * family
+  | FAbs of string * family * family
+  | FApp of family * delta
+  | FInter of family * family
+  | FUnion of family * family
+  | FAtom of string
+  | FOmega
+  | FAny
 
  and delta =
    | DVar of bruijn_index
@@ -37,6 +33,34 @@ type kind =
 	       * delta
    | DInLeft of delta
    | DInRight of delta
+
+(*
+  match fam with
+  | FProd (id1, f1, f2) ->
+  | FAbs (id1, f1, f2) ->
+  | FApp (f1, d1) ->
+  | FInter (f1, f2) ->
+  | FUnion (f1, f2) ->
+  | FAtom id1 ->
+  | FOmega ->
+  | FAny ->
+
+  match d with
+  | DVar b1 ->
+  | DStar ->
+  | DAbs (id1, f1, d1) ->
+  | DApp (d1, d2) ->
+  | DInter (d1, d2) ->
+  | DPrLeft d1
+  | DPrRight d1
+  | DUnion (id1, f1, d1, id2, f2, d2, d3) ->
+  | DInLeft d1 ->
+  | DInRight d1 ->
+ *)
+
+type kind =
+  | Type
+  | KProd of string * family * kind
 
 (* We call sigma the context in which the delta-terms are processed *)
 type declaration =
@@ -85,7 +109,6 @@ let rec get_index n l =
   match l with
   | [] -> assert false (* we suppose the index is correct *)
   | x :: l' -> if n = 0 then x else get_index (n-1) l'
-
 
 (* !!!!!!!!!!!!!!!!!!!!!!!!! *)
 (* The proof module should be rewritten from scratch *)
