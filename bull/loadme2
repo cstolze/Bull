@@ -26,3 +26,4 @@ Proof eqlemma : (equal (add (proj_l c3) (proj_l c7) S 0) (proj_l c10 S 0)) & (eq
 inter;
 exact (eq_refl (proj_l c10 S 0));
 exact (eq_refl (proj_l c10 S 0));
+

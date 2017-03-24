@@ -24,3 +24,4 @@ exact x;
 intro x;
 intro y;
 exact proj_l not (proj_l and (proj_r not x) (proj_r not y));
+
