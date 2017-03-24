@@ -13,65 +13,141 @@ also function for fixing Gamma
  *)
 
 (* Map iterators *)
-(* inc modifies the counter k each time we add a level of abstraction *)
+(* inc modifies the counter h each time we add a level of abstraction *)
 (* f is a function that maps De Bruijn indexes to delta-terms *)
-let rec map_family inc k f fam =
-  let aux_d k d = map_delta inc k f d in
-  let rec aux k fam =
+let rec map_family inc h f fam =
+  let aux_d h d = map_delta inc h f d in
+  let rec aux h fam =
   match fam with
-  | FProd (id1, f1, f2) -> FProd(id1, aux k f1, aux (inc k) f2)
-  | FAbs (id1, f1, f2) -> FAbs (id1, aux k f1, aux (inc k) f2)
-  | FApp (f1, d1) -> FApp (aux k fam, aux_d k d1)
-  | FInter (f1, f2) -> FInter (aux k f1, aux k f2)
-  | FUnion (f1, f2) -> FUnion (aux k f1, aux k f2)
+  | FProd (id1, f1, f2) -> FProd(id1, aux h f1, aux (inc h) f2)
+  | FAbs (id1, f1, f2) -> FAbs (id1, aux h f1, aux (inc h) f2)
+  | FApp (f1, d1) -> FApp (aux h fam, aux_d h d1)
+  | FInter (f1, f2) -> FInter (aux h f1, aux h f2)
+  | FUnion (f1, f2) -> FUnion (aux h f1, aux h f2)
   | _ -> fam
-  in aux k fam
+  in aux h fam
 
-and map_delta inc k f d =
-  let aux_f k fam = map_family inc k f fam in
-  let rec aux k d =
+and map_delta inc h f d =
+  let aux_f h fam = map_family inc h f fam in
+  let rec aux h d =
     match d with
-    | DVar b1 -> f k b1
+    | DVar b1 -> f h b1
     | DStar -> d
-    | DAbs (id1, f1, d1) -> DAbs (id1, aux_f k f1, aux (inc k) d1)
-    | DApp (d1, d2) -> DApp (aux k d1, aux k d2)
-    | DInter (d1, d2) -> DInter (aux k d1, aux k d2)
-    | DPrLeft d1 -> DPrLeft (aux k d1)
-    | DPrRight d1 -> DPrRight (aux k d1)
+    | DAbs (id1, f1, d1) -> DAbs (id1, aux_f h f1, aux (inc h) d1)
+    | DApp (d1, d2) -> DApp (aux h d1, aux h d2)
+    | DInter (d1, d2) -> DInter (aux h d1, aux h d2)
+    | DPrLeft d1 -> DPrLeft (aux h d1)
+    | DPrRight d1 -> DPrRight (aux h d1)
     | DUnion (id1, f1, d1, id2, f2, d2, d3)
-      -> DUnion (id1, aux_f k f1, aux (inc k) d1, id2, aux_f k f2,
-		 aux (inc k) d2, aux k d3)
-    | DInLeft d1 -> DInLeft (aux k d1)
-    | DInRight d1 -> DInRight (aux k d1)
-  in aux k d
+      -> DUnion (id1, aux_f h f1, aux (inc h) d1, id2, aux_f h f2,
+		 aux (inc h) d2, aux h d3)
+    | DInLeft d1 -> DInLeft (aux h d1)
+    | DInRight d1 -> DInRight (aux h d1)
+  in aux h d
 
-(* k is the index from which the context is changed *)
+let map_kind inc h f k =
+  let aux_f h fam = map_family inc h f fam in
+  let rec aux h k =
+  match k with
+  | Type -> k
+  | KProd (id, f1, k1) -> KProd (id, aux_f h f1, aux (inc h) k)
+  in aux h k
+
+(* h is the index from which the context is changed *)
 (* n is the shift *)
-let lift_family k n =
-  map_family (fun k -> k+1) k
+let lift_family h n =
+  map_family (fun h -> h+1) h
 	     (fun _ b -> match b with
 			 | Bruijn (id, m)
-			   -> if m < k then DVar b
+			   -> if m < h then DVar b
 			      else DVar(Bruijn (id, m+n)))
 
-let lift_delta k n =
-  map_delta (fun k -> k+1) k
+let lift_delta h n =
+  map_delta (fun h -> h+1) h
 	    (fun _ b -> match b with
 			| Bruijn (id, m)
-			  -> if m < k then DVar b
+			  -> if m < h then DVar b
 			     else DVar(Bruijn (id, m+n)))
 
+let lift_kind h n =
+  map_kind (fun h -> h+1) h
+	   (fun _ b -> match b with
+		       | Bruijn (id, m)
+			 -> if m < h then DVar b
+			    else DVar(Bruijn (id, m+n)))
 
-(* If we map this function in the subexpression M of (lambda x. M) d *)
-(* then the result correspond to the beta-reduction M[d/x] *)
-let beta_redex_map d k b =
-  match b with
-  | Bruijn (id, m)
-    -> if m < k then DVar b (* bound variable *)
-       else if m = k then (* x *)
-	 lift_delta 0 k d
-       else (* we change the index as the enclosing lambda goes away *)
-	 DVar (Bruijn (id, m-1))
+
+(* Transform (lambda x. d1) d2 into d1[d2/x] *)
+let beta_redex d1 d2 =
+  let aux h b =
+    match b with
+    | Bruijn (id, m)
+      -> if m < h then DVar b (* bound variable *)
+	 else if m = h then (* x *)
+	   lift_delta 0 h d2
+	 else (* the enclosing lambda goes away *)
+	   DVar (Bruijn (id, m-1))
+  in map_delta (fun h -> k+1) 0 aux d1
+
+(* The indexes are broken during the parsing *)
+(* Broken indexes have a negative value *)
+let rec fix_index_family fam =
+  let aux id1 =
+    map_family (fun h -> h+1) 0
+	       (fun h b -> match b with
+			   | Bruijn (id, m)
+			     -> if id = id1 && m < 0 then
+				  DVar(Bruijn (id, h))
+				else DVar b) in
+  match fam with
+  | FProd (id1, f1, f2) -> let f2' = fix_index_family f2 in
+			   FProd (id1, fix_index_family f1, aux id1 f2')
+  | FAbs (id1, f1, f2) -> let f2' = fix_index_family f2 in
+		  FAbs (id1, fix_index_family f1, aux id1 f2')
+  | FApp (f1, d1) -> FApp (fix_index_family f1, fix_index_delta d1)
+  | FInter (f1, f2) -> FInter (fix_index_family f1, fix_index_family f2)
+  | FUnion (f1, f2) -> FUnion (fix_index_family f1, fix_index_family f2)
+  | _ -> fam
+
+and fix_index_delta d =
+  let aux id1 =
+    map_delta (fun h -> h+1) 0
+	       (fun h b -> match b with
+			   | Bruijn (id, m)
+			     -> if id = id1 && m < 0 then
+				  DVar(Bruijn (id, h))
+				else DVar b) in
+  match d with
+  | DVar b1 -> d
+  | DStar -> d
+  | DAbs (id1, f1, d1) -> let d1' = fix_index_delta d1 in
+			  DAbs (id1, fix_index_family f1, aux id1 d1')
+  | DApp (d1, d2) -> DApp (fix_index_delta d1, fix_index_delta d2)
+
+  | DInter (d1, d2) -> DInter (fix_index_delta d1, fix_index_delta d2)
+  | DPrLeft d1 -> DPrLeft (fix_index_delta d1)
+  | DPrRight d1 -> DPrRight (fix_index_delta d1)
+  | DUnion (id1,f 1, d1, id2, f2, d2, d3)
+    -> let d1' = fix_index_delta d1 in
+       let d2' = fix_index_delta d2 in
+       DUnion (id1, fix_index_family f1, aux id1 d1', id2,
+	       fix_index_family f2, aux id2 d2', fix_index_delta d3)
+  | DInLeft d1 -> DInLeft (fix_index_delta d1)
+  | DInRight d1 -> DInRight (fix_index_delta d1)
+
+let fix_index_kind inc h f k =
+  let aux id1 =
+    map_kind (fun h -> h+1) 0
+	       (fun h b -> match b with
+			   | Bruijn (id, m)
+			     -> if id = id1 && m < 0 then
+				  DVar(Bruijn (id, h))
+				else DVar b) in
+  let rec aux h k =
+    match k with
+    | Type -> k
+    | KProd (id, f1, k1) -> let k1' = fix_index_kind KProd (id, aux_f h f1, aux (inc h) k)
+  in aux h k
 
      (* !!!!!!!!!!!!!!!!!!!!!!!!! *)
 let (fix_index_family, fix_index_delta, fix_index_gamma) =
@@ -112,7 +188,7 @@ let (fix_index_family, fix_index_delta, fix_index_gamma) =
       | DInjR d' -> BDInjR (delta_to_bruijn' d' env)
   in ((fun f -> family_to_bruijn' f []), (fun d -> delta_to_bruijn' d []), (fun d -> fun g -> delta_to_bruijn' d g))
 
-let rec kind_to_bruijn k =
+let rec kind_to_bruijn h =
   match k with
   | Type -> BType
   | KProd (id, f, k') -> BKProd (id, family_to_bruijn f, kind_to_bruijn k')

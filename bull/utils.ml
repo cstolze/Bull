@@ -10,6 +10,15 @@ type essence =
   | EApp of essence * essence
 
 (* Core types *)
+type term =
+  | Prod of string * term * term
+  | Abs of string * term * term
+  | App of term * term
+  | Inter of term * term
+  | Union of term * term
+  | Var of bruijn_index
+  | ???
+
 type family =
   | FProd of string * family * family
   | FAbs of string * family * family
@@ -51,8 +60,8 @@ type family =
   | DAbs (id1, f1, d1) ->
   | DApp (d1, d2) ->
   | DInter (d1, d2) ->
-  | DPrLeft d1
-  | DPrRight d1
+  | DPrLeft d1 ->
+  | DPrRight d1 ->
   | DUnion (id1, f1, d1, id2, f2, d2, d3) ->
   | DInLeft d1 ->
   | DInRight d1 ->
@@ -62,6 +71,11 @@ type kind =
   | Type
   | KProd of string * family * kind
 
+(*
+  match k with
+  | Type ->
+  | KProd (id, f1, k1) ->
+ *)
 (* We call sigma the context in which the delta-terms are processed *)
 type declaration =
   | DefType of kind

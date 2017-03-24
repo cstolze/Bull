@@ -71,3 +71,8 @@ and delta_to_string d =
   | DInjR d ->
      let t = aux d in
      "inj_r " ^ t
+
+let typecst_to_string id t = id ^ " : " ^ (kind_to_string (bruijn_to_kind t)) ^ "\n"
+let cst_to_string id t = "Constant " ^ id ^ " : " ^ (family_to_string (bruijn_to_family t)) ^ "\n"
+let def_to_string id t = let (a,b) = t in
+			 id ^ " = " ^ (delta_to_string (bruijn_to_delta a)) ^ " : " ^ (family_to_string (bruijn_to_family b)) ^ "\n"
