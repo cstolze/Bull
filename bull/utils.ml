@@ -387,3 +387,4 @@ let def_to_string id t = let (a,b) = t in
 			 id ^ " = " ^ (delta_to_string (bruijn_to_delta a)) ^ " : " ^ (family_to_string (bruijn_to_family b)) ^ "\n"
 
 																  (* todo : inference, proof *)
+
