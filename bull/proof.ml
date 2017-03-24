@@ -474,3 +474,4 @@ let proofstep p rule =
 	       | [] -> failwith "can't happen"
 	       | n' :: g -> PG(proof, essence, n', g)
 			    *)
+
