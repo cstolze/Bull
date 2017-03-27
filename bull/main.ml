@@ -298,4 +298,3 @@ let () =
     else
       main_loop lx (load (!initfile) (Sig ([], [], [])))
   end
-

@@ -221,5 +221,3 @@ let rec kind_compute k ctx =
   match k with
   | BType -> BType
   | BKProd (id, f, k') -> BKProd (id, family_compute f ctx, kind_compute k' ctx)
-
-
