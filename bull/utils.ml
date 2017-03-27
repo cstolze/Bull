@@ -3,84 +3,41 @@
 type bruijn_index =
   Bruijn of (string * int)
 
+(* sorts *)
+type sort = Type | Kind
+
 (* Pure lambda-terms *)
 type essence =
   | EVar of bruijn_index
   | EAbs of string * essence
   | EApp of essence * essence
+  | EProd of essence * essence
+  | ESort of sort
 
-(* Core types *)
+(* Core type *)
+(* Note: the Meta variables are useless till we implement a refiner *)
 type term =
+  | Sort of sort
   | Prod of string * term * term
   | Abs of string * term * term
   | App of term * term
   | Inter of term * term
   | Union of term * term
+  | SPair of term * term
+  | SPrLeft of term
+  | SPrRight of term
+  | SMatch of term * term
+  | SInLeft of term * term
+  | SInRight of term * term
   | Var of bruijn_index
-  | ???
+  | Omega
+  | Star
+  | Meta of bruijn_index
 
-type family =
-  | FProd of string * family * family
-  | FAbs of string * family * family
-  | FApp of family * delta
-  | FInter of family * family
-  | FUnion of family * family
-  | FAtom of string
-  | FOmega
-  | FAny
-
- and delta =
-   | DVar of bruijn_index
-   | DStar
-   | DAbs of string * family * delta
-   | DApp of delta * delta
-   | DInter of delta * delta
-   | DPrLeft of delta
-   | DPrRight of delta
-   | DUnion of string * family * delta
-	       * string * family * delta
-	       * delta
-   | DInLeft of delta
-   | DInRight of delta
-
-(*
-  match fam with
-  | FProd (id1, f1, f2) ->
-  | FAbs (id1, f1, f2) ->
-  | FApp (f1, d1) ->
-  | FInter (f1, f2) ->
-  | FUnion (f1, f2) ->
-  | FAtom id1 ->
-  | FOmega ->
-  | FAny ->
-
-  match d with
-  | DVar b1 ->
-  | DStar ->
-  | DAbs (id1, f1, d1) ->
-  | DApp (d1, d2) ->
-  | DInter (d1, d2) ->
-  | DPrLeft d1 ->
-  | DPrRight d1 ->
-  | DUnion (id1, f1, d1, id2, f2, d2, d3) ->
-  | DInLeft d1 ->
-  | DInRight d1 ->
- *)
-
-type kind =
-  | Type
-  | KProd of string * family * kind
-
-(*
-  match k with
-  | Type ->
-  | KProd (id, f1, k1) ->
- *)
 (* We call sigma the context in which the delta-terms are processed *)
 type declaration =
-  | DefType of kind
-  | DefConst of family
-  | DefDelta of delta * family
+  | DefConst of term
+  | DefLet of term * term
 
 type sigma =
   Sigma of (string * declaration) list
@@ -89,11 +46,9 @@ type sigma =
 type sentence =
   | Quit
   | Load of string
-  | Proof of string * family
-  | Typecst of string * kind
-  | Cst of string * family
-  | Typecheck of string * delta * family
-  | Typeinfer of string * delta
+  | Proof of string * term
+  | Axiom of string * term
+  | Definition of string * term * (term option)
   | Print of string
   | Print_all
   | Compute of string
@@ -131,13 +86,13 @@ type proofrule =
   | PQuit
   | PAbort
   | PBacktrack
-  | PExact of delta (* ; __ ; *)
+  | PExact of term (* ; __ ; *)
   | PAbst1 (* dependent case *)
   | PAbst2 of string (* non-dependent case (the user has to input a variable name *)
   | PSConj
-  | PSDisj of string * family * family
-  | PProjL of family
-  | PProjR of family
+  | PSDisj of string * term * term
+  | PProjL of term
+  | PProjR of term
   | PInjL
   | PInjR
 
