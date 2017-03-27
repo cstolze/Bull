@@ -1,210 +1,156 @@
-type kind =
-  | Type
-  | KProd of string * family * kind
-   and
-     family =
-     | SFc of family * family
-     | SProd of string * family * family
-     | SLambda of string * family * family
-     | SApp of family * delta
-     | SAnd of family * family
-     | SOr of family * family
-     | SAtom of string
-     | SOmega
-     | SAnything
-   and
-     delta =
-     | DVar of string
-     | DStar
-     | DLambda of string * family * delta
-     | DApp of delta * delta
-     | DAnd of delta * delta
-     | DProjL of delta
-     | DProjR of delta
-     | DOr of string * family * delta * string * family * delta * delta
-     | DInjL of delta
-     | DInjR of delta
-
-type bkind =
-  | BType
-  | BKProd of string * bfamily * bkind
-   and
-     bfamily =
-     | BSFc of bfamily * bfamily
-     | BSProd of string * bfamily * bfamily
-     | BSLambda of string * bfamily * bfamily
-     | BSApp of bfamily * bdelta
-     | BSAnd of bfamily * bfamily
-     | BSOr of bfamily * bfamily
-     | BSAtom of string
-     | BSOmega
-     | BSAnything
-   and
-     bdelta =
-     | BDVar of (string * bool * int) (* id * is_bound? * bruijn index *)
-     | BDStar
-     | BDLambda of string * bfamily * bdelta
-     | BDApp of bdelta * bdelta
-     | BDAnd of bdelta * bdelta
-     | BDProjL of bdelta
-     | BDProjR of bdelta
-     | BDOr of string * bfamily * bdelta * string * bfamily * bdelta * bdelta
-     | BDInjL of bdelta
-     | BDInjR of bdelta
-
-type sentence =
-  | Quit
-  | Load of string
-  | Proof of string * family
-  | Typecst of string * kind
-  | Cst of string * family
-  | Typecheck of string * delta * family
-  | Typeinfer of string * delta
-  | Print of string
-  | Print_all
-  | Compute of string
-  | Help
-  | Error
-
-type proofrule =
-  | PError
-  | PQuit
-  | PAbort
-  | PBacktrack
-  | PExact of delta (* ; __ ; *)
-  | PAbst1 (* dependent case *)
-  | PAbst2 of string (* non-dependent case (the user has to input a variable name *)
-  | PSConj
-  | PSDisj of string * bfamily * bfamily
-  | PProjL of bfamily
-  | PProjR of bfamily
-  | PInjL
-  | PInjR
-
-type path = Left | Middle | Right
-
-      (*
-type proofrule =
-  (* syntax directed *)
-  | POmega
-  | PVar of string
-  | PIntro of string
-  | PDependentIntro
-  | PAnd
-  | PInjL
-  | PInjR
-  (* non syntax directed *)
-  | PElim of bfamily
-  | PDependentElim of bfamily * bdelta
-  | PProjL of bfamily
-  | PProjR of bfamily
-  | POr of string * bfamily * bfamily
-  (* essence *)
-  (* | PPop : too complicated *)
-  | PBreak
-  (* control flow *)
-  | PBacktrack
-  | PAbort
-  | PSwitch
-       *)
-
-(*
-type proofnode =
-    PN of (int * int list * ((string * bfamily) list) * bfamily * proofrule option * int)
-(* parent ptr, children ptr list, gamma, rule, essence ptr *)
-
-type essencerule = EApp | EAbstr | EVar of int
-type essencenode =
-    EN of (int list * essencerule option * int list)
-(* children ptr list, rule, proof ptr list *)
-
-type proofgraph = PG of ((int * proofnode) list * (int * essencenode) list * int * int list)
-(* derivation tree, essence tree, goal, remaining goals *)
-       *)
-
-type signature =
-    Sig of ((string * bkind) list) * ((string * bfamily) list) * ((string * (bdelta * bfamily)) list) (* type constants, constants, definitions *)
-
-type lambda_bruijn =
-  | BVar of string * bool * int (* name * is it bound? * bruijn index *)
-  | BLambda of lambda_bruijn
-  | BApp of lambda_bruijn * lambda_bruijn
-
-(* to_string functions *)
-
-let rec kind_to_string k =
-  match k with
-  | Type -> "Type"
-  | KProd (id, f, k) -> "!" ^ id ^ " : " ^ (family_to_string f) ^ ". " ^ (kind_to_string k)
-and family_to_string f =
-  let aux f =
-    match f with
-    | SAtom x -> x
-    | SOmega -> "$"
-    | _ -> "(" ^ (family_to_string f) ^ ")"
-  in
-  let aux2 delta =
-    match delta with
-    | DVar i -> i
-    | DStar -> "*"
-    | DAnd (_, _) -> delta_to_string delta
-    | DOr (_, _, _, _, _, _, _) -> delta_to_string delta
-    | _ -> "(" ^ (delta_to_string delta) ^ ")"
-  in
-  match f with
-  | SFc (f1, f2) -> (aux f1) ^ " -> " ^ (aux f2)
-  | SProd (id, f1, f2) -> "!" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
-  | SLambda (id, f1, f2) -> "\\" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
-  | SApp (f1, d) -> (aux f1) ^ " " ^ (aux2 d)
-  | SAnd (f1, f2) -> (aux f1) ^ " & " ^ (aux f2)
-  | SOr (f1, f2) -> (aux f1) ^ " | " ^ (aux f2)
-  | SAtom id -> id
-  | SOmega -> "$"
-  | SAnything -> "?"
-and delta_to_string d =
-  let aux delta =
-    match delta with
-    | DVar i -> i
-    | DStar -> "*"
-    | DAnd (_, _) -> delta_to_string delta
-    | DOr (_, _, _, _, _, _, _) -> delta_to_string delta
-    | _ -> "(" ^ (delta_to_string delta) ^ ")"
-  in
-  match d with
-  | DVar i -> i
-  | DStar -> "*"
-  | DLambda (i, s, d) ->
-     let t = aux d in
-     "\\" ^ i ^ " : " ^ (family_to_string s) ^ ". " ^ t
-  | DApp (d1, d2) ->
-     let t1 = aux d1
-     in let t2 = aux d2 in
-	t1 ^ " " ^ t2
-  | DAnd (d1, d2) ->
-     let t1 = aux d1
-     in let t2 = aux d2 in
-	"< " ^ t1 ^ " & " ^ t2 ^ " >"
-  | DProjL d ->
-     let t = aux d in
-     "proj_l " ^ t
-  | DProjR d ->
-     let t = aux d in
-     "proj_r " ^ t
-  | DOr (x1, f1, d1, x2, f2, d2, d3) ->
-     let t1 = delta_to_string (DLambda (x1,f1,d1))
-     in let t2 = delta_to_string (DLambda (x2,f2,d2))
-	in let t3 = delta_to_string d3 in
-	   "< " ^ t1 ^  " | " ^ t2 ^ " # " ^ t3 ^ " >"
-  | DInjL d ->
-     let t = aux d in
-     "inj_l " ^ t
-  | DInjR d ->
-     let t = aux d in
-     "inj_r " ^ t
+open Utils
 
 (* conversion functions bruijn <-> normal *)
+(* TO FIX *)
 
-let (family_to_bruijn, delta_to_bruijn, delta_gamma) =
+(* TODO:
+cf matita source code:
+substitution
+lift
+fix_index => if the index are wrong and the ids are correct (for the lexer)
+fix_id => if the ids are wrong and the index are correct (after beta-conversion)
+also function for fixing Gamma
+ *)
+
+(* Map iterators *)
+(* inc modifies the counter h each time we add a level of abstraction *)
+(* f is a function that maps De Bruijn indexes to delta-terms *)
+let rec map_family inc h f fam =
+  let aux_d h d = map_delta inc h f d in
+  let rec aux h fam =
+  match fam with
+  | FProd (id1, f1, f2) -> FProd(id1, aux h f1, aux (inc h) f2)
+  | FAbs (id1, f1, f2) -> FAbs (id1, aux h f1, aux (inc h) f2)
+  | FApp (f1, d1) -> FApp (aux h fam, aux_d h d1)
+  | FInter (f1, f2) -> FInter (aux h f1, aux h f2)
+  | FUnion (f1, f2) -> FUnion (aux h f1, aux h f2)
+  | _ -> fam
+  in aux h fam
+
+and map_delta inc h f d =
+  let aux_f h fam = map_family inc h f fam in
+  let rec aux h d =
+    match d with
+    | DVar b1 -> f h b1
+    | DStar -> d
+    | DAbs (id1, f1, d1) -> DAbs (id1, aux_f h f1, aux (inc h) d1)
+    | DApp (d1, d2) -> DApp (aux h d1, aux h d2)
+    | DInter (d1, d2) -> DInter (aux h d1, aux h d2)
+    | DPrLeft d1 -> DPrLeft (aux h d1)
+    | DPrRight d1 -> DPrRight (aux h d1)
+    | DUnion (id1, f1, d1, id2, f2, d2, d3)
+      -> DUnion (id1, aux_f h f1, aux (inc h) d1, id2, aux_f h f2,
+		 aux (inc h) d2, aux h d3)
+    | DInLeft d1 -> DInLeft (aux h d1)
+    | DInRight d1 -> DInRight (aux h d1)
+  in aux h d
+
+let map_kind inc h f k =
+  let aux_f h fam = map_family inc h f fam in
+  let rec aux h k =
+  match k with
+  | Type -> k
+  | KProd (id, f1, k1) -> KProd (id, aux_f h f1, aux (inc h) k)
+  in aux h k
+
+(* h is the index from which the context is changed *)
+(* n is the shift *)
+let lift_family h n =
+  map_family (fun h -> h+1) h
+	     (fun _ b -> match b with
+			 | Bruijn (id, m)
+			   -> if m < h then DVar b
+			      else DVar(Bruijn (id, m+n)))
+
+let lift_delta h n =
+  map_delta (fun h -> h+1) h
+	    (fun _ b -> match b with
+			| Bruijn (id, m)
+			  -> if m < h then DVar b
+			     else DVar(Bruijn (id, m+n)))
+
+let lift_kind h n =
+  map_kind (fun h -> h+1) h
+	   (fun _ b -> match b with
+		       | Bruijn (id, m)
+			 -> if m < h then DVar b
+			    else DVar(Bruijn (id, m+n)))
+
+
+(* Transform (lambda x. d1) d2 into d1[d2/x] *)
+let beta_redex d1 d2 =
+  let aux h b =
+    match b with
+    | Bruijn (id, m)
+      -> if m < h then DVar b (* bound variable *)
+	 else if m = h then (* x *)
+	   lift_delta 0 h d2
+	 else (* the enclosing lambda goes away *)
+	   DVar (Bruijn (id, m-1))
+  in map_delta (fun h -> k+1) 0 aux d1
+
+(* The indexes are broken during the parsing *)
+(* Broken indexes have a negative value *)
+let rec fix_index_family fam =
+  let aux id1 =
+    map_family (fun h -> h+1) 0
+	       (fun h b -> match b with
+			   | Bruijn (id, m)
+			     -> if id = id1 && m < 0 then
+				  DVar(Bruijn (id, h))
+				else DVar b) in
+  match fam with
+  | FProd (id1, f1, f2) -> let f2' = fix_index_family f2 in
+			   FProd (id1, fix_index_family f1, aux id1 f2')
+  | FAbs (id1, f1, f2) -> let f2' = fix_index_family f2 in
+		  FAbs (id1, fix_index_family f1, aux id1 f2')
+  | FApp (f1, d1) -> FApp (fix_index_family f1, fix_index_delta d1)
+  | FInter (f1, f2) -> FInter (fix_index_family f1, fix_index_family f2)
+  | FUnion (f1, f2) -> FUnion (fix_index_family f1, fix_index_family f2)
+  | _ -> fam
+
+and fix_index_delta d =
+  let aux id1 =
+    map_delta (fun h -> h+1) 0
+	       (fun h b -> match b with
+			   | Bruijn (id, m)
+			     -> if id = id1 && m < 0 then
+				  DVar(Bruijn (id, h))
+				else DVar b) in
+  match d with
+  | DVar b1 -> d
+  | DStar -> d
+  | DAbs (id1, f1, d1) -> let d1' = fix_index_delta d1 in
+			  DAbs (id1, fix_index_family f1, aux id1 d1')
+  | DApp (d1, d2) -> DApp (fix_index_delta d1, fix_index_delta d2)
+
+  | DInter (d1, d2) -> DInter (fix_index_delta d1, fix_index_delta d2)
+  | DPrLeft d1 -> DPrLeft (fix_index_delta d1)
+  | DPrRight d1 -> DPrRight (fix_index_delta d1)
+  | DUnion (id1,f 1, d1, id2, f2, d2, d3)
+    -> let d1' = fix_index_delta d1 in
+       let d2' = fix_index_delta d2 in
+       DUnion (id1, fix_index_family f1, aux id1 d1', id2,
+	       fix_index_family f2, aux id2 d2', fix_index_delta d3)
+  | DInLeft d1 -> DInLeft (fix_index_delta d1)
+  | DInRight d1 -> DInRight (fix_index_delta d1)
+
+let fix_index_kind inc h f k =
+  let aux id1 =
+    map_kind (fun h -> h+1) 0
+	       (fun h b -> match b with
+			   | Bruijn (id, m)
+			     -> if id = id1 && m < 0 then
+				  DVar(Bruijn (id, h))
+				else DVar b) in
+  let rec aux h k =
+    match k with
+    | Type -> k
+    | KProd (id, f1, k1) -> let k1' = fix_index_kind KProd (id, aux_f h f1, aux (inc h) k)
+  in aux h k
+
+     (* !!!!!!!!!!!!!!!!!!!!!!!!! *)
+let (fix_index_family, fix_index_delta, fix_index_gamma) =
   let rec find_env x l =
     match l with
     | [] -> false
@@ -242,7 +188,7 @@ let (family_to_bruijn, delta_to_bruijn, delta_gamma) =
       | DInjR d' -> BDInjR (delta_to_bruijn' d' env)
   in ((fun f -> family_to_bruijn' f []), (fun d -> delta_to_bruijn' d []), (fun d -> fun g -> delta_to_bruijn' d g))
 
-let rec kind_to_bruijn k =
+let rec kind_to_bruijn h =
   match k with
   | Type -> BType
   | KProd (id, f, k') -> BKProd (id, family_to_bruijn f, kind_to_bruijn k')
@@ -360,30 +306,3 @@ let rec bruijn_to_kind k =
   match k with
   | BType -> Type
   | BKProd (id, f, k') -> let (id', k'') = alpha_conv id k' None k_check k_replace in KProd (id', bruijn_to_family f, bruijn_to_kind k'')
-
-(* auxiliary functions for using signature *)
-
-let rec find id l =
-  match l with
-  | [] -> false
-  | (x, y) :: l' -> if x = id then true else find id l'
-
-let rec get id l =
-  match l with
-  | [] -> failwith "the programmer should ensure this does not happen (use the find function)"
-  | (x, y) :: l' -> if x = id then y else get id l'
-
-let find_type id ctx = let Sig (a,b,c) = ctx in find id a
-let get_type id ctx = let Sig (a,b,c) = ctx in get id a
-let find_cst id ctx = let Sig (a,b,c) = ctx in find id b
-let get_cst id ctx = let Sig (a,b,c) = ctx in get id b (* we suppose id has already been found *)
-let find_def id ctx = let Sig (a,b,c) = ctx in find id c
-let get_def id ctx = let Sig (a,b,c) = ctx in get id c (* we suppose id has already been found *)
-let find_all id ctx = find_type id ctx || find_cst id ctx || find_def id ctx
-
-let typecst_to_string id t = id ^ " : " ^ (kind_to_string (bruijn_to_kind t)) ^ "\n"
-let cst_to_string id t = "Constant " ^ id ^ " : " ^ (family_to_string (bruijn_to_family t)) ^ "\n"
-let def_to_string id t = let (a,b) = t in
-			 id ^ " = " ^ (delta_to_string (bruijn_to_delta a)) ^ " : " ^ (family_to_string (bruijn_to_family b)) ^ "\n"
-
-																  (* todo : inference, proof *)

@@ -1,15 +1,15 @@
 
 
 (* Define our types *)
-Axiom o : Type.
+Axiom o : Set.
 (* Axiom omegatype : o. *)
 Axioms (arrow inter union : o -> o -> o).
 
 (* Transform our types into LF types *)
-Axiom OK : o -> Type.
+Axiom OK : o -> Set.
 
 (* Define the essence equality as an equivalence relation *)
-Axiom Eq : forall (s t : o), OK s -> OK t -> Type.
+Axiom Eq : forall (s t : o), OK s -> OK t -> Prop.
 Axiom Eqrefl : forall (s : o) (M : OK s), Eq s s M M.
 Axiom Eqsymm : forall (s t : o) (M : OK s) (N : OK t), Eq s t M N -> Eq t s N M.
 Axiom Eqtrans : forall (s t u : o) (M : OK s) (N : OK t) (O : OK u), Eq s t M N -> Eq t u N O -> Eq s u M O.
@@ -29,7 +29,7 @@ Axiom Inj_r : forall (s t : o) (M : OK t), OK (union s t).
 Axiom Copair : forall (s t u : o) (X : OK (arrow s u)) (Y : OK (arrow t u)), OK (union s t) -> Eq (arrow s u) (arrow t u) X Y -> OK u.
 
 (* omega *)
-Axiom star : OK omegatype.
+(* Axiom star : OK omegatype. *)
 
 (* define equality wrt arrow constructors *)
 Axiom Eqabst : forall (s t s' t' : o) (M : OK s -> OK t) (N : OK s' -> OK t'), (forall (x : OK s) (y : OK s'), Eq s s' x y -> Eq t t' (M x) (N y)) -> Eq (arrow s t) (arrow s' t') (Abst s t M) (Abst s' t' N).
@@ -58,7 +58,7 @@ Section Examples.
   (* lambda x. x x : (sigma inter (sigma -> tau)) -> tau *)
   Definition autoapp : OK (arrow (inter s (arrow s t)) t) :=
     Abst (inter s (arrow s t)) t (fun x : OK (inter s (arrow s t)) => App s t (Proj_r s (arrow s t) x) (Proj_l s (arrow s t) x)).
-  
+
   (* lambda x. x : (sigma -> sigma) inter (tau -> tau) *)
   Definition id1 : OK (inter (arrow s s) (arrow t t)) :=
     Pair (arrow s s) (arrow t t) (Abst s s (fun x : OK s => x)) (Abst t t (fun x : OK t => x)) (Eqabst s s t t (fun x : OK s => x) (fun x : OK t => x) (fun (x : OK s) (y : OK t) (Z : Eq s t x y) => Z)).
@@ -67,4 +67,42 @@ Section Examples.
   Definition id2 : OK (arrow (union s t) (union t s)) :=
     Abst (union s t) (union t s) (fun x : OK (union s t) => Copair s t (union t s) (Abst s (union t s) (fun y : OK s => Inj_r t s y)) (Abst t (union t s) (fun y : OK t => Inj_l t s y)) x (Eqabst s (union t s) t (union t s) (fun y : OK s => Inj_r t s y) (fun y : OK t => Inj_l t s y) (fun (x : OK s) (y : OK t) (Z : Eq s t x y) => Eqtrans (union t s) s (union t s) (Inj_r t s x) x (Inj_l t s y) (Eqinj_r t s s x x (Eqrefl s x)) (Eqtrans s t (union t s) x y (Inj_l t s y) Z (Eqsymm (union t s) t (Inj_l t s y) y (Eqinj_l t s t y y (Eqrefl t y))))))).
 
+  Definition id' : OK (arrow (union s t) (union t s)).
+  Proof.
+    apply (Abst (union s t) (union t s)).
+    intro x.
+    apply (Copair s t (union t s) (Abst s (union t s) (fun y : OK s => Inj_r t s y)) (Abst t (union t s) (fun y : OK t => Inj_l t s y)) x).
+    apply Eqabst.
+    intros.
+    assert (Eq s (union t s) x0 (Inj_r t s x0)).
+    {
+      apply Eqsymm.
+      apply Eqinj_r.
+      apply Eqrefl.
+    }
+    assert (Eq t (union t s) y (Inj_l t s y)).
+    {
+      apply Eqsymm.
+      apply Eqinj_l.
+      apply Eqrefl.
+    }
+    eapply Eqtrans.
+    apply (Eqsymm _ _ x0); trivial.
+    eapply Eqtrans.
+    apply H.
+    apply H1.
+  Defined.
+
 End Examples.
+
+Extraction id2.
+(* let id2 s t =
+  abst (union s t) (union t s) (fun x ->
+    copair s t (union t s) (abst s (union t s) (fun y -> inj_r t s y))
+      (abst t (union t s) (fun y -> inj_l t s y)) x) *)
+
+Extraction id'.
+(* let id' s t =
+  abst (union s t) (union t s) (fun x ->
+    copair s t (union t s) (abst s (union t s) (fun y -> inj_r t s y))
+      (abst t (union t s) (fun y -> inj_l t s y)) x) *)
