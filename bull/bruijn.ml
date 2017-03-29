@@ -9,8 +9,8 @@ substitution DONE
 lift DONE
 fix_index => if the index are wrong and the ids are correct (for the *)
 (* lexer) DONE
-fix_id => if the ids are wrong and the index are correct (after beta-conversion)
-also function for fixing Gamma
+fix_id => if the ids are wrong and the index are correct (after beta-conversion) DONE
+also function for fixing Gamma DONE
 
 NOTE : WE DO NOT DEAL WITH META VARIABLES FOR NOW
  *)
@@ -35,10 +35,12 @@ NOTE : WE DO NOT DEAL WITH META VARIABLES FOR NOW
   | Meta b1 ->
      *)
 
-(* Catamorphism iterator *)
+(* Visitor iterator *)
 (* goes recursively into most of the terms constructors *)
-let cata_term f t =
+let visit_term f g t =
   match t with
+  | Prod (id1, t1, t2) -> Prod (id1, f t1, g id1 t2)
+  | Abs (id1, t1, t2) -> Abs (id1, f t1, g id1 t2)
   | App (t1, t2) -> App (f t1, f t2)
   | Inter (t1, t2) -> Inter (f t1, f t2)
   | Union (t1, t2) -> Union (f t1, f t2)
@@ -57,136 +59,103 @@ let cata_term f t =
 let map_term inc k f t =
   let rec aux k t =
     match t with
-    | Prod (id1, t1, t2) -> Prod (id1, aux k t1, aux (inc k) t2)
-    | Abs (id1, t1, t2) -> Abs (id1, aux k t1, aux (inc k) t2)
-    | Var b1 -> f k b1
-    | _ -> cata_term (aux k) t
+    | Var (Bruijn (id, n)) -> f k id n
+    | _ -> visit_term (aux k) (fun id -> aux (inc id k)) t
   in aux k t
+
+let map_term' = map_term (fun _ k -> k+1)
 
 (* k is the index from which the context is changed *)
 (* n is the shift *)
 let lift k n =
-  map_term (fun k -> k+1) k
-	   (fun _ b -> match b with
-		       | Bruijn (id, m)
-			 -> if m < k then Var b
-			    else Var(Bruijn (id, m+n)))
+  map_term' k
+	   (fun _ id m -> if m < k then Var (Bruijn (id, m))
+			  else Var(Bruijn (id, m+n)))
 
 (* Transform (lambda x. t1) t2 into t1[t2/x] *)
 let beta_redex t1 t2 =
-  let aux k b =
-    match b with
-    | Bruijn (id, m)
-      -> if m < k then Var b (* bound variable *)
-	 else if m = k then (* x *)
-	   lift 0 k t2
-	 else (* the enclosing lambda goes away *)
-	   Var (Bruijn (id, m-1))
-  in map_term (fun k -> k+1) 0 aux t1
+  let aux k id m =
+    if m < k then Var (Bruijn (id, m)) (* bound variable *)
+    else if m = k then (* x *)
+      lift 0 k t2
+    else (* the enclosing lambda goes away *)
+      Var (Bruijn (id, m-1))
+  in map_term' 0 aux t1
 
 (* The indexes are broken during the parsing *)
 (* Broken indexes have a negative value *)
-let rec fix_index t =
-  let aux id1 =
-        map_term (fun k -> k+1) 0
-	       (fun k b -> match b with
-			   | Bruijn (id, m)
-			     -> if id = id1 && m < 0 then
-				  Var(Bruijn (id, k))
-				else Var b) in
-  match t with
-  | Prod (id1, t1, t2) -> let t2' = fix_index t2 in
-			  Prod (id1, fix_index t1, aux id1 t2')
-  | Abs (id1, t1, t2) -> let t2' = fix_index t2 in
-			  Abs (id1, fix_index t1, aux id1 t2')
-  | _ -> cata_term fix_index t
+
+let rec fix_index sigma =
+  map_term (fun id l ->
+	    (* DefConst Omega is a hack *)
+	    (id, DefConst Omega) :: l)
+	   sigma
+	   (fun l id m
+	    ->
+	    match (get_index id l) with
+	    | None -> Var(Bruijn(id, -1)) (* ERROR *)
+	    | Some n ->
+	       Var(Bruijn (id, n)))
 
 
-(* !!!!!!!!!!!!!!!!!!!!!!!!! *)
 
+(* is_free id t = true iff id appears as a free variable in t *)
 let is_free id t =
   let rec aux k t =
     match t with
-  | Prod (id1, t1, t2) -> aux k t1 && aux (k+1) t2
-  | Abs (id1, t1, t2) -> aux k t1 && aux (k+1) t2
-  | Var (Bruijn (id1, m)) -> if m >= k && id = id1 then true else false
+    | Var (Bruijn (id1, m)) -> if m >= k && id = id1 then true
+			       else false
+    | SPrLeft t1 -> aux k t1
+    | SPrRight t1 -> aux k t1
+    | Prod (id1, t1, t2) -> aux k t1 || aux (k+1) t2
+    | Abs (id1, t1, t2) -> aux k t1 || aux (k+1) t2
+    | App (t1, t2) -> aux k t1 || aux (k+1) t2
+    | Inter (t1, t2) -> aux k t1 || aux (k+1) t2
+    | Union (t1, t2) -> aux k t1 || aux (k+1) t2
+    | SPair (t1, t2) -> aux k t1 || aux (k+1) t2
+    | SMatch (t1, t2) -> aux k t1 || aux (k+1) t2
+    | SInLeft (t1, t2) -> aux k t1 || aux (k+1) t2
+    | SInRight (t1, t2) -> aux k t1 || aux (k+1) t2
+    | _ -> false
+  in aux 0 t
 
-let fix_id t =
-  
-     (* !!!!!!!!!!!!!!!!!!!!!!!!! *)
+(* find a fresh name for base_id (for alpha-conversion) *)
+(* we suppose is_free base_id t = true *)
+let new_ident base_id t =
+  let rec aux k =
+    let id = base_id ^ (string_of_int k) in
+    if is_free id t then aux (k+1) else id
+  in aux 0
 
-let rec f_replace f id n =
-  match f with
-  | BSFc (f1, f2) -> BSFc (f_replace f1 id n, f_replace f2 id (n+1))
-  | BSProd (id', f1, f2) -> BSProd (id', f_replace f1 id n, f_replace f2 id (n+1))
-  | BSLambda (id', f1, f2) -> BSLambda (id', f_replace f1 id n, f_replace f2 id (n+1))
-  | BSApp (f1, d2) -> BSApp (f_replace f1 id n, d_replace d2 id n)
-  | BSAnd (f1, f2) -> BSAnd (f_replace f1 id n, f_replace f2 id n)
-  | BSOr (f1, f2) -> BSOr (f_replace f1 id n, f_replace f2 id n)
-  | BSAtom id' -> f
-  | BSOmega -> f
-  | BSAnything -> f
-  and
-    d_replace d id n =
-    match d with
-    | BDVar (id', false, n') -> d
-    | BDVar (id', true, n') -> if (n = n') then BDVar (id, true, n') else d
-    | BDStar -> d
-    | BDLambda (id', f1, d') -> BDLambda (id', f_replace f1 id n, d_replace d' id (n+1))
-    | BDApp (d1, d2) -> BDApp (d_replace d1 id n, d_replace d2 id n)
-    | BDAnd (d1, d2) -> BDAnd (d_replace d1 id n, d_replace d2 id n)
-    | BDProjL d' -> BDProjL (d_replace d' id n)
-    | BDProjR d' -> BDProjR (d_replace d' id n)
-    | BDOr (id', f', d', id'', f'', d'', d''') ->
-       BDOr (id',
-	     f_replace f' id n,
-	     d_replace d' id (n+1),
-	     id'',
-	     f_replace f'' id n,
-	     d_replace d'' id (n+1),
-	     d_replace d''' id n)
-    | BDInjL d' -> BDInjL (d_replace d' id n)
-    | BDInjR d' -> BDInjR (d_replace d' id n)
+(* The ids are broken during beta-reduction *)
+let rec fix_id t =
+  let aux id t =
+    if is_free id t then
+      let new_id = new_ident id t in
+      fix_id @@ map_term' 0
+		(fun k id n
+		 -> Var (Bruijn (new_id, n))) t
+    else fix_id t
+  in visit_term fix_id aux t
 
-let rec bruijn_to_family f =
-  match f with
-  | BSFc (f1, f2) -> SFc (bruijn_to_family f1, bruijn_to_family f2)
-  | BSProd (id, f1, f2) -> let (id', f2') = alpha_conv id f2 None f_check f_replace in SProd (id', bruijn_to_family f1, bruijn_to_family f2')
-  | BSLambda (id, f1, f2) -> let (id', f2') = alpha_conv id f2 None f_check f_replace in SLambda (id', bruijn_to_family f1, bruijn_to_family f2')
-  | BSApp (f1, d2) -> SApp (bruijn_to_family f1, bruijn_to_delta d2)
-  | BSAnd (f1, f2) -> SAnd (bruijn_to_family f1, bruijn_to_family f2)
-  | BSOr (f1, f2) -> SOr (bruijn_to_family f1, bruijn_to_family f2)
-  | BSAtom id -> SAtom id
-  | BSOmega -> SOmega
-  | BSAnything -> SAnything
-  and
-    bruijn_to_delta d =
-    match d with
-    | BDVar (id, b, n) -> DVar id
-    | BDStar -> DStar
-    | BDLambda (id, f1, d') -> let (id', d'') = alpha_conv id d' None d_check d_replace in DLambda (id', bruijn_to_family f1, bruijn_to_delta d'')
-    | BDApp (d1, d2) -> DApp (bruijn_to_delta d1, bruijn_to_delta d2)
-    | BDAnd (d1, d2) -> DAnd (bruijn_to_delta d1, bruijn_to_delta d2)
-    | BDProjL d' -> DProjL (bruijn_to_delta d')
-    | BDProjR d' -> DProjR (bruijn_to_delta d')
-    | BDOr (id', f', d', id'', f'', d'', d''') ->
-       let (id'1, d'1) = alpha_conv id' d' None d_check d_replace in
-       let (id''1, d''1) = alpha_conv id'' d'' None d_check d_replace in
-       DOr (id'1, bruijn_to_family f', bruijn_to_delta d'1, id''1, bruijn_to_family f'', bruijn_to_delta d''1, bruijn_to_delta d''')
-    | BDInjL d' -> DInjL (bruijn_to_delta d')
-    | BDInjR d' -> DInjR (bruijn_to_delta d')
+(* gives the essence and type of the term of index n *)
 
-let rec bruijn_to_kind k =
-  let rec k_check id k n =
-    match k with
-    | BType -> true
-    | BKProd (id', f, k') -> (f_check id f n) && (k_check id k' (n+1))
+let get sigma gamma n =
+  let rec get f err n l =
+    match l with
+    | [] -> err n (* we suppose the index is correct *)
+    | x :: l' -> if n = 0 then f x else get f err (n-1) l'
   in
-  let rec k_replace k id n =
-    match k with
-    | BType -> k
-    | BKProd (id', f, k') -> BKProd (id', f_replace f id n, k_replace k' id (n+1))
-  in
-  match k with
-  | BType -> Type
-  | BKProd (id, f, k') -> let (id', k'') = alpha_conv id k' None k_check k_replace in KProd (id', bruijn_to_family f, bruijn_to_kind k'')
+  get
+    (fun t -> (Var (Bruijn ("_",n)), lift 0 n t))
+    (fun n -> get
+		(fun (_,x) ->
+		 match x with
+		 | DefConst t -> (Var (Bruijn ("_",n)), lift 0 n t)
+		 | DefLet (t1, t2, t3) -> (lift 0 n t2, lift 0 n t3)
+		)
+		(fun _ -> assert false)
+		n
+		sigma)
+    n
+    gamma

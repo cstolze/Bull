@@ -6,14 +6,6 @@ type bruijn_index =
 (* sorts *)
 type sort = Type | Kind
 
-(* Pure lambda-terms *)
-type essence =
-  | EVar of bruijn_index
-  | EAbs of string * essence
-  | EApp of essence * essence
-  | EProd of essence * essence
-  | ESort of sort
-
 (* Core type *)
 (* Note: the Meta variables are useless till we implement a refiner *)
 type term =
@@ -34,13 +26,11 @@ type term =
   | Star
   | Meta of bruijn_index
 
-(* We call sigma the context in which the delta-terms are processed *)
+(* In the contexts, there are let-ins and axioms *)
 type declaration =
   | DefConst of term
-  | DefLet of term * term
-
-type sigma =
-  Sigma of (string * declaration) list
+  (* term * essence * type *)
+  | DefLet of term * term * term
 
 (* Commands from the REPL *)
 type sentence =
@@ -69,15 +59,12 @@ module Result = struct
 
 (* auxiliary functions for using signature *)
 
-let rec get id l =
-  match l with
-  | [] -> None
-  | (x, y) :: l' -> if x = id then Some y else get id l'
-
-let rec get_index n l =
-  match l with
-  | [] -> assert false (* we suppose the index is correct *)
-  | x :: l' -> if n = 0 then x else get_index (n-1) l'
+let get_index id l =
+  let rec aux k l =
+    match l with
+    | [] -> None
+    | (x, y) :: l' -> if x = id then Some k else aux (k+1) l'
+  in aux 0 l
 
 (* !!!!!!!!!!!!!!!!!!!!!!!!! *)
 (* The proof module should be rewritten from scratch *)
