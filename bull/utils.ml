@@ -1,8 +1,3 @@
-(* We need both a string identifier and the Bruijn index for the terms, as we *)
-(* will print the identifier back to the user. *)
-type bruijn_index =
-  Bruijn of (string * int)
-
 (* sorts *)
 type sort = Type | Kind
 
@@ -10,8 +5,11 @@ type sort = Type | Kind
 (* Note: the Meta variables are useless till we implement a refiner *)
 type term =
   | Sort of sort
+  | Let of string * term * term
   | Prod of string * term * term
   | Abs of string * term * term
+  | Subset of string * term * term
+  | Subapp of string * term * term
   | App of term * term
   | Inter of term * term
   | Union of term * term
@@ -21,14 +19,16 @@ type term =
   | SMatch of term * term
   | SInLeft of term * term
   | SInRight of term * term
-  | Var of bruijn_index
+  | Coercion of term * term
+  | Var of int (* bruijn index *)
+  | Const of string (* variable name *)
   | Omega
   | Star
-  | Meta of bruijn_index
+  | Meta of int
 
 (* In the contexts, there are let-ins and axioms *)
 type declaration =
-  | DefConst of term
+  | DefAxiom of term
   (* term * essence * type *)
   | DefLet of term * term * term
 
@@ -56,15 +56,6 @@ module Result = struct
       | Ok a -> f a
       | Error b -> Error b
   end
-
-(* auxiliary functions for using signature *)
-
-let get_index id l =
-  let rec aux k l =
-    match l with
-    | [] -> None
-    | (x, y) :: l' -> if x = id then Some k else aux (k+1) l'
-  in aux 0 l
 
 (* !!!!!!!!!!!!!!!!!!!!!!!!! *)
 (* The proof module should be rewritten from scratch *)

@@ -1,6 +1,41 @@
 open Utils
 open Reduction
 
+(* TODO : ERROR HANDLING (see the parser) *)
+
+let type_of_sort s =
+  match s with
+  | Type -> Result.Ok Kind
+  | Kind -> Result.Error ("should not happen", Kind)
+
+let rec reconstruction id_list gamma t =
+  let bind f e t = Result.bind (e,t) f in
+  let bind2 f e1 t1 e2 t2 = bind (bind f e1 t1) e2 t2 in
+  match t with
+  | Sort s -> type_of_sort s
+  | Let (id1, t1, t2) ->
+  | Prod (id1, t1, t2) ->
+  | Abs (id1, t1, t2) ->
+  | Subset (id1, t1, t2) ->
+  | Subapp (id1, t1, t2) ->
+  | App (t1, t2) ->
+  | Inter (t1, t2) ->
+  | Union (t1, t2) ->
+  | SPair (t1, t2) ->
+  | SPrLeft t1 ->
+  | SPrRight t1 ->
+  | SMatch (t1, t2) ->
+  | SInLeft (t1, t2) ->
+  | SInRight (t1, t2) ->
+  | Coercion (t1, t2) ->
+  | Var n -> let (_, e, t) = get_from_context gamma n in Result.OK (e,t)
+  | Const id1 -> Error ("Error: constant" ^ id1 ^ "undeclared.",
+			Const id1)
+  | Omega
+  | Star
+  | Meta n ->
+
+
 (* increments the de Bruijn indexes everywhere in gamma *)
 let rec inc gamma =
   let rec family_inc f =
