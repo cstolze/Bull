@@ -23,7 +23,6 @@ type term =
   | Var of int (* bruijn index *)
   | Const of string (* variable name *)
   | Omega
-  | Star
   | Meta of int
 
 (* In the contexts, there are let-ins and axioms *)

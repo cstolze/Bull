@@ -6,7 +6,7 @@ rule read = parse
 	| ')' {CLOSP}
 	| '<' {LT}
 	| '>' {GT}
-	| '\\' {LAMBDA}
+	| 'fun' {LAMBDA}
 	| '.' {DOT}
 	| ',' {COMMA}
 	| ':' {COLON}
@@ -18,7 +18,7 @@ rule read = parse
 	| '|' {SOR}
 	| '*' {STAR}
 	| '$' {OMEGA}
-	| '!' {PI}
+	| "forall" {PI}
 	| "abort" {ABORT}
 	| "backtrack" {BACKTRACK}
 	| "intro" {INTRO}
@@ -34,7 +34,7 @@ rule read = parse
 	| "Load" {LOAD}
 	| "Proof" {PROOF}
 	| "Type" {TYPE}
-	| "Constant" {CONSTANT}
+	| "Axiom" {AXIOM}
 	| "Definition" {DELTATERM}
 	| "Compute" {COMPUTE}
 	| "Print" {PRINT}
