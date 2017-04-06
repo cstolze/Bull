@@ -1,136 +1,127 @@
-%{open Utils%}
+%{open Utils
+
+  let foo x f = let (l,t) = x in f l t
+  let foo2 x y f = foo y (foo x f)
+  let foo3 x y z f = foo z (foo2 x y f)
+
+  let fun0 f = (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), []), f)
+  let fun1 f x = foo x (fun l1 t1 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1]), f t1))
+  let fun2 f x y = foo2 x y (fun l1 t1 l2 t2 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1; l2]), f t1 t2))
+  let fun3 f x y z = foo3 x y z (fun l1 t1 l2 t2 l3 t3 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1; l2; l3]), f t1 t2 t3))
+%}
 
 %token OPENP
 %token CLOSP
+%token LT
+%token GT
 %token LAMBDA
+%token ENDLAMBDA
 %token DOT
 %token COMMA
 %token COLON
-%token STAR
-%token OMEGA
-%token PI
-%token EQUAL
+%token ASSIGN
 %token SEMICOLON
 %token ARROW
-%token SOR
 %token SAND
-%token SCONJ
-%token INTRO
-%token EXACT
-%token PROJLEFT
-%token PROJRIGHT
+%token SOR
+%token OMEGA
+%token SMATCH
+%token RETURN
+%token WITH
+%token PI
+%token SUBSET
+%token LAMBDAR
 %token INJLEFT
 %token INJRIGHT
-%token SDISJ
-%token BACKTRACK
-%token CHANGERULE
-%token ABORT
+%token PROJLEFT
+%token PROJRIGHT
 %token QUIT
 %token LOAD
-%token PROOF
+%token LEMMA
 %token TYPE
-%token CONSTANT
+%token AXIOM
+%token DEFINITION
 %token COMPUTE
-%token LT
-%token GT
-%token SHARP
-%token DELTATERM
 %token PRINT
 %token SIG
 %token HELP
 %token <string> ID
-		%token EOF
-
-		%start proof
-		%type <Utils.proofrule> proof
+%token EOF
 
 %start s
 %type <Utils.sentence> s
 
-			     %%
+%%
 
-			       s:
-    | QUIT SEMICOLON { Quit }
-    | LOAD ID SEMICOLON { Load $2 }
-    | PROOF ID COLON family SEMICOLON { Proof ($2, $4) }
-    | TYPE ID COLON kind SEMICOLON { Typecst ($2, $4) }
-    | CONSTANT ID COLON family SEMICOLON { Cst ($2, $4) }
-    | DELTATERM ID EQUAL deltaterm COLON family SEMICOLON { Typecheck ($2, $4, $6) }
-    | DELTATERM ID EQUAL deltaterm SEMICOLON { Typeinfer ($2, $4) }
-    | PRINT ID SEMICOLON { Print $2 }
-    | SIG SEMICOLON { Print_all }
-    | COMPUTE ID SEMICOLON { Compute $2 }
-    | HELP SEMICOLON { Help }
-    | error SEMICOLON { Error }
+s:
+    | QUIT DOT { Quit }
+    | LOAD ID DOT { Load $2 }
+    | LEMMA ID COLON term DOT { foo $4 (fun l t => Proof ($2, l, t)) }
+    | AXIOM ID COLON term DOT { foo $4 (fun l t => Axiom ($2, l, t)) }
+    | DEFINITION ID ASSIGN term COLON term
+		 DOT { foo2 $4 $6 (fun l1 t1 l2 t2 => Definition ($2, l1, t1, Some(l2,t2))) }
+    | DEFINITION ID ASSIGN term DOT { foo $4 (fun l t => Definition ($2, l, t)) }
+    | PRINT ID DOT { Print $2 }
+    | SIG DOT { Print_all }
+    | COMPUTE ID DOT { Compute $2 }
+    | HELP DOT { Help }
+    | error DOT { Error }
     | EOF { Quit }
     ;
 
-      kind:
-    | OPENP kind CLOSP { $2 }
-    | TYPE { Type }
-    | PI ID COLON family DOT kind { KProd ($2, $4, $6) }
-    ;
-
-      family:
-    | PI ID COLON family DOT family { SProd ($2, $4, $6) } /* lowest precedence */
-    | LAMBDA ID COLON family DOT family { SLambda ($2, $4, $6) }
-    | family2 { $1 }
-
-	family2:
-    | family3 ARROW family2 { SFc ($1, $3) } /* arrow is right-to-left */
-    | family3 { $1 }
-
-	family3:
-    | family4 SOR family3 { SOr ($1, $3) } /* sor is right-to-left */
-    | family4 { $1 }
-
-	family4:
-    | family5 SAND family4 { SAnd ($1, $3) } /* sand is right-to-left */
-    | family5 { $1 }
-
-	family5:
-    | family5 deltaterm3 { SApp ($1, $2) } /* highest precedence */ /* we choose deltaterm3 because it is like a deltaterm application, ie the deltaterm2 rule */
-    | ID { SAtom $1 }
-    | OMEGA { SOmega }
-    | OPENP family CLOSP { $2 }
-    ;
-
       /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the "application operator" (which does not exist, haha) automatically */
-      deltaterm:
-    | LAMBDA ID COLON family DOT deltaterm { DLambda ($2, $4, $6) } /* lowest precedence */
-    | deltaterm2 { $1 }
 
-	deltaterm2:
-    | deltaterm2 deltaterm3 { DApp ($1, $2) } /* applications are left-to-right */
-    | deltaterm3 { $1 }
-
-		 deltaterm3:
-    | PROJLEFT deltaterm3 { DProjL $2 }
-    | PROJRIGHT deltaterm3 { DProjR $2 }
-    | INJLEFT deltaterm3 { DInjL $2 }
-    | INJRIGHT deltaterm3 { DInjR $2 }
-    | deltaterm4 { $1 }
-
-	deltaterm4:
-    | OPENP deltaterm CLOSP { $2 } /* highest precedence */
-    | ID { DVar $1 }
-    | STAR { DStar }
-    | LT deltaterm SAND deltaterm GT { DAnd ($2, $4) }
-    | LT LAMBDA ID COLON family DOT deltaterm SOR LAMBDA ID COLON family DOT deltaterm SHARP deltaterm GT { DOr ($3, $5, $7, $10, $12, $14, $16) }
+term:
+    | PI ID COLON term COMMA
+	     term
+	     { fun2 (fun t1 t2 => Prod ($2, t1, t2)) $4 $6 }
+    | SUBSET ID COLON term COMMA
+	     term
+	     { fun2 (fun t1 t2 => Subset ($2, t1, t2)) $4 $6 }
+    | LAMBDA ID COLON term ENDLAMBDA
+	     term
+	     { fun2 (fun t1 t2 => Abs ($2, t1, t2)) $4 $6 }
+    | LAMBDAR ID COLON term ENDLAMBDA
+	     term
+	     { fun2 (fun t1 t2 => Subabs ($2, t1, t2)) $4 $6 }
+    | term2 { $1 }
     ;
 
-      proof:
-    | ABORT SEMICOLON { PAbort }
-    | BACKTRACK SEMICOLON { PBacktrack }
-    | INTRO SEMICOLON { PAbst1 }
-    | EXACT deltaterm SEMICOLON { PExact $2 }
-    | INTRO ID SEMICOLON { PAbst2 $2 }
-    | SCONJ SEMICOLON { PSConj }
-    | SDISJ ID COMMA family COMMA family SEMICOLON { PSDisj ($2, family_to_bruijn ($4), family_to_bruijn ($6)) }
-    | PROJLEFT family SEMICOLON { PProjL (family_to_bruijn $2) }
-    | PROJRIGHT family SEMICOLON { PProjR (family_to_bruijn $2) }
-    | INJLEFT SEMICOLON { PInjL }
-    | INJRIGHT SEMICOLON { PInjR }
-    | error SEMICOLON { PError }
-    | EOF { PQuit }
+term2:
+    | term3 ARROW term2 { fun2 (fun t1 t2 => Prod("", t1, t2)) $1 $3 } /* arrow is right-to-left */
+    | term3 { $1 }
+    ;
+
+term3:
+    | term4 SOR term3 { fun2 (fun t1 t2 => Union(t1, t2)) $1 $3 } /* union is right-to-left */
+    | term4 { $1 }
+    ;
+
+term4:
+    | term5 SAND term4 { fun2 (fun t1 t2 => Inter(t1, t2)) $1 $3 } /* inter is right-to-left */
+    | term5 { $1 }
+    ;
+
+term5:
+    | term5 term6 { fun2 (fun t1 t2 => App (t1, t2)) $1 $2 } /* applications are left-
+      to-right */
+    | term6 { $1 }
+    ;
+
+term6:
+    | PROJLEFT term6 { fun1 (fun t1 => SPrLeft (t1)) $2 }
+    | PROJRIGHT term6 { fun1 (fun t1 => SPrRight (t1)) $2 }
+    | INJLEFT term6 term6 { foo2 (fun t1 t2 => SInLeft (t1, t2)) $2 $3 }
+    | INJRIGHT term6 term6 { foo2 (fun t1 t2 => SInRight (t1, t2)) $2 $3 }
+    | term7 { $1 }
+    ;
+
+term7:
+    | OPENP term CLOSP { $2 } /* highest precedence */
+    | ID { fun0 (Const $1) }
+    | OMEGA { fun0 Omega }
+    | TYPE { fun0 (Sort Type) }
+    | LT term COMMA term GT { fun2 (fun t1 t2 => SPair (t1, t2)) $2 $4 }
+    | RETURN term WITH LT term COMMA term
+	     GT { fun3 (fun t1 t2 t3 => SMatch (t1, t2, t3)) $2 $5 $7 }
     ;

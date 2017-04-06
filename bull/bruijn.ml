@@ -23,14 +23,14 @@ let visit_term f g h t =
   | Prod (id1, t1, t2) -> Prod (h id1 t2, f t1, g (h id1 t2) t2)
   | Abs (id1, t1, t2) -> Abs (h id1 t2, f t1, g (h id1 t2) t2)
   | Subset (id1, t1, t2) -> Subset (h id1 t2, f t1, g (h id1 t2) t2)
-  | Subapp (id1, t1, t2) -> Subapp (h id1 t2, f t1, g (h id1 t2) t2)
+  | Subabs (id1, t1, t2) -> Subabs (h id1 t2, f t1, g (h id1 t2) t2)
   | App (t1, t2) -> App (f t1, f t2)
   | Inter (t1, t2) -> Inter (f t1, f t2)
   | Union (t1, t2) -> Union (f t1, f t2)
   | SPair (t1, t2) -> SPair (f t1, f t2)
   | SPrLeft t1 -> SPrLeft (f t1)
   | SPrRight t1 -> SPrRight (f t1)
-  | SMatch (t1, t2) -> SMatch (f t1, f t2)
+  | SMatch (t1, t2, t3) -> SMatch (f t1, f t2, f t3)
   | SInLeft (t1, t2) -> SInLeft (f t1, f t2)
   | SInRight (t1, t2) -> SInRight (f t1, f t2)
   | _ -> t
@@ -81,10 +81,11 @@ let is_const id t =
     | Const id1 -> id = id1
     | SPrLeft t1 | SPrRight t1 -> aux k t1
     | Prod (id1, t1, t2) | Abs (id1, t1, t2) | Subset (id1, t1, t2)
-    | Let (id1, t1, t2) | Subapp (id1, t1, t2) -> aux k t1 || aux (k+1) t2
+    | Let (id1, t1, t2) | Subabs (id1, t1, t2) -> aux k t1 || aux (k+1) t2
     | App (t1, t2) | Inter (t1, t2) | Union (t1, t2) | SPair (t1, t2)
-    | SMatch (t1, t2) | Coercion (t1, t2) | SInLeft (t1, t2)
+    | Coercion (t1, t2) | SInLeft (t1, t2)
     | SInRight (t1, t2) -> aux k t1 || aux k t2
+    | SMatch (t1, t2, t3) -> aux k t1 || aux k t2 || aux k t3
     | _ -> false
   in aux 0 t
 

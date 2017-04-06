@@ -24,7 +24,9 @@ let rec strongly_normalize gamma t =
   let t = sn_children t in
   match t with
   (* Beta-redex *)
-  | App (Abs (_,_, t1), t2) -> strongly_normalize gamma (beta_redex t1 t2)
+  | App (Abs (_,_, t1), t2)
+    -> strongly_normalize gamma (beta_redex t1 t2)
+  | App (Subabs (_,_, t1), t2) -> strongly_normalize gamma (beta_redex t1 t2)
   | Let (_, t1, t2) -> strongly_normalize gamma (beta_redex t1 t2)
   (* Delta-redex *)
   | Var n -> let (t1, _, _) = get_from_context gamma n in

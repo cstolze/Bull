@@ -3,7 +3,7 @@
 (* Define our types *)
 Axiom o : Set.
 (* Axiom omegatype : o. *)
-Axioms (arrow inter union : o -> o -> o).
+Axioms (arrow relev inter union : o -> o -> o).
 
 (* Transform our types into LF types *)
 Axiom OK : o -> Set.
@@ -16,16 +16,18 @@ Axiom Eqtrans : forall (s t u : o) (M : OK s) (N : OK t) (O : OK u), Eq s t M N 
 
 (* constructors for arrow (->I and ->E) *)
 Axiom Abst : forall (s t : o), ((OK s) -> (OK t)) -> OK (arrow s t).
+Axiom Sabst : forall (s t : o) (M : OK s -> OK t) (N : OK s), (Eq s t N (M N)) -> OK (relev s t).
 Axiom App : forall (s t : o), OK (arrow s t) -> OK s -> OK t.
+Axiom Sapp : forall (s t : o), OK (relev s t) -> OK s -> OK t.
 
 (* constructors for intersection *)
+Axiom Proj_l : forall (s t : o), OK (inter s t) -> OK s.
+Axiom Proj_r : forall (s t : o), OK (inter s t) -> OK t.
 Axiom Pair : forall (s t : o) (M : OK s) (N : OK t), Eq s t M N -> OK (inter s t).
-Axiom Proj_l : forall (s t : o) (M : OK (inter s t)), OK s.
-Axiom Proj_r : forall (s t : o) (M : OK (inter s t)), OK t.
 
 (* constructors for union *)
-Axiom Inj_l : forall (s t : o) (M : OK s), OK (union s t).
-Axiom Inj_r : forall (s t : o) (M : OK t), OK (union s t).
+Axiom Inj_l : forall (s t : o), OK s -> OK (union s t).
+Axiom Inj_r : forall (s t : o), OK t -> OK (union s t).
 Axiom Copair : forall (s t u : o) (X : OK (arrow s u)) (Y : OK (arrow t u)), OK (union s t) -> Eq (arrow s u) (arrow t u) X Y -> OK u.
 
 (* omega *)
@@ -34,9 +36,11 @@ Axiom Copair : forall (s t u : o) (X : OK (arrow s u)) (Y : OK (arrow t u)), OK 
 (* define equality wrt arrow constructors *)
 Axiom Eqabst : forall (s t s' t' : o) (M : OK s -> OK t) (N : OK s' -> OK t'), (forall (x : OK s) (y : OK s'), Eq s s' x y -> Eq t t' (M x) (N y)) -> Eq (arrow s t) (arrow s' t') (Abst s t M) (Abst s' t' N).
 Axiom Eqapp : forall (s t s' t' : o) (M : OK (arrow s t)) (N : OK s) (M' : OK (arrow s' t')) (N' : OK s'), Eq (arrow s t) (arrow s' t') M M' -> Eq s s' N N' -> Eq t t' (App s t M N) (App s' t' M' N').
+Axiom Eqsabst : forall (s t s' t' : o) (M : OK (relev s t)) (N : OK (relev s' t')), Eq (relev s t) (relev s' t') M N.
+Axiom Eqsapp : forall (s t : o) (M : OK (relev s t)) (x : OK s), Eq s t x (Sapp s t M x).
 
 (* define equality wrt intersection constructors *)
-Axiom Eqpair : forall (s t s' t' : o) (M : OK s) (N : OK t) (Z : Eq s t M N) (M' : OK s') (N' : OK t') (Z' : Eq s' t' M' N'), Eq s s' M M' -> Eq (inter s t) (inter s' t') (Pair s t M N Z) (Pair s' t' M' N' Z'). (* note that Eq s s' M M' could have been replace by Eq t t' N N', it does not matter because Eq is an equivalence relation *)
+Axiom Eqpair : forall (s t u : o) (M : OK s) (N : OK t) (O : OK u) (pf : Eq s t M N), (Eq s u M O) -> Eq (inter s t) u (Pair s t M N pf) O.
 Axiom Eqproj_l : forall (s t u : o) (M : OK (inter s t)) (N : OK u), Eq (inter s t) u M N -> Eq s u (Proj_l s t M) N.
 Axiom Eqproj_r : forall (s t u : o) (M : OK (inter s t)) (N : OK u), Eq (inter s t) u M N -> Eq t u (Proj_r s t M) N.
 

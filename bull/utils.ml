@@ -9,14 +9,14 @@ type term =
   | Prod of string * term * term
   | Abs of string * term * term
   | Subset of string * term * term
-  | Subapp of string * term * term
+  | Subabs of string * term * term
   | App of term * term
   | Inter of term * term
   | Union of term * term
   | SPair of term * term
   | SPrLeft of term
   | SPrRight of term
-  | SMatch of term * term
+  | SMatch of term * term * term
   | SInLeft of term * term
   | SInRight of term * term
   | Coercion of term * term
@@ -31,13 +31,17 @@ type declaration =
   (* term * essence * type *)
   | DefLet of term * term * term
 
+
+type loc =
+  | Locnode of Lexing.position * Lexing.position * loc list
+
 (* Commands from the REPL *)
 type sentence =
   | Quit
   | Load of string
-  | Proof of string * term
-  | Axiom of string * term
-  | Definition of string * term * (term option)
+  | Proof of string * loc * term
+  | Axiom of string * loc * term
+  | Definition of string * loc * term * ((loc * term) option)
   | Print of string
   | Print_all
   | Compute of string
