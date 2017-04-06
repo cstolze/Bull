@@ -1,0 +1,8 @@
+#directory "_build"
+
+#load "bruijn.cmo"
+#load "lexer.cmo"
+#load "main.cmo"
+#load "parser.cmo"
+#load "reduction.cmo"
+#load "utils.cmo"

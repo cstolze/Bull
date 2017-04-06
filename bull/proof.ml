@@ -21,7 +21,7 @@ Pour chaque essence-noeud :
  *)
 
 
-
+(*
 open Utils
 open Reduction
 open Inference
@@ -473,4 +473,5 @@ let proofstep p rule =
   | PSwitch -> match (enqueue goals n) with
 	       | [] -> failwith "can't happen"
 	       | n' :: g -> PG(proof, essence, n', g)
+			    *)
 			    *)

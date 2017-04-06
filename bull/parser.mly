@@ -56,11 +56,11 @@
 s:
     | QUIT DOT { Quit }
     | LOAD ID DOT { Load $2 }
-    | LEMMA ID COLON term DOT { foo $4 (fun l t => Proof ($2, l, t)) }
-    | AXIOM ID COLON term DOT { foo $4 (fun l t => Axiom ($2, l, t)) }
-    | DEFINITION ID ASSIGN term COLON term
-		 DOT { foo2 $4 $6 (fun l1 t1 l2 t2 => Definition ($2, l1, t1, Some(l2,t2))) }
-    | DEFINITION ID ASSIGN term DOT { foo $4 (fun l t => Definition ($2, l, t)) }
+    | LEMMA ID COLON term DOT { foo $4 (fun l t -> Proof ($2, l, t)) }
+    | AXIOM ID COLON term DOT { foo $4 (fun l t -> Axiom ($2, l, t)) }
+    | DEFINITION ID COLON term ASSIGN term
+		 DOT { foo2 $4 $6 (fun l1 t1 l2 t2 -> Definition ($2, l1, t1, Some(l2,t2))) }
+    | DEFINITION ID ASSIGN term DOT { foo $4 (fun l t -> Definition ($2, l, t, None)) }
     | PRINT ID DOT { Print $2 }
     | SIG DOT { Print_all }
     | COMPUTE ID DOT { Compute $2 }
@@ -74,45 +74,45 @@ s:
 term:
     | PI ID COLON term COMMA
 	     term
-	     { fun2 (fun t1 t2 => Prod ($2, t1, t2)) $4 $6 }
+	     { fun2 (fun t1 t2 -> Prod ($2, t1, t2)) $4 $6 }
     | SUBSET ID COLON term COMMA
 	     term
-	     { fun2 (fun t1 t2 => Subset ($2, t1, t2)) $4 $6 }
+	     { fun2 (fun t1 t2 -> Subset ($2, t1, t2)) $4 $6 }
     | LAMBDA ID COLON term ENDLAMBDA
 	     term
-	     { fun2 (fun t1 t2 => Abs ($2, t1, t2)) $4 $6 }
+	     { fun2 (fun t1 t2 -> Abs ($2, t1, t2)) $4 $6 }
     | LAMBDAR ID COLON term ENDLAMBDA
 	     term
-	     { fun2 (fun t1 t2 => Subabs ($2, t1, t2)) $4 $6 }
+	     { fun2 (fun t1 t2 -> Subabs ($2, t1, t2)) $4 $6 }
     | term2 { $1 }
     ;
 
 term2:
-    | term3 ARROW term2 { fun2 (fun t1 t2 => Prod("", t1, t2)) $1 $3 } /* arrow is right-to-left */
+    | term3 ARROW term2 { fun2 (fun t1 t2 -> Prod("", t1, t2)) $1 $3 } /* arrow is right-to-left */
     | term3 { $1 }
     ;
 
 term3:
-    | term4 SOR term3 { fun2 (fun t1 t2 => Union(t1, t2)) $1 $3 } /* union is right-to-left */
+    | term4 SOR term3 { fun2 (fun t1 t2 -> Union(t1, t2)) $1 $3 } /* union is right-to-left */
     | term4 { $1 }
     ;
 
 term4:
-    | term5 SAND term4 { fun2 (fun t1 t2 => Inter(t1, t2)) $1 $3 } /* inter is right-to-left */
+    | term5 SAND term4 { fun2 (fun t1 t2 -> Inter(t1, t2)) $1 $3 } /* inter is right-to-left */
     | term5 { $1 }
     ;
 
 term5:
-    | term5 term6 { fun2 (fun t1 t2 => App (t1, t2)) $1 $2 } /* applications are left-
+    | term5 term6 { fun2 (fun t1 t2 -> App (t1, t2)) $1 $2 } /* applications are left-
       to-right */
     | term6 { $1 }
     ;
 
 term6:
-    | PROJLEFT term6 { fun1 (fun t1 => SPrLeft (t1)) $2 }
-    | PROJRIGHT term6 { fun1 (fun t1 => SPrRight (t1)) $2 }
-    | INJLEFT term6 term6 { foo2 (fun t1 t2 => SInLeft (t1, t2)) $2 $3 }
-    | INJRIGHT term6 term6 { foo2 (fun t1 t2 => SInRight (t1, t2)) $2 $3 }
+    | PROJLEFT term6 { fun1 (fun t1 -> SPrLeft (t1)) $2 }
+    | PROJRIGHT term6 { fun1 (fun t1 -> SPrRight (t1)) $2 }
+    | INJLEFT term6 term6 { fun2 (fun t1 t2 -> SInLeft (t1, t2)) $2 $3 }
+    | INJRIGHT term6 term6 { fun2 (fun t1 t2 -> SInRight (t1, t2)) $2 $3 }
     | term7 { $1 }
     ;
 
@@ -121,7 +121,7 @@ term7:
     | ID { fun0 (Const $1) }
     | OMEGA { fun0 Omega }
     | TYPE { fun0 (Sort Type) }
-    | LT term COMMA term GT { fun2 (fun t1 t2 => SPair (t1, t2)) $2 $4 }
+    | LT term COMMA term GT { fun2 (fun t1 t2 -> SPair (t1, t2)) $2 $4 }
     | RETURN term WITH LT term COMMA term
-	     GT { fun3 (fun t1 t2 t3 => SMatch (t1, t2, t3)) $2 $5 $7 }
+	     GT { fun3 (fun t1 t2 t3 -> SMatch (t1, t2, t3)) $2 $5 $7 }
     ;

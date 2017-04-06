@@ -12,7 +12,6 @@ rule read = parse
 	| ',' {COMMA}
 	| ":=" {ASSIGN}
 	| ':' {COLON}
-	| '=' {EQUAL}
 	| ';' {SEMICOLON}
 	| "->" {ARROW}
 	| '&' {SAND}
