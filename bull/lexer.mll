@@ -6,39 +6,37 @@ rule read = parse
 	| ')' {CLOSP}
 	| '<' {LT}
 	| '>' {GT}
-	| 'fun' {LAMBDA}
+	| "fun" {LAMBDA}
+	| "=>" {ENDLAMBDA}
 	| '.' {DOT}
 	| ',' {COMMA}
+	| ":=" {ASSIGN}
 	| ':' {COLON}
 	| '=' {EQUAL}
 	| ';' {SEMICOLON}
-	| '#' {SHARP}
 	| "->" {ARROW}
 	| '&' {SAND}
 	| '|' {SOR}
-	| '*' {STAR}
 	| '$' {OMEGA}
+	| "smatch" {SMATCH}
+	| "return" {RETURN}
+	| "with" {WITH}
 	| "forall" {PI}
-	| "abort" {ABORT}
-	| "backtrack" {BACKTRACK}
-	| "intro" {INTRO}
-	| "exact" {EXACT}
-	| "inter" {SCONJ}
+	| "sforall" {SUBSET}
+	| "sfun" {LAMBDAR}
 	| "inj_l" {INJLEFT}
 	| "inj_r" {INJRIGHT}
-	| "union" {SDISJ}
 	| "proj_l" {PROJLEFT}
 	| "proj_r" {PROJRIGHT}
-	| "changerule" {CHANGERULE}
 	| "Quit" {QUIT}
 	| "Load" {LOAD}
-	| "Proof" {PROOF}
+	| "Lemma" {LEMMA}
 	| "Type" {TYPE}
 	| "Axiom" {AXIOM}
-	| "Definition" {DELTATERM}
+	| "Definition" {DEFINITION}
 	| "Compute" {COMPUTE}
+	| "Printall" {SIG}
 	| "Print" {PRINT}
-	| "Print_all" {SIG}
 	| "Help" {HELP}
 	| ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x {ID x}
 	| eof {EOF}
