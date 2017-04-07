@@ -31,7 +31,15 @@ type declaration =
   (* term * essence * type *)
   | DefLet of term * term * term
 
+(* find the de Bruijn index associated with an identifier *)
+let find id id_list =
+  let rec aux l n =
+    match l with
+    | [] -> None
+    | id' :: l' -> if id = id' then Some n else (aux l' (n+1))
+  in aux id_list 0
 
+(* location of text (for error reports) *)
 type loc =
   | Locnode of Lexing.position * Lexing.position * loc list
 
@@ -60,21 +68,3 @@ module Result = struct
       | Error b -> Error b
   end
 
-(* !!!!!!!!!!!!!!!!!!!!!!!!! *)
-(* The proof module should be rewritten from scratch *)
-type proofrule =
-  | PError
-  | PQuit
-  | PAbort
-  | PBacktrack
-  | PExact of term (* ; __ ; *)
-  | PAbst1 (* dependent case *)
-  | PAbst2 of string (* non-dependent case (the user has to input a variable name *)
-  | PSConj
-  | PSDisj of string * term * term
-  | PProjL of term
-  | PProjR of term
-  | PInjL
-  | PInjR
-
-type path = Left | Middle | Right

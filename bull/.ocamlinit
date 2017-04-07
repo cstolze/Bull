@@ -6,3 +6,4 @@
 #load "parser.cmo"
 #load "reduction.cmo"
 #load "utils.cmo"
+#load "printer.cmo"

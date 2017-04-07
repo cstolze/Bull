@@ -15,72 +15,40 @@ $ ./main.native [initfile]
 
 ----------------------------------------------------------------------------------------------------
 
-- How to use this program:
+- List of commands:
+Help.				     for a list of commands
+Load file.		      	     for loading a script file
+Axiom term : type.	    	     define a constant or an axiom
+Lemma proofname : term.        	     start an interactive proof (not implemented yet)
+Definition name [: type] := term.    define a term
+Print name. 	       	  	     print the definition of name
+Printall. 			     print all the signature (axioms and definitions)
+Compute name.			     normalize name and print the result
+Quit. 				     quit
 
-Help;				     for a list of commands
-Load file;		      	     for loading a script file
-Type typename : kind;	    	     define a type constant
-Constant cstname : type;       	     define a constant
-Proof proofname : type;        	     start an interactive proof (not implemented yet)
-Definition name = term [: type];     define a term
-Print name; 	       	  	     print the definition of name
-Print_all; 			     print all the signature (type constants, constants, definitions)
-Compute name;			     normalize name and print the result
-Quit; 				     quit
+Names are composed of any alphanumeric symbol, _ and '.
+Terms and types have the same syntax.
 
-Syntax of kinds:
-kind ::=
-| Type
-| ! x : type. kind					# for dependent types
-
-Syntax of types:
-type ::=
-| id
-| $
-| type -> type
-| ! x : type. type
-| \ x : type. type
-| type term
-| type & type
-| type | type
-
-Note: '$' is omega, '&' is intersection, '|' is union
-
-term ::=
-| id
-| *
-| term term
-| \ id : type . term
-| < term & term >
-| proj_l term
-| proj_r term
-| < \ id : type . term | \ id : type . term # term >
-| inj_l term
-| inj_r term
-
-The file "loadme" is an example of script/init file.
-
-The commands of the interactive prover are:
-- abort; abort the current proof
-- backtrack; go one step back in the proof flow
-- intro x; if the goal is "a -> b", introduce a variable x of type "a", the remaining goal is "b"
-- intro; if the goal is "! x : a. b", introduce a variable x of type "a", the remaining goal is "b"
-- exact term; solves the goal in one step by giving a term that typechecks to it.
-- inter; transforms a goal "a & b" into two goals "a" and "b"
-- union x,a,b; creates three goals:
-  1. same goal, but with a variable x of type "a".
-  2. same goal, but with a variable x of type "b".
-  3. goal is "a | b".
-- proj_l a; changes a goal "b" into "b & a"
-- proj_r a; changes a goal "b" into "a & b"
-- inj_l; changes a goal "a | b" into "a"
-- inj_r; changes a goal "a | b" into "b"
-
-Each time you enter a command, the software output the current goal and the local variables.
+Syntax of terms:
+| Type				# sort Type
+| name				# identifier
+| $				# omega, the universal type
+| forall x : term, term		# dependent product
+| term -> term	   		# non-dependent product
+| fun x : term => type		# lambda-abstraction
+| term term    	  		# application
+| term & term			# intersection of types
+| term | term			# union of types
+| <term, term>			# strong pair
+| proj_l term			# left projection of a strong pair
+| proj_r term			# right projection of a strong pair
+| return term with <term, term> # strong co-pair
+| inj_l term term   	  	# left injection
+| inj_r term term		# right injection
 
 ----------------------------------------------------------------------------------------------------
 
-Example of user session:
+Example of user session: (TO UPDATE)
 $ rlwrap ./main.native
 Type "Help;" for help.
 
@@ -101,7 +69,7 @@ g = \x : a. < \y : a. ((proj_l f) y) | \z : b. ((proj_r f) z) # inj_l x > : a ->
 
 ----------------------------------------------------------------------------------------------------
 
-Source code:
+Source code: (TO UPDATE)
 
 main.ml describes the REPL
 lexer.mll and parser.mly describes the lexer and the parser
@@ -114,5 +82,6 @@ proof.ml describes the proof-related functions
 
 TODO:
 
-Fix the proof system
-Implement subtyping
+Implement subtyping.
+Implement a refiner.
+Implement a proof system.

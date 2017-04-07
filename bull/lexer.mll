@@ -1,11 +1,14 @@
 {open Parser}
 
 rule read = parse
-	| ['\n' ' ' '\t'] {read lexbuf}
+        | [' ' '\t'] {read lexbuf}
+        | [ '\n' ] { begin Lexing.new_line lexbuf; read lexbuf end }
 	| '(' {OPENP}
 	| ')' {CLOSP}
 	| '<' {LT}
 	| '>' {GT}
+	| "let" {LET}
+	| "in" {IN}
 	| "fun" {LAMBDA}
 	| "=>" {ENDLAMBDA}
 	| '.' {DOT}
@@ -23,6 +26,7 @@ rule read = parse
 	| "forall" {PI}
 	| "sforall" {SUBSET}
 	| "sfun" {LAMBDAR}
+	| "coe" {COERCION}
 	| "inj_l" {INJLEFT}
 	| "inj_r" {INJRIGHT}
 	| "proj_l" {PROJLEFT}

@@ -1,78 +1,90 @@
-(* TO FIX *)
-(* Change the syntax of terms so it's more Coq-like *)
-(* Possible extension: do pretty-printing stuff whose types are Format.formatter -> t -> unit, so we can mess with the toplevel ocaml pretty-printer *)
+(* Possible extension: do pretty-printing functions whose types are Format.formatter -> t -> unit, so we can mess with the toplevel ocaml pretty-printer *)
 
-let rec kind_to_string k =
-  match k with
-  | Type -> "Type"
-  | KProd (id, f, k) -> "!" ^ id ^ " : " ^ (family_to_string f) ^ ". " ^ (kind_to_string k)
-and family_to_string f =
-  let aux f =
-    match f with
-    | SAtom x -> x
-    | SOmega -> "$"
-    | _ -> "(" ^ (family_to_string f) ^ ")"
-  in
-  let aux2 delta =
-    match delta with
-    | DVar i -> i
-    | DStar -> "*"
-    | DAnd (_, _) -> delta_to_string delta
-    | DOr (_, _, _, _, _, _, _) -> delta_to_string delta
-    | _ -> "(" ^ (delta_to_string delta) ^ ")"
-  in
-  match f with
-  | SFc (f1, f2) -> (aux f1) ^ " -> " ^ (aux f2)
-  | SProd (id, f1, f2) -> "!" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
-  | SLambda (id, f1, f2) -> "\\" ^ id ^ " : " ^ (family_to_string f1) ^ ". " ^ (aux f2)
-  | SApp (f1, d) -> (aux f1) ^ " " ^ (aux2 d)
-  | SAnd (f1, f2) -> (aux f1) ^ " & " ^ (aux f2)
-  | SOr (f1, f2) -> (aux f1) ^ " | " ^ (aux f2)
-  | SAtom id -> id
-  | SOmega -> "$"
-  | SAnything -> "?"
-and delta_to_string d =
-  let aux delta =
-    match delta with
-    | DVar i -> i
-    | DStar -> "*"
-    | DAnd (_, _) -> delta_to_string delta
-    | DOr (_, _, _, _, _, _, _) -> delta_to_string delta
-    | _ -> "(" ^ (delta_to_string delta) ^ ")"
-  in
-  match d with
-  | DVar i -> i
-  | DStar -> "*"
-  | DLambda (i, s, d) ->
-     let t = aux d in
-     "\\" ^ i ^ " : " ^ (family_to_string s) ^ ". " ^ t
-  | DApp (d1, d2) ->
-     let t1 = aux d1
-     in let t2 = aux d2 in
-	t1 ^ " " ^ t2
-  | DAnd (d1, d2) ->
-     let t1 = aux d1
-     in let t2 = aux d2 in
-	"< " ^ t1 ^ " & " ^ t2 ^ " >"
-  | DProjL d ->
-     let t = aux d in
-     "proj_l " ^ t
-  | DProjR d ->
-     let t = aux d in
-     "proj_r " ^ t
-  | DOr (x1, f1, d1, x2, f2, d2, d3) ->
-     let t1 = delta_to_string (DLambda (x1,f1,d1))
-     in let t2 = delta_to_string (DLambda (x2,f2,d2))
-	in let t3 = delta_to_string d3 in
-	   "< " ^ t1 ^  " | " ^ t2 ^ " # " ^ t3 ^ " >"
-  | DInjL d ->
-     let t = aux d in
-     "inj_l " ^ t
-  | DInjR d ->
-     let t = aux d in
-     "inj_r " ^ t
+open Utils
+open Bruijn
 
-let typecst_to_string id t = id ^ " : " ^ (kind_to_string (bruijn_to_kind t)) ^ "\n"
-let cst_to_string id t = "Constant " ^ id ^ " : " ^ (family_to_string (bruijn_to_family t)) ^ "\n"
-let def_to_string id t = let (a,b) = t in
-			 id ^ " = " ^ (delta_to_string (bruijn_to_delta a)) ^ " : " ^ (family_to_string (bruijn_to_family b)) ^ "\n"
+(* cli arguments *)
+
+let usage = "Usage: ./main.native [-v] [FILE]\n"
+let version_option = "-v"
+let version_text = "Bull  Copyright (C) 2016  Claude Stolze, ENS Rennes, UPMC, INRIA\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n"
+let version_doc = "output version information and exit\n"
+
+(* REPL text *)
+
+let prompt = "> "
+let welcome_message = "Type \"Help.\" for help.\n"
+let help_text = "List of commands:\nHelp.\t\t\t\t     show this list of commands\nLoad file.\t\t      \t     for loading a script file\nAxiom term : type.\t    \t     define a constant or an axiom\nLemma proofname : term.        \t     start an interactive proof (not implemented yet)\nDefinition name [: type] := term.    define a term\nPrint name. \t       \t  \t     print the definition of name\nPrintall. \t\t\t     print all the signature (axioms and definitions)\nCompute name.\t\t\t     normalize name and print the result\nQuit. \t\t\t\t     quit"
+
+(* Error messages *)
+
+let error_not_declared id = "Error: " ^ id ^ " is not a declared term."
+let error_declared id = "Error: " ^ id ^ " already exists."
+let syserror a = "System error: " ^ a ^ ".\n"
+let failure a = "Error: " ^ a ^ ".\n"
+let syntaxerror = "Syntax error.\n"
+let unknownerror = "Unknown error.\n"
+
+(* for the precedences, see parser.mly *)
+(* when calling aux, the precedence is (precedence-1) *)
+let string_of_term is_essence id_list t =
+  let rec aux t precedence =
+    let parentheseme trigger text =
+      if precedence < trigger then text else "(" ^ text ^ ")"
+    in
+    match t with
+    | Sort s -> (match s with
+		 | Type -> "Type"
+		 | Kind -> "Kind")
+    | Let (id, t1, t2) -> parentheseme 1 ("let " ^ id ^ " := "
+					  ^ aux t1 0 ^ " in " ^ aux t2 0)
+    | Prod (id, t1, t2) -> parentheseme 1 ("forall " ^ id ^ " : "
+					   ^ aux t1 0 ^ ", " ^ aux t2 0)
+    | Abs (id, t1, t2)
+      -> parentheseme 1 ("fun " ^ id ^ (if is_essence
+					then "" else " : " ^ aux t1 0)
+			 ^ " => " ^ aux t2 0)
+    | Subset (id, t1, t2) -> parentheseme 1 ("sforall " ^ id ^ " : "
+					     ^ aux t1 0 ^ ", "
+					     ^ aux t2 0)
+    | Subabs (id, t1, t2) -> parentheseme 1 ("sfun " ^ id ^ " : "
+					     ^ aux t1 0 ^ ", "
+					     ^ aux t2 0)
+    | App (t1, t2) -> parentheseme 5 (aux t1 4 ^ aux t2 5)
+    | Inter (t1, t2) -> parentheseme 4 (aux t1 4 ^ " & " ^ aux t2 3)
+    | Union (t1, t2) -> parentheseme 3 (aux t1 3 ^ " | " ^ aux t2 2)
+    | SPair (t1, t2) -> "< " ^  aux t1 0 ^ ", " ^ aux t2 0 ^ " >"
+    | SPrLeft t1 -> parentheseme 6 ("proj_l " ^ aux t1 5)
+    | SPrRight t1 -> parentheseme 6 ("proj_l " ^ aux t1 5)
+    | SMatch (t1, t2, t3) -> "return " ^ aux t1 0 ^ " with < "
+			     ^ aux t2 0 ^ ", " ^ aux t3 0 ^ " >"
+    | SInLeft (t1, t2) -> parentheseme 6 ("inj_l " ^ aux t1 5
+					  ^ aux t2 5)
+    | SInRight (t1, t2) -> parentheseme 6 ("inj_r " ^ aux t1 5
+					  ^ aux t2 5)
+    | Coercion (t1, t2) -> parentheseme 6 ("coe " ^ aux t1 5 ^ aux t2 5)
+    | Var _ -> assert false
+    | Const id -> id
+    | Omega -> "$"
+    | Meta n -> "?" ^ string_of_int n
+  in
+  aux (fix_id id_list t) 0
+
+(* wrappers for the print functions *)
+
+let pretty_print_term =
+  string_of_term false
+
+let pretty_print_essence =
+  string_of_term true
+
+let pretty_print_let (t1,t2,t3) id_list =
+  pretty_print_term id_list t1 ^ ", essence = "
+  ^ pretty_print_essence id_list t2
+  ^ " : " ^ pretty_print_term id_list t3
+
+let string_of_axiom id t id_list =
+  "Axiom " ^ id ^ " : " ^ pretty_print_term id_list t
+
+let string_of_let id tuple id_list =
+  "Definition" ^ id ^ " = " ^ pretty_print_let tuple id_list

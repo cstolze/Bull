@@ -16,6 +16,8 @@
 %token GT
 %token LAMBDA
 %token ENDLAMBDA
+%token LET
+%token IN
 %token DOT
 %token COMMA
 %token COLON
@@ -31,6 +33,7 @@
 %token PI
 %token SUBSET
 %token LAMBDAR
+%token COERCION
 %token INJLEFT
 %token INJRIGHT
 %token PROJLEFT
@@ -59,7 +62,7 @@ s:
     | LEMMA ID COLON term DOT { foo $4 (fun l t -> Proof ($2, l, t)) }
     | AXIOM ID COLON term DOT { foo $4 (fun l t -> Axiom ($2, l, t)) }
     | DEFINITION ID COLON term ASSIGN term
-		 DOT { foo2 $4 $6 (fun l1 t1 l2 t2 -> Definition ($2, l1, t1, Some(l2,t2))) }
+		 DOT { foo2 $6 $4 (fun l1 t1 l2 t2 -> Definition ($2, l1, t1, Some(l2,t2))) }
     | DEFINITION ID ASSIGN term DOT { foo $4 (fun l t -> Definition ($2, l, t, None)) }
     | PRINT ID DOT { Print $2 }
     | SIG DOT { Print_all }
@@ -84,6 +87,7 @@ term:
     | LAMBDAR ID COLON term ENDLAMBDA
 	     term
 	     { fun2 (fun t1 t2 -> Subabs ($2, t1, t2)) $4 $6 }
+    | LET ID ASSIGN term IN term { fun2 (fun t1 t2 -> Let ($2, t1, t2)) $4 $6 }
     | term2 { $1 }
     ;
 
@@ -109,6 +113,7 @@ term5:
     ;
 
 term6:
+    | COERCION term6 term6 { fun2 (fun t1 t2 -> Coercion (t1 ,t2)) $2 $3 }
     | PROJLEFT term6 { fun1 (fun t1 -> SPrLeft (t1)) $2 }
     | PROJRIGHT term6 { fun1 (fun t1 -> SPrRight (t1)) $2 }
     | INJLEFT term6 term6 { fun2 (fun t1 t2 -> SInLeft (t1, t2)) $2 $3 }
