@@ -16,7 +16,8 @@ let rec strongly_normalize gamma t =
   let sn_children = visit_term (strongly_normalize gamma)
 			       (fun _
 				    (* DefConst Omega is a hack *)
-				-> strongly_normalize ((DefAxiom Omega)
+				->
+				strongly_normalize ((DefAxiom (Omega, Omega))
 						       :: gamma))
 			       (fun id _ -> id)
   in
@@ -29,7 +30,7 @@ let rec strongly_normalize gamma t =
   | App (Subabs (_,_, t1), t2) -> strongly_normalize gamma (beta_redex t1 t2)
   | Let (_, t1, t2) -> strongly_normalize gamma (beta_redex t1 t2)
   (* Delta-redex *)
-  | Var n -> let (t1, _, _) = get_from_context gamma n in
+  | Var n -> let (t1, _, _, _) = get_from_context gamma n in
 	     (match t1 with
 	      | Var _ -> t1
 	      | _ -> strongly_normalize gamma t1)

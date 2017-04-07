@@ -27,9 +27,9 @@ type term =
 
 (* In the contexts, there are let-ins and axioms *)
 type declaration =
-  | DefAxiom of term
-  (* term * essence * type *)
-  | DefLet of term * term * term
+  | DefAxiom of term * term (* type * etype *)
+  (* term * type * essence * etype *)
+  | DefLet of term * term * term * term
 
 (* find the de Bruijn index associated with an identifier *)
 let find id id_list =

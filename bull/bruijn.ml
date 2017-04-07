@@ -129,8 +129,10 @@ let get_from_context gamma n =
     | [] -> assert false
     | x :: l -> if k = 0 then
 		  match x with
-		  | DefAxiom t -> (Var n, Var n, lift 0 (n+1) t)
-		  | DefLet (d, e, t)
-		    -> (lift 0 (n+1) d, lift 0 (n+1) e, lift 0 (n+1) t)
+		  | DefAxiom (t1, t2) -> (Var n, lift 0 (n+1) t1, Var n
+					  , lift 0 (n+1) t2)
+		  | DefLet (d, t, e, et)
+		    -> (lift 0 (n+1) d, lift 0 (n+1) t, lift 0 (n+1) e
+			, lift 0 (n+1) et)
 		else get (k-1) l
   in get n gamma

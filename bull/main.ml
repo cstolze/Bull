@@ -21,6 +21,7 @@ open Parser
 open Lexer
 open Bruijn
 open Reduction
+open Reconstruction
 open Printer
 
 (* cli arguments *)
@@ -43,26 +44,74 @@ let print id id_list sigma =
 let rec print_all id_list sigma =
   match (id_list, sigma) with
   | ([],[]) -> ()
-  | (id::l',DefAxiom t::s') ->
+  | (id::l',DefAxiom (t1,t2)::s') ->
      begin
-       print_endline (string_of_axiom id t id_list);
        print_all l' s';
+       print_endline (string_of_axiom id t1 t2 l');
      end
-  | (id::l',DefLet (t1,t2,t3)::s') ->
+  | (id::l',DefLet (t1,t2,t3,t4)::s') ->
      begin
-       print_endline (string_of_let id (t1,t2,t3) id_list);
        print_all l' s';
+       print_endline (string_of_let id (t1,t2,t3,t4) l');
      end
   | _ -> assert false
 
-let addaxiom id l t id_list sigma verbose = prerr_endline "TODO"; (id_list, sigma)
-
-let proof id l t id_list sigma verbose =
+let proof id str l t id_list sigma verbose =
   prerr_endline "Error: proof system not implemented.\n"; (id_list, sigma)
 
-let addlet id l t o id_list sigma verbose = prerr_endline "TODO"; (id_list, sigma)
 
-let normalize id id_list sigma = prerr_endline "TODO"
+let add_axiom id str l t id_list sigma verbose =
+  match find id id_list with
+  | Some n -> prerr_endline (error_declared id); (id_list, sigma)
+  | None -> let t = (fix_index id_list t) in
+	    match check_axiom sigma str l t with
+	    | Result.Ok (t') ->
+	       begin
+		 if verbose then
+		   print_endline (axiom_message id)
+		 else ();
+		 (id :: id_list, DefAxiom (t,t') :: sigma)
+	       end
+	    | Result.Error (reason) ->
+		 prerr_endline reason; (id_list, sigma)
+
+let add_let id str l d o id_list sigma verbose =
+  prerr_endline "TODO"; (id_list, sigma)
+
+(*
+let add_let id str l d o id_list sigma verbose =
+  match find id id_list with
+  | Some n -> prerr_endline (error_declared id); (id_list, sigma)
+  | None -> let d = (fix_index id_list t) in
+	    match reconstruction sigma str l d with
+	    | Result.Error (reason) ->
+		 prerr_endline reason; (id_list, sigma)
+	    | Result.Ok (e,t) ->
+	       match o with
+	       | None ->
+		  begin
+		    if verbose then
+		      print_endline (axiom_message id)
+		    else ();
+		    (id :: id_list, DefLet (d,e,t) :: sigma)
+		  end
+	       | Some (l', t') ->
+		  match reconstruction sigma str l' t' with
+		  | Result.Error (reason) ->
+		     prerr_endline reason; (id_list, sigma)
+		  | Result.Ok (e', s) -> ???????????????????????
+					   TODO: ESSENCE DU TYPE
+						 *)
+
+let normalize id id_list sigma =
+  match find id id_list with
+  | None -> prerr_endline (error_not_declared id)
+  | Some n -> let (d, t, e, et) = get_from_context sigma n in
+	      let d = strongly_normalize sigma d in
+	      let t = strongly_normalize sigma t in
+	      let e = strongly_normalize sigma e in
+	      let et = strongly_normalize sigma et in
+	      print_endline (pretty_print_let (d,t,e,et) id_list)
 
 (* repl *)
 
@@ -76,10 +125,10 @@ let rec repl lx id_list sigma verbose =
 	match Parser.s Lexer.read (Lexing.from_string str) with
 	| Quit -> (id_list, sigma)
 	| Load id -> loop (repl (Lexing.from_channel (open_in id)) id_list sigma false)
-	| Proof (id, l, t) -> loop (proof id l t id_list sigma verbose)
-	| Axiom (id, l, t) -> loop (addaxiom id l t id_list sigma verbose)
+	| Proof (id, l, t) -> loop (proof id str l t id_list sigma verbose)
+	| Axiom (id, l, t) -> loop (add_axiom id str l t id_list sigma verbose)
 	| Definition (id, l, t, o)
-	  -> loop (addlet id l t o id_list sigma verbose)
+	  -> loop (add_let id str l t o id_list sigma verbose)
 	| Print id -> print id id_list sigma; loop (id_list, sigma)
 	| Print_all -> print_all id_list sigma; loop (id_list, sigma)
 	| Compute id -> normalize id id_list sigma;

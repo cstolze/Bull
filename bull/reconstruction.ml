@@ -45,7 +45,14 @@ let type_prod id (e1,t1) (e2,t2) =
     | None -> Result.Error "TODO (type_prod)")
   | _ -> Result.Error "TODO (type_prod 2)"
 
-let type_abs id (e1,t1) (e2,t2) =
+let reconstruction gamma str l t =
+  Result.Ok (Meta 1, Meta 2, Meta 3) (* TO FIX *)
+
+let check_axiom gamma str l t =
+  Result.Ok (Meta 1) (* TO FIX *)
+
+
+(*let type_abs id (e1,t1) (e2,t2) =
   Result.Ok (Abs(id,e1,e2), Prod(id,t1,t2)) (* no *)
 
 let rec reconstruction id_list gamma t =
@@ -77,3 +84,4 @@ let rec reconstruction id_list gamma t =
   | Const id1 -> Result.Error ("TODO (unknown variable)")
   | Omega -> Result.Ok (Omega, Type)
   | Meta n -> Result.Error ("We don't manage meta variables for now.")
+ *)
