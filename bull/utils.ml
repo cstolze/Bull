@@ -16,13 +16,14 @@ type term =
   | SPair of term * term
   | SPrLeft of term
   | SPrRight of term
-  | SMatch of term * term * term
+  | SMatch of term * term
   | SInLeft of term * term
   | SInRight of term * term
   | Coercion of term * term
   | Var of int (* bruijn index *)
   | Const of string (* variable name *)
   | Omega
+  | Nothing (* type inside pure lambda-terms *)
   | Meta of int
 
 (* In the contexts, there are let-ins and axioms *)

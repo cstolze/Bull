@@ -7,7 +7,7 @@
   let fun0 f = (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), []), f)
   let fun1 f x = foo x (fun l1 t1 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1]), f t1))
   let fun2 f x y = foo2 x y (fun l1 t1 l2 t2 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1; l2]), f t1 t2))
-  let fun3 f x y z = foo3 x y z (fun l1 t1 l2 t2 l3 t3 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1; l2; l3]), f t1 t2 t3))
+
 %}
 
 %token OPENP
@@ -92,7 +92,7 @@ term:
     ;
 
 term2:
-    | term3 ARROW term2 { fun2 (fun t1 t2 -> Prod("", t1, t2)) $1 $3 } /* arrow is right-to-left */
+    | term3 ARROW term2 { fun2 (fun t1 t2 -> Prod("_", t1, t2)) $1 $3 } /* arrow is right-to-left */
     | term3 { $1 }
     ;
 
@@ -118,6 +118,7 @@ term6:
     | PROJRIGHT term6 { fun1 (fun t1 -> SPrRight (t1)) $2 }
     | INJLEFT term6 term6 { fun2 (fun t1 t2 -> SInLeft (t1, t2)) $2 $3 }
     | INJRIGHT term6 term6 { fun2 (fun t1 t2 -> SInRight (t1, t2)) $2 $3 }
+    | RETURN term WITH term6 { fun2 (fun t1 t2 -> SMatch (t1, t2)) $2 $4 }
     | term7 { $1 }
     ;
 
@@ -127,6 +128,4 @@ term7:
     | OMEGA { fun0 Omega }
     | TYPE { fun0 (Sort Type) }
     | LT term COMMA term GT { fun2 (fun t1 t2 -> SPair (t1, t2)) $2 $4 }
-    | RETURN term WITH LT term COMMA term
-	     GT { fun3 (fun t1 t2 t3 -> SMatch (t1, t2, t3)) $2 $5 $7 }
     ;

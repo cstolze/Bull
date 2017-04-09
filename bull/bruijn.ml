@@ -30,7 +30,7 @@ let visit_term f g h t =
   | SPair (t1, t2) -> SPair (f t1, f t2)
   | SPrLeft t1 -> SPrLeft (f t1)
   | SPrRight t1 -> SPrRight (f t1)
-  | SMatch (t1, t2, t3) -> SMatch (f t1, f t2, f t3)
+  | SMatch (t1, t2) -> SMatch (f t1, f t2)
   | SInLeft (t1, t2) -> SInLeft (f t1, f t2)
   | SInRight (t1, t2) -> SInRight (f t1, f t2)
   | _ -> t
@@ -83,9 +83,8 @@ let is_const id t =
     | Prod (id1, t1, t2) | Abs (id1, t1, t2) | Subset (id1, t1, t2)
     | Let (id1, t1, t2) | Subabs (id1, t1, t2) -> aux k t1 || aux (k+1) t2
     | App (t1, t2) | Inter (t1, t2) | Union (t1, t2) | SPair (t1, t2)
-    | Coercion (t1, t2) | SInLeft (t1, t2)
+    | Coercion (t1, t2) | SInLeft (t1, t2) | SMatch (t1, t2)
     | SInRight (t1, t2) -> aux k t1 || aux k t2
-    | SMatch (t1, t2, t3) -> aux k t1 || aux k t2 || aux k t3
     | _ -> false
   in aux 0 t
 
@@ -124,15 +123,9 @@ let fix_id id_list t =
 (* gives the term essence and type of the term of index n *)
 
 let get_from_context gamma n =
-  let rec get k gamma =
-    match gamma with
-    | [] -> assert false
-    | x :: l -> if k = 0 then
-		  match x with
-		  | DefAxiom (t1, t2) -> (Var n, lift 0 (n+1) t1, Var n
-					  , lift 0 (n+1) t2)
-		  | DefLet (d, t, e, et)
-		    -> (lift 0 (n+1) d, lift 0 (n+1) t, lift 0 (n+1) e
-			, lift 0 (n+1) et)
-		else get (k-1) l
-  in get n gamma
+    match List.nth gamma n with
+    | DefAxiom (t1, t2) -> (Var n, lift 0 (n+1) t1, Var n
+			    , lift 0 (n+1) t2)
+    | DefLet (d, t, e, et)
+      -> (lift 0 (n+1) d, lift 0 (n+1) t, lift 0 (n+1) e
+	  , lift 0 (n+1) et)

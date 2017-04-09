@@ -15,9 +15,8 @@ let beta_redex t1 t2 =
 let rec strongly_normalize gamma t =
   let sn_children = visit_term (strongly_normalize gamma)
 			       (fun _
-				    (* DefConst Omega is a hack *)
 				->
-				strongly_normalize ((DefAxiom (Omega, Omega))
+				strongly_normalize ((DefAxiom (Nothing, Nothing))
 						       :: gamma))
 			       (fun id _ -> id)
   in

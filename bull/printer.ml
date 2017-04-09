@@ -34,16 +34,17 @@ let string_of_term is_essence id_list t =
     | SPair (t1, t2) -> "< " ^  aux t1 0 ^ ", " ^ aux t2 0 ^ " >"
     | SPrLeft t1 -> parentheseme 6 ("proj_l " ^ aux t1 5)
     | SPrRight t1 -> parentheseme 6 ("proj_l " ^ aux t1 5)
-    | SMatch (t1, t2, t3) -> "return " ^ aux t1 0 ^ " with < "
-			     ^ aux t2 0 ^ ", " ^ aux t3 0 ^ " >"
+    | SMatch (t1, t2) -> parentheseme 6 ("return " ^ aux t1 0
+					 ^ " with " ^ (aux t2 5))
     | SInLeft (t1, t2) -> parentheseme 6 ("inj_l " ^ aux t1 5
-					  ^ aux t2 5)
+					  ^ " " ^ aux t2 5)
     | SInRight (t1, t2) -> parentheseme 6 ("inj_r " ^ aux t1 5
-					  ^ aux t2 5)
+					  ^ " " ^ aux t2 5)
     | Coercion (t1, t2) -> parentheseme 6 ("coe " ^ aux t1 5 ^ aux t2 5)
     | Var _ -> assert false
     | Const id -> id
     | Omega -> "$"
+    | Nothing -> assert false
     | Meta n -> "?" ^ string_of_int n
   in
   aux (fix_id id_list t) 0
@@ -87,12 +88,17 @@ let help_text = "List of commands:\nHelp.\t\t\t\t     show this list of commands
 
 (* Error messages *)
 
-let error_not_declared id = "Error: " ^ id ^ " is not a declared term."
-let error_declared id = "Error: " ^ id ^ " already exists."
+let error_not_declared id = "Error: " ^ id ^ " is not a declared term.\n"
+let error_declared id = "Error: " ^ id ^ " already exists.\n"
 let syserror a = "System error: " ^ a ^ ".\n"
 let failure a = "Error: " ^ a ^ ".\n"
 let syntaxerror = "Syntax error.\n"
 let unknownerror = "Unknown error.\n"
 let sort_error t id_list =
   "Error: sort is "
-  ^ pretty_print_term t id_list ^ " (should be Type or Kind)."
+  ^ pretty_print_term id_list t ^ " (should be Type or Kind).\n"
+
+let let_error t t' id_list =
+  "Error: type " ^ pretty_print_term id_list t'
+  ^ " is not compatible with "
+  ^ pretty_print_term id_list t ^ ".\n"

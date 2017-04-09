@@ -1,9 +1,17 @@
 #directory "_build"
 
-#load "bruijn.cmo"
-#load "lexer.cmo"
-#load "main.cmo"
-#load "parser.cmo"
-#load "reduction.cmo"
 #load "utils.cmo"
+open Utils
+#load "bruijn.cmo"
+open Bruijn
 #load "printer.cmo"
+open Printer
+#load "reduction.cmo"
+open Reduction
+#load "reconstruction.cmo"
+open Reconstruction
+
+#load "parser.cmo"
+#load "lexer.cmo"
+#load "sentence.cmo"
+
