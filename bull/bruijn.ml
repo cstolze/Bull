@@ -76,17 +76,19 @@ let rec fix_index id_list t =
 
 (* is_const id t = true iff Const id appears in t *)
 let is_const id t =
-  let rec aux k t =
+  let rec aux t =
     match t with
     | Const id1 -> id = id1
-    | SPrLeft t1 | SPrRight t1 -> aux k t1
+    | SPrLeft t1 | SPrRight t1 -> aux t1
     | Prod (id1, t1, t2) | Abs (id1, t1, t2) | Subset (id1, t1, t2)
-    | Let (id1, t1, t2) | Subabs (id1, t1, t2) -> aux k t1 || aux (k+1) t2
+    | Let (id1, t1, t2) |
+    Subabs (id1, t1, t2) -> aux t1 || (if id1 = id then false
+					    else aux t2)
     | App (t1, t2) | Inter (t1, t2) | Union (t1, t2) | SPair (t1, t2)
     | Coercion (t1, t2) | SInLeft (t1, t2) | SMatch (t1, t2)
-    | SInRight (t1, t2) -> aux k t1 || aux k t2
+    | SInRight (t1, t2) -> aux t1 || aux t2
     | _ -> false
-  in aux 0 t
+  in aux t
 
 (* find a fresh name for base_id (for alpha-conversion) *)
 (* we suppose is_const base_id t = true *)

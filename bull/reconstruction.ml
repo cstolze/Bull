@@ -1,16 +1,22 @@
 open Utils
 open Bruijn
 open Reduction
+open Printer
 
 (* returns the essence and the type of a term *)
 
 let is_equal gamma t t' =
+  let rec remove_id t = (* erase the identifiers *)
+    visit_term remove_id (fun _ -> remove_id) (fun _ _ -> "") t
+  in
+  let t = remove_id t in
+  let t' = remove_id t' in
   strongly_normalize gamma t = strongly_normalize gamma  t'
 
 let type_of_sort s =
   match s with
   | Type -> Result.Ok (Sort Kind, Sort Type, Sort Kind)
-  | Kind -> assert false
+  | Kind -> Result.Error (error_kind)
 
 (* returns the sort of Pi x : A. B, where A:s1 and b:s2 *)
 let principal_type_system s1 s2 =
@@ -43,36 +49,37 @@ let rec reconstruction str id_list gamma l t =
     r nl1 t1 (fun (s1,e1,_) ->
 	      match s1 with
 	      | Sort s -> Result.bind (r0 (x::id_list) (DefAxiom(t1,e1)::gamma) (get nl2) t2) (f s e1) (* note the signature of f *)
-	      | _ -> Result.Error "TODO (check_abs)")
+	      | _ -> Result.Error (error_abs id_list (get 0) str s1) )
   in
-  let type_prod s1 t2 = (* s1 is the sort of A in 'forall x:A, t2' *)
+  let type_prod x s1 t2 = (* s1 is the sort of A in 'forall x:A, t2' *)
     match t2 with
     | Sort s2 ->
        (match principal_type_system s1 s2 with
 	| Some s -> Result.Ok s
-	| None -> Result.Error "TODO (type_prod)")
-    | _ -> Result.Error "TODO (type_prod 2)"
+	| None -> Result.Error (error_pts getloc str))
+    | _ -> Result.Error (error_type_prod (x::id_list) getloc str t2)
   in
   let type_app t (t1,e1,et1) (t2,e2,et2) =
     match (t1,et1) with
-    | (Prod(_,_,t3), Prod (_,et2',et3)) -> if is_equal gamma et2 et2' then Result.Ok (beta_redex t3 t, App(e1,e2), beta_redex et3 e1)
-					   else Result.Error "TODO (type_app) no match"
-    | (Subset(_,_,t3), Subset(_,et2',et3)) -> if is_equal gamma et2 et2' then Result.Ok (beta_redex t3 t, e2, beta_redex et3 e1) else Result.Error "TODO (type_app) no match"
-    | _ -> Result.Error "TODO (type_app) no prod"
+    | (Prod(_,_,t3), Prod (_,et2',et3)) -> if is_equal gamma et2 et2' then Result.Ok (beta_redex t3 t, App(e1,e2), beta_redex et3 e2)
+					   else
+					     Result.Error (error_match id_list getloc str et2' et2)
+    | (Subset(_,_,t3), Subset(_,et2',et3)) -> if is_equal gamma et2 et2' then Result.Ok (beta_redex t3 t, e2, beta_redex et3 e2) else Result.Error (error_match id_list getloc str et2' et2)
+    | _ -> Result.Error (error_no_prod id_list (get 0) str t1)
   in
   let type_sproj b t1 = (* b = true -> proj_left *)
      r 0 t1
        (fun (t1,e1,et1) ->
 	match (t1,et1) with
 	| (Inter(l,r),Inter(el,er)) -> Result.Ok((if b then l else r),e1,if b then el else er)
-	| _ -> Result.Error "TODO (SProj)")
+	| _ -> Result.Error (error_sproj id_list (get 0) str t1))
   in
   let type_set s1 s2 e = (* look if s1 = s2 and if we are dealing with sets *)
     if s1 = s2 then
       match s1 with
-      | Sort s -> if is_set s then Result.Ok (Sort s,e,Sort s) else Result.Error "TODO (type_set) set"
-      | _ -> Result.Error "TODO (type_set) sort"
-    else Result.Error "TODO (type_set) equal"
+      | Sort s -> if is_set s then Result.Ok (Sort s,e,Sort s) else Result.Error (error_set getloc str)
+      | _ -> Result.Error (error_set getloc str)
+    else Result.Error (error_set getloc str)
   in
   let type_union_inter b t1 t2 = (* b = true -> inter *)
     r2 t1 t2 (fun (s1,e1,_) (s2,e2,_) ->
@@ -92,19 +99,21 @@ let rec reconstruction str id_list gamma l t =
      r 0 t1
        (fun (t1',e1',et1')
 	-> r0 (id::id_list) (DefLet(t1,t1',e1',et1') :: gamma) (get 1) t2)
-  | Prod (id,t1,t2) -> check_abs id 0 t1 1 t2 (fun s1 e1 (t2,e2,_) -> Result.bind (type_prod s1 t2) (fun s -> Result.Ok (Sort s,Prod(id,e1,e2),Sort s)))
+  | Prod (id,t1,t2) -> check_abs id 0 t1 1 t2 (fun s1 e1 (t2,e2,_)
+					       ->
+					       Result.bind (type_prod id s1 t2) (fun s -> Result.Ok (Sort s,Prod(id,e1,e2),Sort s)))
   | Abs (id,t1,t2) -> check_abs id 0 t1 1 t2 (fun s1 e1 (t2,e2,et2) ->
  					      (* hack to see if Prod(id,t1,t2) is well-defined *)
 						 Result.bind (r0 id_list gamma l (Prod(id,t1,t2)))
 							     (fun (_,et,_) -> Result.Ok (Prod(id,t1,t2), Abs(id,Nothing,e2),Prod(id,e1,et2))))
-  | Subset (id,t1,t2) -> check_abs id 0 t1 1 t2 (fun s1 e1 (t2,e2,_) -> type_set (Sort s1) t2 (Prod(id,e1,e2)))
+  | Subset (id,t1,t2) -> check_abs id 0 t1 1 t2 (fun s1 e1 (t2,e2,_) -> type_set (Sort s1) t2 (Subset(id,e1,e2)))
   | Subabs (id,t1,t2) -> check_abs id 0 t1 1 t2 (fun s1 e1 (t2,e2,et2) ->
 						 if is_equal (DefAxiom(Nothing,Nothing)::gamma) e2 (Var 0) then
 						   (* hack to see if Subset(id,t1,t2) is well-defined *)
 						   Result.bind (r0 id_list gamma l (Subset(id,t1,t2)))
 							       (fun (_,et,_) -> Result.Ok (Subset(id,t1,t2), Abs(id,Nothing,e2),Subset(id,e1,et2)))
-						 else Result.Error "TODO subabs essence")
-  | App (t1, t2) -> r2 t1 t2 (type_app t1)
+						 else Result.Error (error_essence getloc str))
+  | App (t1, t2) -> r2 t1 t2 (type_app t2)
   | Inter (t1, t2) -> type_union_inter true t1 t2
   | Union (t1, t2) -> type_union_inter false t1 t2
   | SPair (t1, t2) -> r2 t1 t2
@@ -112,9 +121,9 @@ let rec reconstruction str id_list gamma l t =
 			  if is_equal gamma e1 e2 then
 			    r2 t1 t2 (fun (s1,_,_) (s2,_,_) ->
 				      match (s1,s2) with
-				      | (Sort s1, Sort s2) -> if (s1 == s2) then if is_set s1 then Result.Ok (Inter (t1, t2), e1, Inter(et1,et2)) else Result.Error "TODO (SPair) not set" else Result.Error "TODO (SPair) not equal"
+				      | (Sort s1, Sort s2) -> if (s1 == s2) then if is_set s1 then Result.Ok (Inter (t1, t2), e1, Inter(et1,et2)) else Result.Error (error_set getloc str) else Result.Error (error_set getloc str)
 				      | _ -> assert false)
-			  else Result.Error "TODO (SPair) not essence")
+			  else Result.Error (error_essence getloc str))
   | SPrLeft t1 -> type_sproj true t1
   | SPrRight t1 -> type_sproj false t1
   | SMatch (t1, t2) -> r2 t1 t2 (fun (t1',e1',et1') (t2',e2',et2') ->
@@ -122,16 +131,16 @@ let rec reconstruction str id_list gamma l t =
 				 | (Prod(_,Union(a,b),f),
 				    Inter(Prod(_,a',fa),Prod(_,b',fb)))->
 				    if is_equal (DefAxiom(Nothing,Nothing)::gamma) fa fb then
-				      if is_equal (DefAxiom(Nothing,Nothing)::gamma) f fa then
+				      if is_equal (DefAxiom(Nothing,Nothing)::gamma) f fa && is_equal gamma a a' && is_equal gamma b b' then
 					Result.Ok (t1, e2', e1')
-				      else Result.Error "TODO Smatch type"
-				    else Result.Error "TODO Smatch domain"
-				 | _ -> Result.Error "TODO Smatch bigproblem")
+				      else Result.Error (error_return (get 0) str)
+				    else Result.Error (error_with (get 1) str)
+				 | _ -> Result.Error (error_smatch getloc str))
   | SInLeft (t1, t2) -> type_inj true t1 t2
   | SInRight (t1, t2) -> type_inj false t1 t2
   | Coercion (t1, t2) -> Result.Error("No coercion for now.\n")
   | Var n -> let (_,t,e,et) = get_from_context gamma n in Result.Ok(t,e,et)
-  | Const id -> Result.Error("TODO Const")
+  | Const id -> Result.Error(error_const getloc str id)
   | Omega -> Result.Ok(Sort Type, Omega, Sort Type)
   | Nothing -> assert false
   | Meta n -> Result.Error("No meta variables for now.\n")
@@ -140,4 +149,4 @@ let check_axiom str id_list gamma l t =
   Result.bind (reconstruction str id_list gamma l t)
 	      (fun (s,et,_) -> match s with
 			       | Sort s -> Result.Ok (et)
-			       | _ -> Result.Error "TODO check_axiom")
+			       | _ -> Result.Error error_axiom)

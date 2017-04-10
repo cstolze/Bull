@@ -1,45 +1,58 @@
 {open Parser}
 
-rule read = parse
-        | [' ' '\t'] {read lexbuf}
-        | [ '\n' ] { begin Lexing.new_line lexbuf; read lexbuf end }
-	| '(' {OPENP}
-	| ')' {CLOSP}
-	| '<' {LT}
-	| '>' {GT}
-	| "let" {LET}
-	| "in" {IN}
-	| "fun" {LAMBDA}
-	| "=>" {ENDLAMBDA}
-	| '.' {DOT}
-	| ',' {COMMA}
-	| ":=" {ASSIGN}
-	| ':' {COLON}
-	| ';' {SEMICOLON}
-	| "->" {ARROW}
-	| '&' {SAND}
-	| '|' {SOR}
-	| '$' {OMEGA}
-	| "smatch" {SMATCH}
-	| "return" {RETURN}
-	| "with" {WITH}
-	| "forall" {PI}
-	| "sforall" {SUBSET}
-	| "sfun" {LAMBDAR}
-	| "coe" {COERCION}
-	| "inj_l" {INJLEFT}
-	| "inj_r" {INJRIGHT}
-	| "proj_l" {PROJLEFT}
-	| "proj_r" {PROJRIGHT}
-	| "Quit" {QUIT}
-	| "Load" {LOAD}
-	| "Lemma" {LEMMA}
-	| "Type" {TYPE}
-	| "Axiom" {AXIOM}
-	| "Definition" {DEFINITION}
-	| "Compute" {COMPUTE}
-	| "Printall" {SIG}
-	| "Print" {PRINT}
-	| "Help" {HELP}
-	| ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x {ID x}
-	| eof {EOF}
+rule read buf = parse
+   | [' ' '\t'] as char { begin Buffer.add_char buf char;
+				read buf lexbuf end}
+   | [ '\n' ] { begin Buffer.add_char buf '\n'; Lexing.new_line lexbuf
+		      ; read buf lexbuf end }
+   | "(*" { begin Buffer.add_string buf "(*"; end_comment buf lexbuf; read buf lexbuf end }
+   | '(' { begin Buffer.add_char buf '('; OPENP end }
+   | ')' { begin Buffer.add_char buf ')'; CLOSP end }
+   | '<' { begin Buffer.add_char buf '<'; LT end }
+   | '>' { begin Buffer.add_char buf '>'; GT end }
+   | "let" { begin Buffer.add_string buf "let"; LET end }
+   | "in" { begin Buffer.add_string buf "in"; IN end }
+   | "fun" { begin Buffer.add_string buf "fun"; LAMBDA end }
+   | "=>" { begin Buffer.add_string buf "=>"; ENDLAMBDA end }
+   | '.' { begin Buffer.add_char buf '.'; DOT end }
+   | ',' { begin Buffer.add_char buf ','; COMMA end }
+   | ":=" { begin Buffer.add_string buf ":="; ASSIGN end }
+   | ':' { begin Buffer.add_char buf ':'; COLON end }
+   | ';' { begin Buffer.add_char buf ';'; SEMICOLON end }
+   | "->" { begin Buffer.add_string buf "->"; ARROW end }
+   | ">>" { begin Buffer.add_string buf ">>"; SARROW end }
+   | '&' { begin Buffer.add_char buf '&'; SAND end }
+   | '|' { begin Buffer.add_char buf '|'; SOR end }
+   | '$' { begin Buffer.add_char buf '$'; OMEGA end }
+   | "smatch" { begin Buffer.add_string buf "smatch"; SMATCH end }
+   | "return" { begin Buffer.add_string buf "return"; RETURN end }
+   | "with" { begin Buffer.add_string buf "with"; WITH end }
+   | "forall" { begin Buffer.add_string buf "forall"; PI end }
+   | "sforall" { begin Buffer.add_string buf "sforall"; SUBSET end }
+   | "sfun" { begin Buffer.add_string buf "sfun"; LAMBDAR end }
+   | "coe" { begin Buffer.add_string buf "coe"; COERCION end }
+   | "inj_l" { begin Buffer.add_string buf "inj_l"; INJLEFT end }
+   | "inj_r" { begin Buffer.add_string buf "inj_r"; INJRIGHT end }
+   | "proj_l" { begin Buffer.add_string buf "proj_l"; PROJLEFT end }
+   | "proj_r" { begin Buffer.add_string buf "proj_r"; PROJRIGHT end }
+   | "Quit" { begin Buffer.add_string buf "Quit"; QUIT end }
+   | "Load" { begin Buffer.add_string buf "Load"; LOAD end }
+   | "Lemma" { begin Buffer.add_string buf "Lemma"; LEMMA end }
+   | "Type" { begin Buffer.add_string buf "Type"; TYPE end }
+   | "Axiom" { begin Buffer.add_string buf "Axiom"; AXIOM end }
+   | "Definition" { begin Buffer.add_string buf "Definition"; DEFINITION end }
+   | "Compute" { begin Buffer.add_string buf "Compute"; COMPUTE end }
+   | "Printall" { begin Buffer.add_string buf "Printall"; SIG end }
+   | "Print" { begin Buffer.add_string buf "Print"; PRINT end }
+   | "Help" { begin Buffer.add_string buf "Help"; HELP end }
+   | '"' [^ '"' '\n' ]* '"' as x { begin Buffer.add_string buf x; QUOTE x end }
+   | ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x { begin Buffer.add_string buf x; ID x end }
+   | eof {EOF}
+and end_comment buf = parse
+   | "*)" { Buffer.add_string buf "*)" }
+   | "(*" { begin Buffer.add_string buf "(*"; end_comment buf lexbuf;
+		  end_comment buf lexbuf end }
+   | [ '\n' ] { begin Buffer.add_char buf '\n';
+		      Lexing.new_line lexbuf; end_comment buf lexbuf end }
+   | _ as char { begin Buffer.add_char buf char; end_comment buf lexbuf
+		 end }

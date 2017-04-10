@@ -23,6 +23,7 @@ open Bruijn
 open Reduction
 open Reconstruction
 open Printer
+open Lexing
 
 (* cli arguments *)
 
@@ -127,12 +128,19 @@ let rec repl lx id_list sigma verbose =
   let rec loop (id_list,sigma) =
     begin
       try
-	Lexing.flush_input lx;
-	if verbose then (print_string prompt; flush stdout) else ();
-	let str = Sentence.get lx in
-	match Parser.s Lexer.read (Lexing.from_string str) with
+	if verbose then (Lexing.flush_input lx; print_string prompt; flush stdout) else ();
+	let buf = Buffer.create 80 in
+	let rule = Parser.s (Lexer.read buf) lx in
+	let str = Buffer.contents buf in
+	match rule with
 	| Quit -> (id_list, sigma)
-	| Load id -> loop (repl (Lexing.from_channel (open_in id)) id_list sigma false)
+	| Load id -> loop (let lx = Lexing.from_channel (open_in id)
+			   in
+			   begin
+			     lx.lex_curr_p <- {lx.lex_curr_p with Lexing.pos_fname = id};
+			     repl lx id_list sigma false
+			   end
+			  )
 	| Proof (id, l, t) -> loop (proof id str l t id_list sigma verbose)
 	| Axiom (id, l, t) -> loop (add_axiom id str l t id_list sigma verbose)
 	| Definition (id, l, t, o)
@@ -142,7 +150,8 @@ let rec repl lx id_list sigma verbose =
 	| Compute id -> normalize id id_list sigma;
 			loop (id_list, sigma)
 	| Help -> help (); loop (id_list, sigma)
-	| Error -> prerr_endline syntaxerror;
+	| Error -> prerr_endline (syntaxerror str lx);
+		   Lexing.flush_input lx;
 		   loop (id_list, sigma)
       with
       | Failure a -> prerr_endline (failure a);

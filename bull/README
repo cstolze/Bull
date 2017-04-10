@@ -17,7 +17,7 @@ $ ./main.native [initfile]
 
 - List of commands:
 Help.				     for a list of commands
-Load file.		      	     for loading a script file
+Load "file".		      	     for loading a script file
 Axiom term : type.	    	     define a constant or an axiom
 Lemma proofname : term.        	     start an interactive proof (not implemented yet)
 Definition name [: type] := term.    define a term
@@ -28,6 +28,7 @@ Quit. 				     quit
 
 Names are composed of any alphanumeric symbol, _ and '.
 Terms and types have the same syntax.
+Comments are enclosed between (* and *), à la ocaml.
 
 Syntax of terms:
 | Type				# sort Type
@@ -42,41 +43,56 @@ Syntax of terms:
 | <term, term>			# strong pair
 | proj_l term			# left projection of a strong pair
 | proj_r term			# right projection of a strong pair
-| return term with <term, term> # strong co-pair
+| return term with term		# strong co-pair
 | inj_l term term   	  	# left injection
 | inj_r term term		# right injection
 
 ----------------------------------------------------------------------------------------------------
 
-Example of user session: (TO UPDATE)
+Example of user session:
 $ rlwrap ./main.native
-Type "Help;" for help.
+Welcome to Bull, an experimental LF-based proof checker with set-inspired types.
+Type "Help." for help.
 
-> Type a : Type;
-> Type b : Type;
-> Type c : Type;
-> Constant cst : c;
-> Definition f = <\x:a.cst & \y:b.cst>;
-f = < (\x : a. cst) & (\y : b. cst) > : (a -> c) & (b -> c)
+> Axiom a : Type.
+a is assumed.
 
-> Definition g = \ x : a . < \ y : a . proj_l f y | \ z : b . proj_r f z # inj_l x >;
-g = \x : a. < \y : a. ((proj_l f) y) | \z : b. ((proj_r f) z) # inj_l x > : a -> c
+> Axiom b : Type.
+b is assumed.
 
-> Compute g;
-\$x : a. cst
+> Axiom c : Type.
+c is assumed.
 
-> Quit;
+> Axiom cst : c.
+cst is assumed.
+
+> Definition f := < fun x : a => cst, fun y : b => cst >.
+f is defined.
+
+> Definition g := fun x : a => return (a | b) -> c with < fun y : a => proj_l f y, fun z : b => proj_r f z > inj_l b x.
+g is defined.
+
+> Compute g.
+fun x : a => return forall _ : a | b, c with < fun y : a => proj_l < fun x : a => cst, fun y : b => cst > y, fun z : b => proj_l < fun x : a => cst, fun y : b => cst > z > inj_l b x : forall x : a, c (essence = fun x => cst : forall x : a, c)
+> Quit.
 
 ----------------------------------------------------------------------------------------------------
 
-Source code: (TO UPDATE)
+barbanera.script is the implementation of the Barbanera-Dezani-De'Liguoro type system. Type
+> Load "barbanera.script".
+in a user session to load it. Or alternatively, launch the program with "barbanera.script" as a command-line argument.
+
+----------------------------------------------------------------------------------------------------
+
+Source code:
 
 main.ml describes the REPL
-lexer.mll and parser.mly describes the lexer and the parser
-utils.ml describes the types
-reduction.ml describes the normalization algorithm
-inference.ml describes the reconstruction algorithm
-proof.ml describes the proof-related functions
+lexer.mll and parser.mly describes the lexer and the parser.
+utils.ml describes the types.
+bruijn.ml implements functions related to de Bruijn indexes.
+printer.ml implements function printers and error printers.
+reduction.ml describes the normalization algorithm.
+reconstruction.ml describes the reconstruction algorithm.
 
 ----------------------------------------------------------------------------------------------------
 

@@ -6,7 +6,12 @@
 
   let fun0 f = (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), []), f)
   let fun1 f x = foo x (fun l1 t1 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1]), f t1))
-  let fun2 f x y = foo2 x y (fun l1 t1 l2 t2 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1; l2]), f t1 t2))
+  let fun2 f x y = foo2 x y (fun l1 t1 l2 t2
+			     -> (Locnode(Parsing.symbol_start_pos(),
+					 Parsing.symbol_end_pos ()
+					 , [l1; l2]), f t1 t2))
+  let quote s = String.trim (String.map (fun c -> if c = '"' then ' '
+						  else c) s)
 
 %}
 
@@ -24,6 +29,7 @@
 %token ASSIGN
 %token SEMICOLON
 %token ARROW
+%token SARROW
 %token SAND
 %token SOR
 %token OMEGA
@@ -48,6 +54,7 @@
 %token PRINT
 %token SIG
 %token HELP
+%token <string> QUOTE
 %token <string> ID
 %token EOF
 
@@ -58,7 +65,7 @@
 
 s:
     | QUIT DOT { Quit }
-    | LOAD ID DOT { Load $2 }
+    | LOAD QUOTE DOT { Load (quote $2) }
     | LEMMA ID COLON term DOT { foo $4 (fun l t -> Proof ($2, l, t)) }
     | AXIOM ID COLON term DOT { foo $4 (fun l t -> Axiom ($2, l, t)) }
     | DEFINITION ID COLON term ASSIGN term
@@ -68,7 +75,7 @@ s:
     | SIG DOT { Print_all }
     | COMPUTE ID DOT { Compute $2 }
     | HELP DOT { Help }
-    | error DOT { Error }
+    | error { Error }
     | EOF { Quit }
     ;
 
@@ -92,7 +99,9 @@ term:
     ;
 
 term2:
-    | term3 ARROW term2 { fun2 (fun t1 t2 -> Prod("_", t1, t2)) $1 $3 } /* arrow is right-to-left */
+    | term3 ARROW term2 { fun2 (fun t1 t2 -> Prod("_", t1, t2)) $1 $3
+			} /* arrow is right-to-left */
+    | term3 SARROW term2 { fun2 (fun t1 t2 -> Subset("_", t1, t2)) $1 $3 } /* sarrow is right-to-left */
     | term3 { $1 }
     ;
 

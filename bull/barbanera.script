@@ -1,0 +1,33 @@
+(* Object type *)
+Axiom o : Type.
+
+(* Type connectives *)
+Axiom carrow : o -> o -> o.
+Axiom cinter : o -> o -> o.
+Axiom cunion : o -> o -> o.
+Axiom crelev : o -> o -> o.
+
+(* To transform the object types into real types *)
+Axiom aOk : o -> Type.
+
+(* Semantics *)
+Axiom cabst : forall s : o, forall t : o, (aOk s -> aOk t) >> aOk (carrow s t).
+Axiom capp : forall s : o, forall t : o, aOk (carrow s t) >> aOk s -> aOk t.
+Axiom csabst : forall s : o, forall t : o,  (aOk s >> aOk t) >> aOk (crelev s t).
+Axiom csapp : forall s : o, forall t : o, aOk (crelev s t) >> aOk s >> aOk t.
+Axiom cpair : forall s : o, forall t : o, (aOk s & aOk t) >> aOk (cinter s t).
+Axiom cpri : forall s : o, forall t : o, aOk (cinter s t) >> (aOk s & aOk t).
+Axiom cini : forall s : o, forall t : o, (aOk s | aOk t) >> aOk (cunion s t).
+Axiom ccopair : forall s : o, forall t : o, aOk (cunion s t) >> (aOk s | aOk t).
+
+(************)
+(* EXAMPLES *)
+(************)
+
+Axiom s : o.
+Axiom t : o.
+
+Definition halfomega := cabst (cinter s (carrow s t)) t (fun x : aOk (cinter s (carrow s t)) => capp s t (proj_r (cpri s (carrow s t) x)) (proj_l (cpri s (carrow s t) x))).
+Definition idpair := cpair (carrow s s) (carrow t t) <cabst s s (fun x : aOk s => x), cabst t t (fun x : aOk t => x)>.
+Definition reflunion := cabst (cunion s t) (cunion t s) (fun x : aOk (cunion s t) => return (aOk s | aOk t) -> aOk (cunion t s) with <fun y : aOk s => cini t s (inj_r (aOk t) y), fun y : aOk t => cini t s (inj_l (aOk s) y)> (ccopair s t x)).
+Definition reflunion' := csabst (cunion s t) (cunion t s) (sfun x : aOk (cunion s t) => return (aOk s | aOk t) -> aOk (cunion t s) with <fun y : aOk s => cini t s (inj_r (aOk t) y), fun y : aOk t => cini t s (inj_l (aOk s) y)> (ccopair s t x)).

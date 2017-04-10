@@ -13,5 +13,4 @@ open Reconstruction
 
 #load "parser.cmo"
 #load "lexer.cmo"
-#load "sentence.cmo"
-
+#load "main.cmo"
