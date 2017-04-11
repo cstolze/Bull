@@ -78,9 +78,9 @@ fun x : a => return forall _ : a | b, c with < fun y : a => proj_l < fun x : a =
 
 ----------------------------------------------------------------------------------------------------
 
-barbanera.script is the implementation of the Barbanera-Dezani-De'Liguoro type system. Type
-> Load "barbanera.script".
-in a user session to load it. Or alternatively, launch the program with "barbanera.script" as a command-line argument.
+intersection_union.script is the implementation of the Barbanera-Dezani-De'Liguoro type system. Type
+> Load "intersection_union.script".
+in a user session to load it. Or alternatively, launch the program with "intersection_union.script" as a command-line argument.
 
 ----------------------------------------------------------------------------------------------------
 
