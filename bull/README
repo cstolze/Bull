@@ -33,10 +33,12 @@ Comments are enclosed between (* and *), à la ocaml.
 Syntax of terms:
 | Type				# sort Type
 | name				# identifier
-| $				# omega, the universal type
 | forall x : term, term		# dependent product
 | term -> term	   		# non-dependent product
 | fun x : term => type		# lambda-abstraction
+| sforall x : term, term	# relevant dependent product
+| term >> term	    		# relevant non-dependent product
+| sfun x : term => term		# relevant lambda-abstraction
 | term term    	  		# application
 | term & term			# intersection of types
 | term | term			# union of types
@@ -46,6 +48,13 @@ Syntax of terms:
 | return term with term		# strong co-pair
 | inj_l term term   	  	# left injection
 | inj_r term term		# right injection
+
+- Relevant lambda-abstractions only type terms equivalent to the identity function.
+- Strong pair has an intersection type and both its arguments must share the same essence.
+- The first argument of the strong co-pair must be its type (of the shape forall x : a | b, c),
+  and the second argument must have type (forall x : a, c) & (forall x : b, c).
+- The first argument of the injection is the type that is added in a union to the type of the
+  second argument.
 
 ----------------------------------------------------------------------------------------------------
 
@@ -63,17 +72,15 @@ b is assumed.
 > Axiom c : Type.
 c is assumed.
 
-> Axiom cst : c.
-cst is assumed.
-
-> Definition f := < fun x : a => cst, fun y : b => cst >.
+> Definition f := < fun x : a => x, fun y : b => y >.
 f is defined.
 
-> Definition g := fun x : a => return (a | b) -> c with < fun y : a => proj_l f y, fun z : b => proj_r f z > inj_l b x.
+> Definition g := sfun x : a => return (a | b) -> (b | a) with < fun y : a => inj_r b (proj_l f y), fun z : b => inj_l a (proj_r f z) > inj_l b x.
 g is defined.
 
 > Compute g.
-fun x : a => return forall _ : a | b, c with < fun y : a => proj_l < fun x : a => cst, fun y : b => cst > y, fun z : b => proj_l < fun x : a => cst, fun y : b => cst > z > inj_l b x : forall x : a, c (essence = fun x => cst : forall x : a, c)
+sfun x : a, return a | b -> b | a with < fun y : a => inj_r b (proj_l < fun x : a => x, fun y : b => y > y), fun z : b => inj_l a (proj_l < fun x : a => x, fun y : b => y > z) > inj_l b x : a >> b | a
+	essence = fun x => x : a >> b | a
 > Quit.
 
 ----------------------------------------------------------------------------------------------------
