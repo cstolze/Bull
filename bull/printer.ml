@@ -142,7 +142,6 @@ let syntaxerror str lx =
   let tok = Lexing.lexeme lx in
   error_loc curr curr str ^
   "Syntax error: \"" ^ tok ^ "\" encountered.\n"
-let unknownerror = "Unknown error.\n"
 
 let error_axiom =
   "Error: invalid type.\n"

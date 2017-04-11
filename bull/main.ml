@@ -158,7 +158,7 @@ let rec repl lx id_list sigma verbose =
 		     loop (id_list, sigma)
       | Sys_error a -> prerr_endline (syserror a);
 		       loop (id_list, sigma)
-      | _ -> prerr_endline unknownerror;
+      | e -> prerr_endline (Printexc.to_string e);
 	     loop (id_list, sigma)
     end
   in loop (id_list, sigma)
