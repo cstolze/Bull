@@ -1,4 +1,4 @@
-
+(* Encodings made thanks to the help of Furio Honsell and Ivan Scagnetto *)
 
 (* Define our types *)
 Axiom o : Set.
