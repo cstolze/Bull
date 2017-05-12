@@ -34,5 +34,13 @@ let rec strongly_normalize gamma t =
 	      | Var _ -> t1
 	      | _ -> strongly_normalize gamma t1)
   (* Eta-redex *)
-(* | Abs (t1, Var 0) -> eta_redex t1 NOT IMPLEMENTED *)
+  (* | Abs (t1, Var 0) -> eta_redex t1 NOT IMPLEMENTED *)
+  (* Pair-redex *)
+  | SPrLeft (SPair (x,_)) -> x
+  | SPrRight (SPair (_, x)) -> x
+  (* inj-reduction *)
+  | SMatch (x, SInLeft (_,y))
+    -> strongly_normalize gamma (App (SPrLeft x, y))
+  | SMatch (x, SInRight (_,y))
+    -> strongly_normalize gamma (App (SPrRight x, y))
   | _ -> t

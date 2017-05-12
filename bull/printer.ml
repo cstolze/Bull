@@ -77,7 +77,7 @@ let string_of_term is_essence id_list t =
     | Union (t1, t2) -> parentheseme 3 (aux t1 3 ^ " | " ^ aux t2 2)
     | SPair (t1, t2) -> "< " ^  aux t1 0 ^ ", " ^ aux t2 0 ^ " >"
     | SPrLeft t1 -> parentheseme 6 ("proj_l " ^ aux t1 5)
-    | SPrRight t1 -> parentheseme 6 ("proj_l " ^ aux t1 5)
+    | SPrRight t1 -> parentheseme 6 ("proj_r " ^ aux t1 5)
     | SMatch (t1, t2) -> parentheseme 6 ("return " ^ aux t1 0
 					 ^ " with " ^ (aux t2 5))
     | SInLeft (t1, t2) -> parentheseme 6 ("inj_l " ^ aux t1 5
