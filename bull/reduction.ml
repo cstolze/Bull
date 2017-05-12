@@ -39,8 +39,8 @@ let rec strongly_normalize gamma t =
   | SPrLeft (SPair (x,_)) -> x
   | SPrRight (SPair (_, x)) -> x
   (* inj-reduction *)
-  | SMatch (x, SInLeft (_,y))
+  | App (SMatch (_, x), SInLeft (_,y))
     -> strongly_normalize gamma (App (SPrLeft x, y))
-  | SMatch (x, SInRight (_,y))
+  | App (SMatch (_, x), SInRight (_,y))
     -> strongly_normalize gamma (App (SPrRight x, y))
   | _ -> t
