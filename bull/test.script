@@ -1,0 +1,13 @@
+Axiom Neg : Type.
+Axiom Zero : Type.
+Axiom Pos : Type.
+
+Axiom T : Type. (* True *)
+Axiom F : Type. (* False *)
+
+Axiom Test : Pos | Neg.
+
+Axiom Is_0 : (Neg -> F) & (Zero -> T) & (Pos -> F).
+
+(* Is_0 Test : F *)
+Definition is0test := return forall x : Pos | Neg, F with < fun x : Pos => proj_r proj_r Is_0 x, fun x : Neg => proj_l Is_0 x> Test.

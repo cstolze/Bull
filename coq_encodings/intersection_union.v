@@ -19,7 +19,7 @@ Axiom Abst : forall (s t : o), ((OK s) -> (OK t)) -> OK (arrow s t).
 Axiom App : forall (s t : o), OK (arrow s t) -> OK s -> OK t.
 
 (* constructors for strong arrows *)
-Axiom Sabst : forall (s t : o) (M : OK s -> OK t) (N : OK s), (Eq s t N (M N)) -> OK (relev s t).
+Axiom Sabst : forall (s t : o) (M : OK s -> OK t), (forall (N : OK s), (Eq s t N (M N))) -> OK (relev s t).
 Axiom Sapp : forall (s t : o), OK (relev s t) -> OK s -> OK t.
 
 (* constructors for intersection *)
@@ -36,7 +36,7 @@ Axiom Copair : forall (s t u : o) (X : OK (arrow s u)) (Y : OK (arrow t u)), OK 
 Axiom Eqabst : forall (s t s' t' : o) (M : OK s -> OK t) (N : OK s' -> OK t'), (forall (x : OK s) (y : OK s'), Eq s s' x y -> Eq t t' (M x) (N y)) -> Eq (arrow s t) (arrow s' t') (Abst s t M) (Abst s' t' N).
 Axiom Eqapp : forall (s t s' t' : o) (M : OK (arrow s t)) (N : OK s) (M' : OK (arrow s' t')) (N' : OK s'), Eq (arrow s t) (arrow s' t') M M' -> Eq s s' N N' -> Eq t t' (App s t M N) (App s' t' M' N').
 
-(* define equality wrt relevant arrow constructors *)
+(* define equality wrt strong arrow constructors *)
 Axiom Eqsabst : forall (s t s' t' : o) (M : OK (relev s t)) (N : OK (relev s' t')), Eq (relev s t) (relev s' t') M N.
 Axiom Eqsapp : forall (s t : o) (M : OK (relev s t)) (x : OK s), Eq s t x (Sapp s t M x).
 
@@ -101,3 +101,30 @@ Extraction id'.
   abst (union s t) (union t s) (fun x ->
     copair s t (union t s) (abst s (union t s) (fun y -> inj_r t s y))
       (abst t (union t s) (fun y -> inj_l t s y)) x) *)
+
+Section Test.
+  Hypotheses (Pos Zero Neg T F : o).
+  Hypotheses (Test : OK (union Pos Neg)) (is_0 : OK (inter (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)))).
+
+  (* is_0 Test *)
+  Definition is0test : OK F.
+    apply (Copair _ _ _ (Abst _ _ (fun x : _ => App _ _ (Proj_r _ _ (Proj_r _ _ is_0)) x)) (Abst _ _ (fun x : _ => App _ _ (Proj_l _ _ is_0) x))).
+    now apply Test.
+    apply Eqabst.
+    intros x y pf.
+    apply Eqapp.
+    - assert (H : Eq _ _ is_0 (Proj_r (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0)) by apply Eqproj_r.
+      assert (H0 : Eq _ _ (Proj_r (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0) (Proj_r (arrow Zero T) (arrow Pos F) (Proj_r (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0))) by apply Eqproj_r.
+      assert (H1 : Eq _ _ is_0 (Proj_l (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0)) by apply Eqproj_l.
+      apply Eqsymm in H.
+      apply Eqsymm in H0.
+      eapply Eqtrans.
+      apply H0.
+      eapply Eqtrans.
+      apply H.
+      apply H1.
+    - trivial.
+  Defined.
+
+  Eval compute in is0test.
+End Test.
