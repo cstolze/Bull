@@ -62,7 +62,7 @@ let rec reconstruction str id_list gamma l t =
   let type_app t (t1,e1,et1) (t2,e2,et2) =
     match (t1,et1) with
     | (Prod(_,_,t3), Prod (_,et2',et3)) -> if is_equal gamma et2 et2' then Result.Ok (beta_redex t3 t, App(e1,e2), beta_redex et3 e2)
-					   else
+					      else
 					     Result.Error (error_match id_list getloc str et2' et2)
     | (Subset(_,_,t3), Subset(_,et2',et3)) -> if is_equal gamma et2 et2' then Result.Ok (beta_redex t3 t, e2, beta_redex et3 e2) else Result.Error (error_match id_list getloc str et2' et2)
     | _ -> Result.Error (error_no_prod id_list (get 0) str t1)
@@ -111,7 +111,9 @@ let rec reconstruction str id_list gamma l t =
 						 if is_equal (DefAxiom(Nothing,Nothing)::gamma) e2 (Var 0) then
 						   (* hack to see if Subset(id,t1,t2) is well-defined *)
 						   Result.bind (r0 id_list gamma l (Subset(id,t1,t2)))
-							       (fun (_,et,_) -> Result.Ok (Subset(id,t1,t2), Abs(id,Nothing,e2),Subset(id,e1,et2)))
+							       (fun (_
+								    ,et,_)
+  -> Result.Ok (Subset(id,t1,t2), Abs(id,Nothing,(*e2*)Var 0),Subset(id,e1,et2)))
 						 else Result.Error (error_essence getloc str))
   | App (t1, t2) -> r2 t1 t2 (type_app t2)
   | Inter (t1, t2) -> type_union_inter true t1 t2

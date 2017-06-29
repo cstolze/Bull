@@ -11,6 +11,20 @@ let beta_redex t1 t2 =
       Var (m-1)
   in map_term 0 aux t1
 
+let is_eta t =
+  let rec aux k t =
+    match t with
+    | Var n -> n != k
+    | SPrLeft t1 | SPrRight t1 -> aux k t1
+    | Prod (id1, t1, t2) | Abs (id1, t1, t2) | Subset (id1, t1, t2)
+    | Let (id1, t1, t2) |
+    Subabs (id1, t1, t2) -> aux k t1 && aux (k+1) t2
+    | App (t1, t2) | Inter (t1, t2) | Union (t1, t2) | SPair (t1, t2)
+    | Coercion (t1, t2) | SInLeft (t1, t2) | SMatch (t1, t2)
+    | SInRight (t1, t2) -> aux k t1 && aux k t2
+    | _ -> true
+  in aux 0 t
+
 (* Strong normalization *)
 let rec strongly_normalize gamma t =
   let sn_children = visit_term (strongly_normalize gamma)
@@ -34,7 +48,10 @@ let rec strongly_normalize gamma t =
 	      | Var _ -> t1
 	      | _ -> strongly_normalize gamma t1)
   (* Eta-redex *)
-  (* | Abs (t1, Var 0) -> eta_redex t1 NOT IMPLEMENTED *)
+  | Abs (_,_, App (t1, Var 0)) -> if is_eta t1 then
+			 strongly_normalize gamma (lift 0 (-1) t1)
+		       else
+			 t
   (* Pair-redex *)
   | SPrLeft (SPair (x,_)) -> x
   | SPrRight (SPair (_, x)) -> x

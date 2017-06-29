@@ -33,6 +33,7 @@ let visit_term f g h t =
   | SMatch (t1, t2) -> SMatch (f t1, f t2)
   | SInLeft (t1, t2) -> SInLeft (f t1, f t2)
   | SInRight (t1, t2) -> SInRight (f t1, f t2)
+  | Coercion (t1, t2) -> Coercion (f t1, f t2)
   | _ -> t
 
 (* Map iterator *)
@@ -122,12 +123,17 @@ let fix_id id_list t =
     in visit_term foo aux new_id t
   in foo t
 
-(* gives the term essence and type of the term of index n *)
+(* gives the term, term essence and type of the term of index n *)
 
 let get_from_context gamma n =
     match List.nth gamma n with
-    | DefAxiom (t1, t2) -> (Var n, lift 0 (n+1) t1, Var n
-			    , lift 0 (n+1) t2)
+    | DefAxiom (t1, t2) ->
+       (Var n, lift 0 (n+1) t1
+	, (match t1 (* or t2 *) with
+	     Subset(_,_,_) -> Abs("x",Nothing,Var 0) (* essence of
+    subset is Id *)
+	   | _ -> Var n)
+	, lift 0 (n+1) t2)
     | DefLet (d, t, e, et)
       -> (lift 0 (n+1) d, lift 0 (n+1) t, lift 0 (n+1) e
 	  , lift 0 (n+1) et)

@@ -165,7 +165,7 @@ let rec repl lx id_list sigma verbose =
 
 (* main *)
 
-let () =
+let main () =
   let lx = Lexing.from_channel stdin
   in
   begin
@@ -180,5 +180,7 @@ let () =
 	with
 	| Sys_error a -> prerr_endline (syserror a); ([],[])
     in
-    ignore (repl lx id_list sigma true)
+    repl lx id_list sigma true
   end
+
+let () = ignore (main ())
