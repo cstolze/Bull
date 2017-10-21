@@ -1,17 +1,10 @@
 open Utils
 open Bruijn
 open Reduction
+open Subtyping
 open Printer
 
 (* returns the essence and the type of a term *)
-
-let is_equal gamma t t' =
-  let rec remove_id t = (* erase the identifiers *)
-    visit_term remove_id (fun _ -> remove_id) (fun _ _ -> "") t
-  in
-  let t = remove_id t in
-  let t' = remove_id t' in
-  strongly_normalize gamma t = strongly_normalize gamma  t'
 
 let type_of_sort s =
   match s with
@@ -111,9 +104,7 @@ let rec reconstruction str id_list gamma l t =
 						 if is_equal (DefAxiom(Nothing,Nothing)::gamma) e2 (Var 0) then
 						   (* hack to see if Subset(id,t1,t2) is well-defined *)
 						   Result.bind (r0 id_list gamma l (Subset(id,t1,t2)))
-							       (fun (_
-								    ,et,_)
-  -> Result.Ok (Subset(id,t1,t2), Abs(id,Nothing,(*e2*)Var 0),Subset(id,e1,et2)))
+							       (fun (_,et,_) -> Result.Ok (Subset(id,t1,t2), Abs(id,Nothing,(*e2*)Var 0),Subset(id,e1,et2)))
 						 else Result.Error (error_essence getloc str))
   | App (t1, t2) -> r2 t1 t2 (type_app t2)
   | Inter (t1, t2) -> type_union_inter true t1 t2
@@ -140,7 +131,15 @@ let rec reconstruction str id_list gamma l t =
 				 | _ -> Result.Error (error_smatch getloc str))
   | SInLeft (t1, t2) -> type_inj true t1 t2
   | SInRight (t1, t2) -> type_inj false t1 t2
-  | Coercion (t1, t2) -> Result.Error("No coercion for now.\n")
+  | Coercion (t1, t2) -> r2 t1 t2 (fun (t1',e1',_) (t2',e2',et2') ->
+    match t1' with
+    | Sort Type ->
+       Result.bind (r0 id_list gamma l t2')
+         (fun (t,_,_) -> match t with
+         | Sort Type -> if is_subtype gamma et2' e1' then Result.Ok(t1,e2',e1')
+           else Result.Error(error_subtype l str id_list t1 t2')
+         | _ -> Result.Error(error_coe2 (get 1) str))
+    | _ -> Result.Error(error_coe1 (get 0) str id_list t1'))
   | Var n -> let (_,t,e,et) = get_from_context gamma n in Result.Ok(t,e,et)
   | Const id -> Result.Error(error_const getloc str id)
   | Omega -> Result.Ok(Sort Type, Omega, Sort Type)

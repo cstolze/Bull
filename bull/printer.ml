@@ -84,7 +84,7 @@ let string_of_term is_essence id_list t =
 					  ^ " " ^ aux t2 5)
     | SInRight (t1, t2) -> parentheseme 6 ("inj_r " ^ aux t1 5
 					  ^ " " ^ aux t2 5)
-    | Coercion (t1, t2) -> parentheseme 6 ("coe " ^ aux t1 5 ^ aux t2 5)
+    | Coercion (t1, t2) -> parentheseme 6 ("coe " ^ aux t1 5 ^ " " ^ aux t2 5)
     | Var _ -> assert false
     | Const id -> id
     | Omega -> "$"
@@ -105,7 +105,7 @@ let pretty_print_let (t1,t2,t3,t4) id_list =
   pretty_print_term id_list t1 ^ " : " ^ pretty_print_term id_list t2
   ^ "\n\tessence = "
   ^ pretty_print_essence id_list t3 ^ " : "
-  ^ pretty_print_term id_list t4
+  ^ pretty_print_essence id_list t4
 
 let string_of_axiom id t1 t2 id_list =
   "Axiom " ^ id ^ " : " ^ pretty_print_term id_list t1
@@ -215,3 +215,20 @@ let error_with l str =
 let error_smatch (l1,l2) str =
   error_loc l1 l2 str
   ^ "Error: type mismatch.\n"
+
+let error_subtype l str id_list t1 t2 =
+  let Locnode(l1, l2,_) = l in
+  error_loc l1 l2 str
+  ^ "Error: the type " ^ pretty_print_term id_list t2 ^ " is not a subtype of " ^
+    pretty_print_term id_list t1 ^ ".\n"
+
+let error_coe1 l str id_list t =
+  let Locnode(l1,l2,_) = l in
+  error_loc l1 l2 str
+  ^ "Error: this term has type " ^ pretty_print_term id_list t
+  ^ " (should be Type).\n"
+
+let error_coe2 l str =
+  let Locnode(l1,l2,_) = l in
+  error_loc l1 l2 str
+  ^ "Error: this term is not coercible.\n"

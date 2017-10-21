@@ -8,6 +8,8 @@ open Bruijn
 open Printer
 #load "reduction.cmo"
 open Reduction
+#load "subtyping.cmo"
+open Subtyping
 #load "reconstruction.cmo"
 open Reconstruction
 

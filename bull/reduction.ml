@@ -61,3 +61,13 @@ let rec strongly_normalize gamma t =
   | App (SMatch (_, x), SInRight (_,y))
     -> strongly_normalize gamma (App (SPrRight x, y))
   | _ -> t
+
+
+(* t =_\beta t' *)
+let is_equal gamma t t' =
+  let rec remove_id t = (* erase the identifiers *)
+    visit_term remove_id (fun _ -> remove_id) (fun _ _ -> "") t
+  in
+  let t = remove_id t in
+  let t' = remove_id t' in
+  strongly_normalize gamma t = strongly_normalize gamma  t'
