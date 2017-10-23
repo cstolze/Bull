@@ -226,7 +226,7 @@ let error_coe1 l str id_list t =
   let Locnode(l1,l2,_) = l in
   error_loc l1 l2 str
   ^ "Error: this term has type " ^ pretty_print_term id_list t
-  ^ " (should be Type).\n"
+  ^ " (should be Type or Kind).\n"
 
 let error_coe2 l str =
   let Locnode(l1,l2,_) = l in

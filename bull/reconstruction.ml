@@ -18,9 +18,9 @@ let principal_type_system s1 s2 =
   | (Type, Kind) -> Some Kind (* types depending on terms *)
   | _ -> None (* we are doing lambdaP (aka LF) for now *)
 
-(* tells if x of type s is a set, ie if "x inter x" is legal *)
+(* tells if x of type (Sort s) is a set, ie if "x inter x" is legal *)
 let is_set s =
-  s = Type
+  true
 
 let rec reconstruction str id_list gamma l t =
   let r0 = reconstruction str in
@@ -133,12 +133,18 @@ let rec reconstruction str id_list gamma l t =
   | SInRight (t1, t2) -> type_inj false t1 t2
   | Coercion (t1, t2) -> r2 t1 t2 (fun (t1',e1',_) (t2',e2',et2') ->
     match t1' with
-    | Sort Type ->
+    | Sort s1 ->
        Result.bind (r0 id_list gamma l t2')
          (fun (t,_,_) -> match t with
-         | Sort Type -> if is_subtype gamma et2' e1' then Result.Ok(t1,e2',e1')
-           else Result.Error(error_subtype l str id_list t1 t2')
-         | _ -> Result.Error(error_coe2 (get 1) str))
+                         | Sort s2 -> if s1 == s2 then
+                                        if is_subtype gamma et2' e1' then Result.Ok(t1,e2',e1')
+                                        else
+                                          Result.Error(error_subtype
+                                                         l str id_list
+                                                         t1 t2')
+                                      else
+                                        Result.Error (error_set getloc str)
+                         | _ -> Result.Error(error_coe2 (get 1) str))
     | _ -> Result.Error(error_coe1 (get 0) str id_list t1'))
   | Var n -> let (_,t,e,et) = get_from_context gamma n in Result.Ok(t,e,et)
   | Const id -> Result.Error(error_const getloc str id)
