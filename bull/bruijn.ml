@@ -1,18 +1,7 @@
 open Utils
 
-(* conversion functions bruijn <-> normal *)
-(* TO FIX *)
-
 (* TODO:
-cf matita source code:
-substitution DONE
-lift DONE
-fix_index => if the index are wrong and the ids are correct (for the *)
-(* lexer) DONE
-fix_id => if the ids are wrong and the index are correct (after beta-conversion) DONE
-also function for fixing Gamma DONE
-
-NOTE : WE DO NOT DEAL WITH META VARIABLES FOR NOW
+ WE DO NOT DEAL WITH META VARIABLES FOR NOW
  *)
 
 (* Visitor iterator *)
