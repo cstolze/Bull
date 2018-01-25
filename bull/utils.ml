@@ -8,8 +8,8 @@ type term =
   | Let of string * term * term
   | Prod of string * term * term
   | Abs of string * term * term
-  | Subset of string * term * term
-  | Subabs of string * term * term
+  | Subset of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *)
+  | Subabs of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *)
   | App of term * term
   | Inter of term * term
   | Union of term * term
@@ -22,7 +22,7 @@ type term =
   | Coercion of term * term
   | Var of int (* bruijn index *)
   | Const of string (* variable name *)
-  | Omega
+  | Omega (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *)
   | Nothing (* type inside pure lambda-terms *)
   | Meta of int
 
