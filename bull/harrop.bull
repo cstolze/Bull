@@ -1,0 +1,33 @@
+(* three base types: atomic propositions, non-atomic goals and non-atomic programs *)
+Axiom atom : Type.
+Axiom non_atomic_goal : Type.
+Axiom non_atomic_prog : Type.
+
+(* goals and programs are defined from the base types *)
+Definition goal := atom | non_atomic_goal.
+Definition prog := atom | non_atomic_prog.
+
+(* constructors (implication, conjunction, disjunction) *)
+Axiom impl : (prog -> goal -> non_atomic_goal) & (goal -> prog -> non_atomic_prog).
+Axiom and : (goal -> goal -> non_atomic_goal) & (prog -> prog -> non_atomic_prog).
+Axiom or : (goal -> goal -> non_atomic_goal).
+
+(* solve p g indicates that the judgment p |- g is valid *)
+Axiom solve : prog -> goal -> Type.
+(* backchain p a g indicates that, if p |- g is valid, then p |- a is valid *)
+Axiom backchain : prog -> atom -> goal -> Type.
+
+(* rules for solve *)
+Axiom solve_and : forall p : prog, forall g1 : goal, forall g2 : goal, solve p g1 -> solve p g2 -> solve p (coe (goal -> goal -> goal) and g1 g2).
+Axiom solve_or1 : forall p : prog, forall g1 : goal, forall g2 : goal, solve p g1 -> solve p (coe (goal -> goal -> goal) or g1 g2).
+Axiom solve_or2 : forall p : prog, forall g1 : goal, forall g2 : goal, solve p g2 -> solve p (coe (goal -> goal -> goal) or g1 g2).
+Axiom solve_impl : forall p1 : prog, forall p2 : prog, forall g : goal, solve (coe (prog -> prog -> prog) and p1 p2) g -> solve p1 (coe (prog -> goal -> goal) impl p2 g).
+Axiom solve_atom : forall p : prog, forall a : atom, forall g : goal, backchain p a g -> solve p g -> solve p (coe goal a).
+
+(* rules for backchain *)
+Axiom backchain_and1 : forall p1 : prog, forall p2 : prog, forall a : atom, forall g : goal, backchain p1 a g -> backchain (coe (prog -> prog -> prog) and p1 p2) a g.
+Axiom backchain_and2 : forall p1 : prog, forall p2 : prog, forall a : atom, forall g : goal, backchain p1 a g -> backchain (coe (prog -> prog -> prog) and p1 p2) a g.
+Axiom backchain_impl_atom : forall a : atom, forall g : goal, backchain (coe (goal -> prog -> prog) impl g (coe prog a)) a g.
+Axiom backchain_impl_impl : forall p : prog, forall a : atom, forall g : goal, forall g1 : goal, forall g2 : goal, backchain (coe (goal -> prog -> prog) impl (coe (goal -> goal -> goal) and g1 g2) p) a g -> backchain (coe (goal -> prog -> prog) impl g1 (coe (goal -> prog -> prog) impl g2 p)) a g.
+Axiom backchain_impl_and1 : forall p1 : prog, forall p2 : prog, forall a : atom, forall g : goal, forall g1 : goal, backchain (coe (goal -> prog -> prog) impl g1 p1) a g -> backchain (coe (goal -> prog -> prog) impl g1 (coe (prog -> prog -> prog) and p1 p2)) a g.
+Axiom backchain_impl_and2 : forall p1 : prog, forall p2 : prog, forall a : atom, forall g : goal, forall g1 : goal, backchain (coe (goal -> prog -> prog) impl g1 p2) a g -> backchain (coe (goal -> prog -> prog) impl g1 (coe (prog -> prog -> prog) and p1 p2)) a g.
