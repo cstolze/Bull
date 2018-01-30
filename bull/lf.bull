@@ -3,7 +3,6 @@ Axiom fam' : Type.
 Axiom knd' : Type.
 Axiom sup' : Type.
 
-(* HACK *)
 Axiom same : obj' & fam' & knd' & sup'.
 Axiom term : (obj' | fam' | knd' | sup') -> Type.
 (* The obj, fam, knd, and sup types have the same essence (term same) *)
