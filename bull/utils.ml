@@ -8,8 +8,8 @@ type term =
   | Let of string * term * term
   | Prod of string * term * term
   | Abs of string * term * term
-  | Subset of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *)
-  | Subabs of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *)
+  | Subset of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *) (* TODO: remove *)
+  | Subabs of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *) (* TODO: remove *)
   | App of term * term
   | Inter of term * term
   | Union of term * term
@@ -22,15 +22,18 @@ type term =
   | Coercion of term * term
   | Var of int (* bruijn index *)
   | Const of string (* variable name *)
-  | Omega (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *)
-  | Nothing (* type inside pure lambda-terms *)
-  | Meta of int
+  | Omega (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *) (* TODO: remove *)
+  | Nothing (* type inside pure lambda-terms (hack) *)
+  | Underscore (* meta-variables before analysis *)
+  | Meta of int * (term list) (* bruijn index and substitution *)
 
 (* In the contexts, there are let-ins and axioms *)
 type declaration =
   | DefAxiom of term * term (* type * etype *)
   (* term * type * essence * etype *)
   | DefLet of term * term * term * term
+  (* type of the hypotheses (type,etype) and type of the term *)
+  | DefMeta of (term * term) list * term * term
 
 (* find the de Bruijn index associated with an identifier *)
 let find id id_list =
@@ -57,7 +60,7 @@ type sentence =
   | Help
   | Error
 
-(* Error encoding *)
+(* Error encoding *) (* TODO: remove *)
 module Result = struct
     type ('a, 'b) t =
       | Ok of 'a

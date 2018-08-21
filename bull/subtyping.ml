@@ -1,6 +1,9 @@
 open Utils
 open Reduction
 
+(* Note: for now, these functions suppose that there is no type meta-variables in the terms *)
+(* TODO: design an unification algorithm for types modulo subtyping *)
+
 (* rewriting function simplifying the use of omega *)
 let rec omega_simpl a =
   match a with

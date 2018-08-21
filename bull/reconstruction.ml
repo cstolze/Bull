@@ -22,6 +22,57 @@ let principal_type_system s1 s2 =
 let is_set s =
   true
 
+exception Error of string
+
+let rec reconstruct str id_list sigma gamma l t =
+  match t with
+  | Sort s -> 
+  | Let (s,t1,t2) -> 
+  | Prod (s,t1,t2) -> 
+  | Abs (s,t1,t2) -> 
+  | App (t1,t2) -> 
+  | Inter (t1,t2) -> 
+  | Union (t1,t2) -> 
+  | SPair (t1,t2) -> 
+  | SPrLeft of term
+  | SPrRight of term
+  | SMatch (t1,t2) -> 
+  | SInLeft (t1,t2) -> 
+  | SInRight (t1,t2) -> 
+  | Coercion (t1,t2) -> 
+  | Var n -> 
+  | Const s -> Result.Error(error_const getloc str id)
+  | Nothing -> assert false
+  | Meta n -> 
+  | _ -> Error "illegal term"
+
+and rec check str id_list sigma gamma l t1 t2 =
+(*  match t1 with
+  | Sort s -> 
+  | Let (s,t1,t2) -> 
+  | Prod (s,t1,t2) -> 
+  | Abs (s,t1,t2) -> 
+  | App (t1,t2) -> 
+  | Inter (t1,t2) -> 
+  | Union (t1,t2) -> 
+  | SPair (t1,t2) -> 
+  | SPrLeft of term
+  | SPrRight of term
+  | SMatch (t1,t2) -> 
+  | SInLeft (t1,t2) -> 
+  | SInRight (t1,t2) -> 
+  | Coercion (t1,t2) -> 
+  | Var n -> 
+  | Const s -> Result.Error(error_const getloc str id)
+  | Nothing -> assert false
+  | Meta n -> 
+  | _ -> Error "illegal term" *)
+
+
+(* **************************************************************************************************** *)
+(* ******************************************** TO REMOVE ********************************************* *)
+(* **************************************************************************************************** *)
+
 let rec reconstruction str id_list gamma l t =
   let r0 = reconstruction str in
   let getloc = (* get location *)

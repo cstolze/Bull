@@ -23,7 +23,7 @@ let visit_term f g h t =
   | SInLeft (t1, t2) -> SInLeft (f t1, f t2)
   | SInRight (t1, t2) -> SInRight (f t1, f t2)
   | Coercion (t1, t2) -> Coercion (f t1, f t2)
-  | _ -> t
+  | _ -> t (* non-recursive cases *)
 
 (* Map iterator *)
 (* f is a function that maps De Bruijn indexes to terms *)
@@ -42,8 +42,7 @@ let lift k n =
 	   (fun k m -> if m < k then Var m
 		       else Var (m+n))
 
-(* The indexes are broken during the parsing *)
-(* Broken indexes have a negative value *)
+(* Change string constants to de bruijn indexes *)
 
 let rec fix_index id_list t =
   let get_index id l =
