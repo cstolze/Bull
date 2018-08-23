@@ -20,16 +20,15 @@ rule read buf = parse
    | ':' { begin Buffer.add_char buf ':'; COLON end }
    | ';' { begin Buffer.add_char buf ';'; SEMICOLON end }
    | "->" { begin Buffer.add_string buf "->"; ARROW end }
-   | ">>" { begin Buffer.add_string buf ">>"; SARROW end }
    | '&' { begin Buffer.add_char buf '&'; SAND end }
    | '|' { begin Buffer.add_char buf '|'; SOR end }
-   | '$' { begin Buffer.add_char buf '$'; OMEGA end }
+   | '_' { begin Buffer.add_char buf '_'; UNDERSCORE end }
    | "smatch" { begin Buffer.add_string buf "smatch"; SMATCH end }
    | "return" { begin Buffer.add_string buf "return"; RETURN end }
    | "with" { begin Buffer.add_string buf "with"; WITH end }
+   | "end" { begin Buffer.add_string buf "end"; END end }
    | "forall" { begin Buffer.add_string buf "forall"; PI end }
    | "sforall" { begin Buffer.add_string buf "sforall"; SUBSET end }
-   | "sfun" { begin Buffer.add_string buf "sfun"; LAMBDAR end }
    | "coe" { begin Buffer.add_string buf "coe"; COERCION end }
    | "inj_l" { begin Buffer.add_string buf "inj_l"; INJLEFT end }
    | "inj_r" { begin Buffer.add_string buf "inj_r"; INJRIGHT end }

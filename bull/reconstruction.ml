@@ -6,10 +6,12 @@ open Printer
 
 (* returns the essence and the type of a term *)
 
+exception Error of string
+
 let type_of_sort s =
   match s with
-  | Type -> Result.Ok (Sort Kind, Sort Type, Sort Kind)
-  | Kind -> Result.Error (error_kind)
+  | Type -> (Sort Kind, Sort Type, Sort Kind)
+  | Kind -> Error (error_kind)
 
 (* returns the sort of Pi x : A. B, where A:s1 and b:s2 *)
 let principal_type_system s1 s2 =
@@ -22,12 +24,98 @@ let principal_type_system s1 s2 =
 let is_set s =
   true
 
-exception Error of string
+(*
+  reconstruct takes as input:
+
+  - a meta-variable environment
+  - a substitution
+  - a term
+ *)
+
+(* reconstruct returns:
+   - a new meta-variable environment
+   - a new substitution
+   - a new fullterm
+   - its fulltype
+
+In case of error, it throws an exception.
+ *)
+
+(*
+  check takes as input:
+  - the location tree (for debugging)
+
+  - a meta-variable environment
+  - a substitution
+  - a term
+  - a type
+
+and returns:
+  - a new meta-variable environment
+  - a new substitution
+  - a new term
+  - the essence
+  - the type
+  - the essence type
+ *)
+
+(*
+  force-type takes as input:
+  - the location tree (for debugging)
+
+  - a meta-variable environment
+  - a substitution
+  - a term
+
+and returns
+  - a term
+  - its essence
+  - a type (which is a sort)
+  - the essence type
+ *)
+
+(*
+  unification function takes as input:
+  - a meta-variable environment
+  - a substitution
+  - a term t
+  - a term t'
+
+and returns
+  - a new meta-var env, a new subst
+ *)
+
+(*
+  cast takes as input
+  - a meta-variable environment
+  - a substitution
+  - a term t
+  - a type t1
+  - a type t2
+
+and returns
+  - a new meta-var env, a new substitution
+  - a new term (such that it has type t2)
+  - its essence
+ *)
+
+(*
+  a meta-variable environment is a list of either
+  - a context, a meta-variable identifier, and a type
+  - a context, and the constraint is-a-sort(meta-variable identifier)
+
+The meta-variable environment comes with an integer being the maximum meta-var id in the list
+(in case we have to add a new id)
+ *)
+(*
+  a substitution is a list of:
+  - context, meta-var id, term, type ( \Gamma \vdash id := term : type )
+ *)
 
 let rec reconstruct str id_list sigma gamma l t =
   match t with
-  | Sort s -> 
-  | Let (s,t1,t2) -> 
+  | Sort s -> type_of_sort s
+  | Let (s,t1,t2,t3) -> 
   | Prod (s,t1,t2) -> 
   | Abs (s,t1,t2) -> 
   | App (t1,t2) -> 
@@ -43,6 +131,7 @@ let rec reconstruct str id_list sigma gamma l t =
   | Var n -> 
   | Const s -> Result.Error(error_const getloc str id)
   | Nothing -> assert false
+  | Underscore (* meta-variables before analysis *)
   | Meta n -> 
   | _ -> Error "illegal term"
 

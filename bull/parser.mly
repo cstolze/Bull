@@ -1,16 +1,6 @@
 %{open Utils
-
-  let foo x f = let (l,t) = x in f l t
-  let foo2 x y f = foo y (foo x f)
-  let foo3 x y z f = foo z (foo2 x y f)
-
-  let fun0 f = (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), []), f)
-  let fun1 f x = foo x (fun l1 t1 -> (Locnode(Parsing.symbol_start_pos(), Parsing.symbol_end_pos (), [l1]), f t1))
-  let fun2 f x y = foo2 x y (fun l1 t1 l2 t2
-			     -> (Locnode(Parsing.symbol_start_pos(),
-					 Parsing.symbol_end_pos ()
-					 , [l1; l2]), f t1 t2))
-  let quote s = String.trim (String.map (fun c -> if c = '"' then ' '
+  let get_loc () = (Parsing.symbol_start_pos (), Parsing.symbol_end_pos ())
+  let unquote s = String.trim (String.map (fun c -> if c = '"' then ' '
 						  else c) s)
 
 %}
@@ -29,16 +19,15 @@
 %token ASSIGN
 %token SEMICOLON
 %token ARROW
-%token SARROW
 %token SAND
 %token SOR
-%token OMEGA
+%token UNDERSCORE
 %token SMATCH
 %token RETURN
 %token WITH
+%token END
 %token PI
 %token SUBSET
-%token LAMBDAR
 %token COERCION
 %token INJLEFT
 %token INJRIGHT
@@ -59,82 +48,69 @@
 %token EOF
 
 %start s
-%type <Utils.sentence> s
+%type <Utils.sentence list> s
 
 %%
 
 s:
-    | QUIT DOT { Quit }
-    | LOAD QUOTE DOT { Load (quote $2) }
-    | LEMMA ID COLON term DOT { foo $4 (fun l t -> Proof ($2, l, t)) }
-    | AXIOM ID COLON term DOT { foo $4 (fun l t -> Axiom ($2, l, t)) }
+    | QUIT DOT { [Quit] }
+    | LOAD QUOTE DOT { [Load (unquote $2)] }
+    | LEMMA ID COLON term DOT { [Proof ($2,$4)] }
+    | AXIOM ID COLON term DOT { [Axiom ($2, $4)] }
     | DEFINITION ID COLON term ASSIGN term
-		 DOT { foo2 $6 $4 (fun l1 t1 l2 t2 -> Definition ($2, l1, t1, Some(l2,t2))) }
-    | DEFINITION ID ASSIGN term DOT { foo $4 (fun l t -> Definition ($2, l, t, None)) }
-    | PRINT ID DOT { Print $2 }
-    | SIG DOT { Print_all }
-    | COMPUTE ID DOT { Compute $2 }
-    | HELP DOT { Help }
-    | error { Error }
-    | EOF { Quit }
+		 DOT { [Definition ($2, $6, Some($4))] }
+    | DEFINITION ID ASSIGN term DOT { [Definition ($2, $4, None)] }
+    | PRINT ID DOT { [Print $2] }
+    | SIG DOT { [Print_all] }
+    | COMPUTE ID DOT { [Compute $2] }
+    | HELP DOT { [Help] }
+    | error { [Error] }
+    | EOF { [Quit] }
     ;
 
       /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the "application operator" (which does not exist, haha) automatically */
 
 term:
-    | PI ID COLON term COMMA
-	     term
-	     { fun2 (fun t1 t2 -> Prod ($2, t1, t2)) $4 $6 }
-    | SUBSET ID COLON term COMMA
-	     term
-	     { fun2 (fun t1 t2 -> Subset ($2, t1, t2)) $4 $6 }
+    | PI ID COLON term COMMA term
+	     { Prod (get_loc (), $2, $4, $6) }
     | LAMBDA ID COLON term ENDLAMBDA
 	     term
-	     { fun2 (fun t1 t2 -> Abs ($2, t1, t2)) $4 $6 }
-    | LAMBDAR ID COLON term ENDLAMBDA
-	     term
-	     { fun2 (fun t1 t2 -> Subabs ($2, t1, t2)) $4 $6 }
-    | LET ID ASSIGN term IN term { fun2 (fun t1 t2 -> Let ($2, t1, t2)) $4 $6 }
+	     { Abs (get_loc (), $2, $4, $6) }
+    | LET ID COLON term ASSIGN term IN term { Let (get_loc (), $2, $4, $6, $8) }
     | term2 { $1 }
     ;
 
 term2:
-    | term3 ARROW term2 { fun2 (fun t1 t2 -> Prod("_", t1, t2)) $1 $3
-			} /* arrow is right-to-left */
-    | term3 SARROW term2 { fun2 (fun t1 t2 -> Subset("_", t1, t2)) $1 $3 } /* sarrow is right-to-left */
+    | term3 ARROW term2 { Prod (get_loc (), "_", $1, $3) } /* arrow is right-to-left */
     | term3 { $1 }
     ;
 
 term3:
-    | term4 SOR term3 { fun2 (fun t1 t2 -> Union(t1, t2)) $1 $3 } /* union is right-to-left */
+    | term4 SOR term3 { Union (get_loc (), $1, $3) } /* union is right-to-left */
     | term4 { $1 }
     ;
 
 term4:
-    | term5 SAND term4 { fun2 (fun t1 t2 -> Inter(t1, t2)) $1 $3 } /* inter is right-to-left */
+    | term5 SAND term4 { Inter (get_loc (), $1, $3) } /* inter is right-to-left */
     | term5 { $1 }
     ;
 
 term5:
-    | term5 term6 { fun2 (fun t1 t2 -> App (t1, t2)) $1 $2 } /* applications are left-
+    | term5 term6 { App (get_loc (), $1, $2) } /* applications are left-
       to-right */
     | term6 { $1 }
     ;
 
 term6:
-    | COERCION term6 term6 { fun2 (fun t1 t2 -> Coercion (t1 ,t2)) $2 $3 }
-    | PROJLEFT term6 { fun1 (fun t1 -> SPrLeft (t1)) $2 }
-    | PROJRIGHT term6 { fun1 (fun t1 -> SPrRight (t1)) $2 }
-    | INJLEFT term6 term6 { fun2 (fun t1 t2 -> SInLeft (t1, t2)) $2 $3 }
-    | INJRIGHT term6 term6 { fun2 (fun t1 t2 -> SInRight (t1, t2)) $2 $3 }
-    | RETURN term WITH term6 { fun2 (fun t1 t2 -> SMatch (t1, t2)) $2 $4 }
-    | term7 { $1 }
-    ;
+    | COERCION term6 term6 { Coercion (get_loc (),$2, $3) }
+    | PROJLEFT term6 { SPrLeft (get_loc (), $2) }
+    | PROJRIGHT term6 { SPrRight (get_loc (), $2) }
+    | INJLEFT term6 term6 { SInLeft (get_loc (), $2, $3) }
+    | INJRIGHT term6 term6 { SInRight (get_loc (), $2, $3) }
 
-term7:
     | OPENP term CLOSP { $2 } /* highest precedence */
-    | ID { fun0 (Const $1) }
-    | OMEGA { fun0 Omega }
-    | TYPE { fun0 (Sort Type) }
-    | LT term COMMA term GT { fun2 (fun t1 t2 -> SPair (t1, t2)) $2 $4 }
+    | ID { Const (get_loc (), $1) }
+    | TYPE { Sort (get_loc (), Type) }
+    | LT term COMMA term GT { SPair (get_loc (), $2, $4) }
+    | SMATCH term RETURN term WITH ID COLON term ENDLAMBDA term COMMA ID COLON term ENDLAMBDA term END { SMatch (get_loc (), $2, $4, $6, $8, $10, $12, $14, $16) }
     ;

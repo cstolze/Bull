@@ -6,24 +6,28 @@ open Utils
 
 (* Visitor iterator *)
 (* goes recursively into most of the terms constructors *)
-let visit_term f g h t =
-  match t with
-  | Let (id1, t1, t2) -> Let (h id1 t2, f t1, g (h id1 t2) t2)
-  | Prod (id1, t1, t2) -> Prod (h id1 t2, f t1, g (h id1 t2) t2)
-  | Abs (id1, t1, t2) -> Abs (h id1 t2, f t1, g (h id1 t2) t2)
-  | Subset (id1, t1, t2) -> Subset (h id1 t2, f t1, g (h id1 t2) t2)
-  | Subabs (id1, t1, t2) -> Subabs (h id1 t2, f t1, g (h id1 t2) t2)
-  | App (t1, t2) -> App (f t1, f t2)
-  | Inter (t1, t2) -> Inter (f t1, f t2)
-  | Union (t1, t2) -> Union (f t1, f t2)
-  | SPair (t1, t2) -> SPair (f t1, f t2)
-  | SPrLeft t1 -> SPrLeft (f t1)
-  | SPrRight t1 -> SPrRight (f t1)
-  | SMatch (t1, t2) -> SMatch (f t1, f t2)
-  | SInLeft (t1, t2) -> SInLeft (f t1, f t2)
-  | SInRight (t1, t2) -> SInRight (f t1, f t2)
-  | Coercion (t1, t2) -> Coercion (f t1, f t2)
-  | _ -> t (* non-recursive cases *)
+(* f : recursor
+   g : incremented recursor
+   h : id modifier (take the subterm where id is free as argument)
+*)
+let visit_term f g h = function
+  | Let (l, id1, t1, t2, t3) -> Let (l, h id1 t3, f t1, f t2, g (h id1 t3) t3)
+  | Prod (l, id1, t1, t2) -> Prod (l, h id1 t2, f t1, g (h id1 t2) t2)
+  | Abs (l, id1, t1, t2) -> Abs (l, h id1 t2, f t1, g (h id1 t2) t2)
+  | App (l, t1, t2) -> App (l, f t1, f t2)
+  | Inter (l, t1, t2) -> Inter (l, f t1, f t2)
+  | Union (l, t1, t2) -> Union (l, f t1, f t2)
+  | SPair (l, t1, t2) -> SPair (l, f t1, f t2)
+  | SPrLeft (l, t1) -> SPrLeft (l, f t1)
+  | SPrRight (l, t1) -> SPrRight (l, f t1)
+  | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
+     SMatch (l, f t1, f t2,
+             h id1 t4, f t3, g (h id1 t4) t4,
+             h id2 t6, f t5, g (h id1 t6) t6)
+  | SInLeft (l, t1, t2) -> SInLeft (l, f t1, f t2)
+  | SInRight (l, t1, t2) -> SInRight (l, f t1, f t2)
+  | Coercion (l, t1, t2) -> Coercion (l, f t1, f t2)
+  | t -> t (* non-recursive cases *)
 
 (* Map iterator *)
 (* f is a function that maps De Bruijn indexes to terms *)
@@ -31,7 +35,7 @@ let visit_term f g h t =
 let map_term k f t =
   let rec aux k t =
     match t with
-    | Var n -> f k n
+    | Var (l, n) -> f k l n
     | _ -> visit_term (aux k) (fun _ -> aux (k + 1)) (fun id _ -> id) t
   in aux k t
 
@@ -39,8 +43,8 @@ let map_term k f t =
 (* n is the shift *)
 let lift k n =
   map_term k
-	   (fun k m -> if m < k then Var m
-		       else Var (m+n))
+	   (fun k l m -> if m < k then Var (l, m)
+		       else Var (l, m+n))
 
 (* Change string constants to de bruijn indexes *)
 
@@ -53,29 +57,34 @@ let rec fix_index id_list t =
   in aux 0 l
   in
   match t with
-  | Const id -> (match get_index id id_list with
+  | Const (l,id) -> (match get_index id id_list with
 		 | None -> t
-		 | Some k -> Var k)
+		 | Some k -> Var (l,k))
   | _ -> visit_term
 	   (fix_index id_list)
 	   (fun id -> fix_index (id :: id_list))
 	   (fun id _ -> id)
 	   t
 
-
 (* is_const id t = true iff Const id appears in t *)
 let is_const id t =
   let rec aux t =
     match t with
-    | Const id1 -> id = id1
-    | SPrLeft t1 | SPrRight t1 -> aux t1
-    | Prod (id1, t1, t2) | Abs (id1, t1, t2) | Subset (id1, t1, t2)
-    | Let (id1, t1, t2) |
-    Subabs (id1, t1, t2) -> aux t1 || (if id1 = id then false
-					    else aux t2)
-    | App (t1, t2) | Inter (t1, t2) | Union (t1, t2) | SPair (t1, t2)
-    | Coercion (t1, t2) | SInLeft (t1, t2) | SMatch (t1, t2)
-    | SInRight (t1, t2) -> aux t1 || aux t2
+    | Const (l, id1) -> id = id1
+    | SPrLeft (l, t1) | SPrRight (l, t1) -> aux t1
+    | Let (l, id1, t1, t2, t3) -> aux t1 || aux t2 ||
+                                    (if id1 = id then false
+                                     else aux t3)
+    | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
+       aux t1 || aux t2 || aux t3 || aux t5 ||
+         (if id1 = id then false else aux t4) ||
+           (if id2 = id then false else aux t6)
+    | Prod (l, id1, t1, t2) | Abs (l, id1, t1, t2)
+      -> aux t1 || (if id1 = id then false
+		    else aux t2)
+    | App (l, t1, t2) | Inter (l, t1, t2) | Union (l, t1, t2) | SPair (l, t1, t2)
+    | Coercion (l, t1, t2) | SInLeft (l, t1, t2)
+    | SInRight (l, t1, t2) -> aux t1 || aux t2
     | _ -> false
   in aux t
 
@@ -95,12 +104,12 @@ let fix_id id_list t =
     | x :: l' -> if index = 0 then x else get_id (index-1) l'
   in
   (* replace Var k by id *)
-  let map_id id = map_term 0 (fun k n -> if k = n then Const id
-					 else Var n)
+  let map_id id = map_term 0 (fun k l n -> if k = n then Const (l,id)
+					 else Var (l,n))
   in
   (* replace the global variables *)
-  let t = map_term 0 (fun k n -> if n < k then Var n
-				 else Const (get_id (n-k) id_list)) t
+  let t = map_term 0 (fun k l n -> if n < k then Var (l, n)
+				 else Const (l, get_id (n-k) id_list)) t
   in
   (* replace the local variables *)
   let rec foo t =
@@ -112,16 +121,20 @@ let fix_id id_list t =
   in foo t
 
 (* gives the term, term essence and type of the term of index n *)
-
 let get_from_context gamma n =
     match List.nth gamma n with
-    | DefAxiom (t1, t2) ->
-       (Var n, lift 0 (n+1) t1
-	, (match t1 (* or t2 *) with
-	     Subset(_,_,_) -> Abs("x",Nothing,Var 0) (* essence of
-    subset is Id *)
-	   | _ -> Var n)
-	, lift 0 (n+1) t2)
-    | DefLet (d, t, e, et)
-      -> (lift 0 (n+1) d, lift 0 (n+1) t, lift 0 (n+1) e
-	  , lift 0 (n+1) et)
+    | DefAxiom (t) ->
+       ({delta=Var(dummy_loc, n);
+         essence=Var(dummy_loc, n)},
+        {delta=lift 0 (n+1) t.delta;
+         essence=lift 0 (n+1) t.essence})
+    | DefEssence (e,t) ->
+       ({delta=Var(dummy_loc, n);
+         essence=lift 0 (n+1) e},
+       {delta=lift 0 (n+1) t.delta;
+         essence=lift 0 (n+1) t.essence})
+    | DefLet (t1, t2) ->
+       ({delta=lift 0 (n+1) t1.delta;
+         essence=lift 0 (n+1) t1.essence},
+        {delta=lift 0 (n+1) t2.delta;
+         essence=lift 0 (n+1) t2.essence})

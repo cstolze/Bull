@@ -1,41 +1,48 @@
+(* TODO:
+   redefine lexing/parsing
+   define meta-env, substitution
+   define couple term * essence
+
+*)
+
+type location = Lexing.position * Lexing.position
+let dummy_loc = (Lexing.dummy_pos, Lexing.dummy_pos)
+
 (* sorts *)
 type sort = Type | Kind
 
 (* Core type *)
-(* Note: the Meta variables are useless till we implement a refiner *)
 type term =
-  | Sort of sort
-  | Let of string * term * term
-  | Prod of string * term * term
-  | Abs of string * term * term
-  | Subset of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *) (* TODO: remove *)
-  | Subabs of string * term * term (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *) (* TODO: remove *)
-  | App of term * term
-  | Inter of term * term
-  | Union of term * term
-  | SPair of term * term
-  | SPrLeft of term
-  | SPrRight of term
-  | SMatch of term * term
-  | SInLeft of term * term
-  | SInRight of term * term
-  | Coercion of term * term
-  | Var of int (* bruijn index *)
-  | Const of string (* variable name *)
-  | Omega (* THIS CONSTRUCTOR MAKES EVERYTHING INCONSISTENT *) (* TODO: remove *)
-  | Nothing (* type inside pure lambda-terms (hack) *)
-  | Underscore (* meta-variables before analysis *)
-  | Meta of int * (term list) (* bruijn index and substitution *)
+  | Sort of location * sort
+  | Let of location * string * term * term * term (* let s : t1 := t2 in t3 *)
+  | Prod of location * string * term * term (* forall s : t1, t2 *)
+  | Abs of location * string * term * term (* fun s : t1 => t2 *)
+  | App of location * term * term (* t1 t2 *)
+  | Inter of location * term * term (* t1 & t2 *)
+  | Union of location * term * term (* t1 | t2 *)
+  | SPair of location * term * term (* < t1, t2 > *)
+  | SPrLeft of location * term (* proj_l t1 *)
+  | SPrRight of location * term (* proj_r t1 *)
+  | SMatch of location * term * term * string * term * term * string * term * term (* match t1 return t2 with s1 : t3 => t4 , s2 : t5 => t6 end *)
+  | SInLeft of location * term * term (* inj_l t1 t2 *)
+  | SInRight of location * term * term (* inj_r t1 t2 *)
+  | Coercion of location * term * term (* coe t1 t2 *)
+  | Var of location * int (* bruijn index *)
+  | Const of location * string (* variable name *)
+  | Underscore of location (* meta-variables before analysis *)
+  | Meta of location * int * (term list) (* index and substitution *)
+
+type fullterm = { delta : term; essence : term }
+type fulltype = fullterm
 
 (* In the contexts, there are let-ins and axioms *)
 type declaration =
-  | DefAxiom of term * term (* type * etype *)
-  (* term * type * essence * etype *)
-  | DefLet of term * term * term * term
-  (* type of the hypotheses (type,etype) and type of the term *)
-  | DefMeta of (term * term) list * term * term
+  | DefAxiom of fulltype (* x : A *)
+  | DefEssence of term * fulltype (* x {essence=t} : A *)
+  | DefLet of fullterm * fulltype (* x := t : A *)
 
 (* find the de Bruijn index associated with an identifier *)
+(* TODO: refactor so utils only contain type declarations *)
 let find id id_list =
   let rec aux l n =
     match l with
@@ -43,32 +50,15 @@ let find id id_list =
     | id' :: l' -> if id = id' then Some n else (aux l' (n+1))
   in aux id_list 0
 
-(* location of text (for error reports) *)
-type loc =
-  | Locnode of Lexing.position * Lexing.position * loc list
-
 (* Commands from the REPL *)
 type sentence =
   | Quit
   | Load of string
-  | Proof of string * loc * term
-  | Axiom of string * loc * term
-  | Definition of string * loc * term * ((loc * term) option)
+  | Proof of string * term
+  | Axiom of string * term
+  | Definition of string * term * (term option)
   | Print of string
   | Print_all
   | Compute of string
   | Help
   | Error
-
-(* Error encoding *) (* TODO: remove *)
-module Result = struct
-    type ('a, 'b) t =
-      | Ok of 'a
-      | Error of 'b
-
-    let bind x f =
-      match x with
-      | Ok a -> f a
-      | Error b -> Error b
-  end
-
