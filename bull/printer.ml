@@ -4,6 +4,7 @@ open Utils
 open Bruijn
 
 (* error localisation *)
+(* hatstring a b returns "   ^^^", where the hats go from position a to position b *)
 let hatstring a b =
   let rec white n =
     if n = 0 then "" else " " ^ (white (n-1))
@@ -12,8 +13,8 @@ let hatstring a b =
     if n = 0 then "" else "^" ^ (hat (n-1))
   in white a ^ hat (b-a) ^ "\n"
 
+(* extract whole lines from position a to position b, including \n in the beginning and end *)
 let rec extract str a b =
-  (* str ^ " " ^ string_of_int a ^ " " ^ string_of_int b ^ "\n"*)
   if (a+1 > String.length str) then extract str (a-1) b else
     if (b+1 > String.length str) then extract str a (b-1) else
       if (b+1 = String.length str || str.[b] = '\n') then
@@ -26,10 +27,10 @@ let rec extract str a b =
       else
 	extract str a (b+1)
 
-let error_loc l1 l2 str =
-  let file = l1.Lexing.pos_fname (* the two positions are in the same file *)
+let error_loc (l1,l2) str =
+  let file = l1.Lexing.pos_fname (* we assume the two positions are in the same file *)
   in
-  if file = "" then
+  let str =
     if l1.Lexing.pos_lnum = l2.Lexing.pos_lnum then
       let str = extract str l1.Lexing.pos_cnum l2.Lexing.pos_cnum in
       let a = l1.Lexing.pos_cnum-l1.Lexing.pos_bol in
@@ -38,7 +39,9 @@ let error_loc l1 l2 str =
       str ^ str2
     else (* multiline error *)
       "\n..." ^ String.sub str l1.Lexing.pos_cnum (l2.Lexing.pos_cnum - l1.Lexing.pos_cnum) ^ "...\n"
-  else "In file " ^ file ^ ", line "^string_of_int l1.Lexing.pos_lnum^", characters " ^ string_of_int (l1.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ " -- " ^ string_of_int (l2.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ ":\n"
+  in
+  if file = "" then str
+  else "In file " ^ file ^ ", line "^string_of_int l1.Lexing.pos_lnum^", characters " ^ string_of_int (l1.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ " -- " ^ string_of_int (l2.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ ":\n" ^ str
 
 (* for the precedences, see parser.mly *)
 (* when calling aux, the precedence is (precedence-1) *)
@@ -48,48 +51,39 @@ let string_of_term is_essence id_list t =
       if precedence < trigger then text else "(" ^ text ^ ")"
     in
     match t with
-    | Sort s -> (match s with
+    | Sort (l, s) -> (match s with
 		 | Type -> "Type"
 		 | Kind -> "Kind")
-    | Let (id, t1, t2) -> parentheseme 1 ("let " ^ id ^ " := "
-					  ^ aux t1 0 ^ " in " ^ aux t2 0)
-    | Prod (id, t1, t2) -> if is_const id t2 then
-			     parentheseme 1 ("forall " ^ id ^ " : "
-					     ^ aux t1 0 ^ ", "
-					     ^ aux t2 0)
-			   else parentheseme 2 (aux t1 2 ^ " -> "
-						^ aux t2 1)
-    | Abs (id, t1, t2)
+    | Let (l, id, t1, t2, t3) -> parentheseme 1 ("let " ^ id ^ " : "
+					  ^ aux t1 0 ^ " := " ^ aux t2 0 ^ " in " ^ aux t3 0)
+    | Prod (l, id, t1, t2) -> if is_const id t2 then
+			        parentheseme 1 ("forall " ^ id ^ " : "
+					        ^ aux t1 0 ^ ", "
+					        ^ aux t2 0)
+			      else parentheseme 2 (aux t1 2 ^ " -> "
+						   ^ aux t2 1)
+    | Abs (l, id, t1, t2)
       -> parentheseme 1 ("fun " ^ id ^ (if is_essence
 					then "" else " : " ^ aux t1 0)
 			 ^ " => " ^ aux t2 0)
-    | Subset (id, t1, t2) -> if is_const id t2 then
-			     parentheseme 1 ("sforall " ^ id ^ " : "
-					     ^ aux t1 0 ^ ", "
-					     ^ aux t2 0)
-			   else parentheseme 2 (aux t1 2 ^ " >> "
-						^ aux t2 1)
-    | Subabs (id, t1, t2) -> parentheseme 1 ("sfun " ^ id ^ " : "
-					     ^ aux t1 0 ^ ", "
-					     ^ aux t2 0)
-    | App (t1, t2) -> parentheseme 5 (aux t1 4 ^ " " ^ aux t2 5)
-    | Inter (t1, t2) -> parentheseme 4 (aux t1 4 ^ " & " ^ aux t2 3)
-    | Union (t1, t2) -> parentheseme 3 (aux t1 3 ^ " | " ^ aux t2 2)
-    | SPair (t1, t2) -> "< " ^  aux t1 0 ^ ", " ^ aux t2 0 ^ " >"
-    | SPrLeft t1 -> parentheseme 6 ("proj_l " ^ aux t1 5)
-    | SPrRight t1 -> parentheseme 6 ("proj_r " ^ aux t1 5)
-    | SMatch (t1, t2) -> parentheseme 6 ("return " ^ aux t1 0
-					 ^ " with " ^ (aux t2 5))
-    | SInLeft (t1, t2) -> parentheseme 6 ("inj_l " ^ aux t1 5
+    | App (l, t1, t2) -> parentheseme 5 (aux t1 4 ^ " " ^ aux t2 5)
+    | Inter (l, t1, t2) -> parentheseme 4 (aux t1 4 ^ " & " ^ aux t2 3)
+    | Union (l, t1, t2) -> parentheseme 3 (aux t1 3 ^ " | " ^ aux t2 2)
+    | SPair (l, t1, t2) -> "< " ^  aux t1 0 ^ ", " ^ aux t2 0 ^ " >"
+    | SPrLeft (l, t1) -> parentheseme 6 ("proj_l " ^ aux t1 5)
+    | SPrRight (l, t1) -> parentheseme 6 ("proj_r " ^ aux t1 5)
+    | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
+       "match " ^ aux t1 0 ^ " return " ^ aux t2 0 ^ " with " ^ id1 ^
+         " : " ^ aux t3 0 ^ " => " ^ aux t4 0 ^ " , " ^ id2 ^ " : " ^ aux t5 0 ^ " => " ^ aux t6 0 ^ " end"
+    | SInLeft (l, t1, t2) -> parentheseme 6 ("inj_l " ^ aux t1 5
 					  ^ " " ^ aux t2 5)
-    | SInRight (t1, t2) -> parentheseme 6 ("inj_r " ^ aux t1 5
+    | SInRight (l, t1, t2) -> parentheseme 6 ("inj_r " ^ aux t1 5
 					  ^ " " ^ aux t2 5)
-    | Coercion (t1, t2) -> parentheseme 6 ("coe " ^ aux t1 5 ^ " " ^ aux t2 5)
+    | Coercion (l, t1, t2) -> parentheseme 6 ("coe " ^ aux t1 5 ^ " " ^ aux t2 5)
     | Var _ -> assert false
-    | Const id -> id
-    | Omega -> "$"
-    | Nothing -> assert false
-    | Meta n -> "?" ^ string_of_int n
+    | Const (l, id) -> id
+    | Underscore l -> "_"
+    | Meta (l,n,s) -> "?" ^ string_of_int n ^ "[???]" (* TODO: FIXME *)
   in
   aux (fix_id id_list t) 0
 
@@ -140,7 +134,7 @@ let failure a = "Error: " ^ a ^ ".\n"
 let syntaxerror str lx =
   let curr = lx.Lexing.lex_curr_p in
   let tok = Lexing.lexeme lx in
-  error_loc curr curr str ^
+  error_loc (curr,curr) str ^
   "Syntax error: \"" ^ tok ^ "\" encountered.\n"
 
 let error_axiom =
@@ -156,79 +150,71 @@ let let_error t t' id_list =
   ^ pretty_print_term id_list t ^ ".\n"
 
 let error_abs id_list l str t =
-  let Locnode(l1,l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: this term has type " ^ pretty_print_term id_list t
   ^ " (should be a sort).\n"
 
 let error_pts (l1,l2) str =
-  error_loc l1 l2 str
+  error_loc (l1,l2) str
   ^ "Error: the Pure Type System cannot infer the sort of this term.\n"
 
 let error_type_prod id_list (l1,l2) str t =
-  error_loc l1 l2 str
+  error_loc (l1,l2) str
   ^ "Error: the returning type is " ^ pretty_print_term id_list t ^ ".\n"
 
 let error_match id_list (l1,l2) str et1 et2 =
-  error_loc l1 l2 str
+  error_loc (l1,l2) str
   ^ "Error: the function expect a term of type "
   ^ pretty_print_essence id_list et1
   ^ ", but is applied to a term of type "
   ^ pretty_print_essence id_list et2 ^".\n"
 
 let error_no_prod id_list l str t =
-  let Locnode(l1,l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: this isn't a function, its type is "
   ^ pretty_print_term id_list t ^ ", it can't be applied.\n"
 
 let error_sproj id_list l str t =
-  let Locnode(l1,l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: this term has type " ^ pretty_print_term id_list t
   ^ ", it is not an intersection.\n"
 
 let error_set (l1,l2) str =
-  error_loc l1 l2 str
+  error_loc (l1,l2) str
   ^ "Error: you can't use set operators on non-set terms.\n"
 
 let error_kind = "Error: we do not deal with infinite hierarchy of universes.\n"
 
 let error_essence (l1,l2) str =
-  error_loc l1 l2 str
+  error_loc (l1,l2) str
   ^ "Error: the essence check failed.\n"
 
 let error_const (l1,l2) str id =
-  error_loc l1 l2 str
+  error_loc (l1,l2) str
   ^ "Error: " ^ id ^ " has not been declared.\n"
 
 let error_return l str =
-  let Locnode(l1,l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: wrong return type.\n"
 
 let error_with l str =
-  let Locnode(l1, l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: wrong argument.\n"
 
 let error_smatch (l1,l2) str =
-  error_loc l1 l2 str
+  error_loc (l1,l2) str
   ^ "Error: type mismatch.\n"
 
 let error_subtype l str id_list t1 t2 =
-  let Locnode(l1, l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: the type " ^ pretty_print_term id_list t2 ^ " is not a subtype of " ^
     pretty_print_term id_list t1 ^ ".\n"
 
 let error_coe1 l str id_list t =
-  let Locnode(l1,l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: this term has type " ^ pretty_print_term id_list t
   ^ " (should be Type or Kind).\n"
 
 let error_coe2 l str =
-  let Locnode(l1,l2,_) = l in
-  error_loc l1 l2 str
+  error_loc l str
   ^ "Error: this term is not coercible.\n"

@@ -1,7 +1,9 @@
 (* TODO:
-   redefine lexing/parsing
    define meta-env, substitution
-   define couple term * essence
+   do refinement
+   do checking
+   define "complex" lexing/parsing
+   define "complex" printing
 
 *)
 
@@ -34,12 +36,38 @@ type term =
 
 type fullterm = { delta : term; essence : term }
 type fulltype = fullterm
+let dummy_term = {delta=Underscore dummy_loc ; essence=Underscore dummy_loc}
 
 (* In the contexts, there are let-ins and axioms *)
 type declaration =
-  | DefAxiom of fulltype (* x : A *)
-  | DefEssence of term * fulltype (* x {essence=t} : A *)
-  | DefLet of fullterm * fulltype (* x := t : A *)
+  | DefAxiom of string * fulltype (* x : A *)
+  | DefEssence of string * term * fulltype (* x {essence=t} : A *)
+  | DefLet of string * fullterm * fulltype (* x := t : A *)
+
+(* Indices for meta-variables are integers (not de Bruijn indices) *)
+
+(* Idea:
+Two questions:
+- do we know the essence? (Y/N)
+- do we know the type? (Y/N)
+Hence 4 main algorithms.
+
+Meta-environment: list of 4 possible things:
+- is_sort ?n (means ?n is either Type or Kind)
+- Gamma |- essence ?n := x
+- Gamma |- ?n := x : T
+- Gamma |- ?n : T
+*)
+type metadeclaration =
+  | DefMeta of declaration list * int * fulltype
+
+type metasubst =
+  | Subst of declaration list * int * fullterm * fulltype
+  | SubstEssence of declaration list * int * term * fulltype
+
+(* if we want to generate a new meta-variable, its identifier is
+   the first value of the metaenv triple *)
+type metaenv = int * (metadeclaration list) * (metasubst list)
 
 (* find the de Bruijn index associated with an identifier *)
 (* TODO: refactor so utils only contain type declarations *)
