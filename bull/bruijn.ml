@@ -27,6 +27,7 @@ let visit_term f g h = function
   | SInLeft (l, t1, t2) -> SInLeft (l, f t1, f t2)
   | SInRight (l, t1, t2) -> SInRight (l, f t1, f t2)
   | Coercion (l, t1, t2) -> Coercion (l, f t1, f t2)
+  | Meta (l, n, subst) -> Meta (l, n, List.map f subst)
   | t -> t (* non-recursive cases *)
 
 (* Map iterator *)

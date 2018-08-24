@@ -11,6 +11,31 @@ let beta_redex t1 t2 =
       Var (l, m-1)
   in map_term 0 aux t1
 
+(* if we know that Gamma |- ?n := t : T, and we consider ?n[subst]
+   then we can compute t[subst] (or T[subst]) *)
+let rec apply_substitution t subst =
+  match subst with
+  | [] -> t
+  | x :: l -> apply_substitution (beta_redex t x) l
+
+let rec find_subst n l =
+  match l with
+  | Subst (g,m,t,t') :: l -> if m = n then Some (g,t,t') else find_subst n l
+  | _ :: l -> find_subst n l
+  | [] -> None
+
+let rec apply_all_substitution (n, meta) t =
+  match t with
+  | Meta (l, n, subst) ->
+     begin
+       match find_subst n meta with
+       | Some (_,t,_) -> apply_substitution t.delta subst
+       | None -> t
+     end
+  | _ -> visit_term (apply_all_substitution (n, meta))
+           (fun _ -> apply_all_substitution (n, meta))
+           (fun x _ -> x) t
+
 let is_eta t =
   let rec aux k t =
     match t with

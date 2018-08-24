@@ -10,93 +10,147 @@ exception Error of string
 
 let type_of_sort s =
   match s with
-  | Type -> (Sort Kind, Sort Type, Sort Kind)
-  | Kind -> Error (error_kind)
+  | Type -> Some ({delta=Sort Type, essence=Sort Type}, {delta=Sort Kind, essence=Sort Kind})
+  | Kind -> None
 
 (* returns the sort of Pi x : A. B, where A:s1 and b:s2 *)
-let principal_type_system s1 s2 =
+(* TODO: rewrite so it can take meta-variables as input *)
+let principal_type_system meta env ctx s1 s2 =
   match (s1, s2) with
-  | (Type, Type) -> Some Type (* terms depending on terms *)
-  | (Type, Kind) -> Some Kind (* types depending on terms *)
-  | _ -> None (* we are doing lambdaP (aka LF) for now *)
+  | (Sort Type, Sort Type) -> Type (* terms depending on terms *)
+  | (Sort Type, Sort Kind) -> Kind (* types depending on terms *)
+  | _ -> Error "PTS" (* we are doing lambdaP (aka LF) for now *)
 
-(* tells if x of type (Sort s) is a set, ie if "x inter x" is legal *)
-let is_set s =
-  true
-
-(*
-  reconstruct takes as input:
-
-  - a meta-variable environment
-  - a substitution
-  - a term
- *)
-
-(* reconstruct returns:
-   - a new meta-variable environment
-   - a new substitution
-   - a new fullterm
-   - its fulltype
-
-In case of error, it throws an exception.
- *)
+(* same as principal type system, but for A | B and A & B *)
+let principal_set_system s1 s2 =
+  match (s1, s2) with
+  | (Type, Type) -> Type
+  | _ -> Error "PSS"
 
 (*
-  check takes as input:
-  - the location tree (for debugging)
+4 algorithms:
+reconstruct
 
-  - a meta-variable environment
-  - a substitution
-  - a term
-  - a type
+reconstruct_with_essence
 
-and returns:
-  - a new meta-variable environment
-  - a new substitution
-  - a new term
-  - the essence
-  - the type
-  - the essence type
+reconstruct_with_type
+
+reconstruct_with_all
+
+These function takes as input:
+- a meta-environment
+- a local environment
+- a full environment
+- a term
+- eventually an essence and/or a type
+
+These functions return:
+- a new meta-environment
+- a new fullterm
+- a new fulltype
+
+These functions can throw an exception
+
  *)
 
-(*
-  force-type takes as input:
-  - the location tree (for debugging)
+let rec reconstruct meta env ctx t =
+  match t with
 
+  | Sort (l, s) ->
+     begin
+       match type_of_sort s with
+       | Some x -> x
+       | None -> Error (error_kind)
+     end
+
+  | Let (l, id, t1, t2, t3) ->
+     let (meta, t1, t1') = force_type meta env ctx t1 in
+     let (meta, t2, t2') = reconstruct_with_type meta env ctx t2 t1.delta in
+     let decl = DefLet(id, t2, t2') in
+     reconstruct meta (decl :: env) (decl :: ctx) t3
+
+  | Prod (l, id, t1, t2) ->
+     let (meta, t1, t1') = force_type meta env ctx t1 in
+     let (meta, t2, t2') =
+       let decl = DefAxiom(id, t1) in
+       force_type meta (decl :: env) (decl :: ctx) t2 in
+     principal_type_system meta env ctx t1' t2'
+
+  | Abs (l, id, t1, t2) ->
+     let (meta, t1, t1') = force_type meta env ctx t1 in
+     let (meta, t2, t2') =
+       let decl = DefAxiom(id, t1) in
+       reconstruct meta (decl :: env) (decl :: ctx) t2 in
+     let (meta,typ,_) = reconstruct meta env ctx (Prod (l, id, t1, t2')) in
+     (meta, {delta=Abs(l, id, t1.delta, t2.delta); essence=Abs(l, id, nothing, t2.essence)},
+      typ)
+
+  | App (l, t1, t2) ->
+     let (meta, t1, t1') = reconstruct meta env ctx t1 in
+     let t1' = strongly_normalize_full env @@ apply_all_substitution_full meta t.delta in
+     begin
+     match t1'.delta, t1'.essence with
+     | Prod (l, u1, u2), Prod(l, eu1, eu2) -> (* case 1: we know the type of t1 *)
+        let (meta, t2, t2') = reconstruct_with_type meta env ctx t2 u1 in
+        (meta, {delta = App(l, t1.delta, t2.delta); essence = App(l, t1.essence, t2.essence)},
+         {delta = beta_redex u2 t2.delta; essence = beta_redex eu2 t2.essence})
+     | _ -> (* case 2: we do not know the type of t1 *)
+        let (meta, t2, t2') = reconstruct meta env ctx t2 in
+        let (meta, s) = meta_add_sort meta in
+        let (meta, k) = meta_add meta ctx s.delta in
+        let meta = unification t1' {delta=Prod(l, "x", t2'.delta, k.delta); essence=Prod(l,"x",t2'.essence, k.essence)} in
+        (meta, subst k.delta t2.delta, subst k.essence t2.essence)
+     end
+
+  | Inter (l, t1, t2) ->
+     let (meta, t1, t1') = force_type meta env ctx t1 in
+     let (meta, t2, t2') = force_type meta env ctx t2 in
+     principal_set_system meta env ctx t1' t2'
+
+  | Union (l, t1, t2) ->
+     let (meta, t1, t1') = force_type meta env ctx t1 in
+     let (meta, t2, t2') = force_type meta env ctx t2 in
+     principal_set_system meta env ctx t1' t2'
+
+  | SPair (l, t1, t2) ->
+  | SPrLeft (l, t1) ->
+  | SPrRight (l, t1) ->
+  | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
+  | SInLeft (l, t1, t2) ->
+  | SInRight (l, t1, t2) ->
+  | Coercion (l, t1, t2) ->
+  | Var (l, n) ->
+  | Const (l, id) -> Error "const"
+  | Underscore l ->
+  | Meta (l, n, subst) ->
+
+
+(*
+  force-type takes is like reconstruct, except that
+it forces the returned type to be either Type, Kind, or a meta-variable with
+the property is_sort
+ *)
+(*
+  cast takes as input
   - a meta-variable environment
-  - a substitution
-  - a term
+  - a fullterm t
+  - a fulltype t1
+  - a fulltype t2
 
 and returns
-  - a term
-  - its essence
-  - a type (which is a sort)
-  - the essence type
+  - a new meta-var env
+  - a new fullterm
+  - a new fulltype
  *)
 
 (*
   unification function takes as input:
   - a meta-variable environment
-  - a substitution
-  - a term t
-  - a term t'
+  - a fullterm t
+  - a fullterm t'
 
 and returns
-  - a new meta-var env, a new subst
- *)
-
-(*
-  cast takes as input
-  - a meta-variable environment
-  - a substitution
-  - a term t
-  - a type t1
-  - a type t2
-
-and returns
-  - a new meta-var env, a new substitution
-  - a new term (such that it has type t2)
-  - its essence
+  - a new meta-var env
  *)
 
 (*
@@ -112,50 +166,8 @@ The meta-variable environment comes with an integer being the maximum meta-var i
   - context, meta-var id, term, type ( \Gamma \vdash id := term : type )
  *)
 
-let rec reconstruct str id_list sigma gamma l t =
-  match t with
-  | Sort s -> type_of_sort s
-  | Let (s,t1,t2,t3) -> 
-  | Prod (s,t1,t2) -> 
-  | Abs (s,t1,t2) -> 
-  | App (t1,t2) -> 
-  | Inter (t1,t2) -> 
-  | Union (t1,t2) -> 
-  | SPair (t1,t2) -> 
-  | SPrLeft of term
-  | SPrRight of term
-  | SMatch (t1,t2) -> 
-  | SInLeft (t1,t2) -> 
-  | SInRight (t1,t2) -> 
-  | Coercion (t1,t2) -> 
-  | Var n -> 
-  | Const s -> Result.Error(error_const getloc str id)
-  | Nothing -> assert false
-  | Underscore (* meta-variables before analysis *)
-  | Meta n -> 
-  | _ -> Error "illegal term"
 
-and rec check str id_list sigma gamma l t1 t2 =
-(*  match t1 with
-  | Sort s -> 
-  | Let (s,t1,t2) -> 
-  | Prod (s,t1,t2) -> 
-  | Abs (s,t1,t2) -> 
-  | App (t1,t2) -> 
-  | Inter (t1,t2) -> 
-  | Union (t1,t2) -> 
-  | SPair (t1,t2) -> 
-  | SPrLeft of term
-  | SPrRight of term
-  | SMatch (t1,t2) -> 
-  | SInLeft (t1,t2) -> 
-  | SInRight (t1,t2) -> 
-  | Coercion (t1,t2) -> 
-  | Var n -> 
-  | Const s -> Result.Error(error_const getloc str id)
-  | Nothing -> assert false
-  | Meta n -> 
-  | _ -> Error "illegal term" *)
+
 
 
 (* **************************************************************************************************** *)

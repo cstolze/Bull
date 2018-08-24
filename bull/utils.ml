@@ -34,9 +34,11 @@ type term =
   | Underscore of location (* meta-variables before analysis *)
   | Meta of location * int * (term list) (* index and substitution *)
 
+let nothing = Underscore dummy_loc
+
 type fullterm = { delta : term; essence : term }
 type fulltype = fullterm
-let dummy_term = {delta=Underscore dummy_loc ; essence=Underscore dummy_loc}
+let dummy_term = {delta=nothing ; essence=nothing}
 
 (* In the contexts, there are let-ins and axioms *)
 type declaration =
@@ -53,21 +55,20 @@ Two questions:
 Hence 4 main algorithms.
 
 Meta-environment: list of 4 possible things:
-- is_sort ?n (means ?n is either Type or Kind)
-- Gamma |- essence ?n := x
+- is_sort ?n (means ?n is either Type or Kind) (superseded by ?n is sort s)
+- ?n is sort s
+- Gamma |- ?n : T (superseded by ?n := x and by essence(?n) := x : T)
+- Gamma |- essence ?n := x : T (superseded by ?n := x)
 - Gamma |- ?n := x : T
-- Gamma |- ?n : T
 *)
 type metadeclaration =
+  | Issort of int
+  | SubstSort of sort
   | DefMeta of declaration list * int * fulltype
-
-type metasubst =
   | Subst of declaration list * int * fullterm * fulltype
   | SubstEssence of declaration list * int * term * fulltype
 
-(* if we want to generate a new meta-variable, its identifier is
-   the first value of the metaenv triple *)
-type metaenv = int * (metadeclaration list) * (metasubst list)
+type metaenv = int * (metadeclaration list)
 
 (* find the de Bruijn index associated with an identifier *)
 (* TODO: refactor so utils only contain type declarations *)
