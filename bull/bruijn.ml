@@ -123,19 +123,19 @@ let fix_id id_list t =
 
 (* gives the term, term essence and type of the term of index n *)
 let get_from_context gamma n =
-    match List.nth gamma n with
-    | DefAxiom (_, t) ->
-       ({delta=Var(dummy_loc, n);
-         essence=Var(dummy_loc, n)},
-        {delta=lift 0 (n+1) t.delta;
-         essence=lift 0 (n+1) t.essence})
-    | DefEssence (_, e,t) ->
-       ({delta=Var(dummy_loc, n);
-         essence=lift 0 (n+1) e},
-       {delta=lift 0 (n+1) t.delta;
-         essence=lift 0 (n+1) t.essence})
-    | DefLet (_, t1, t2) ->
-       ({delta=lift 0 (n+1) t1.delta;
-         essence=lift 0 (n+1) t1.essence},
-        {delta=lift 0 (n+1) t2.delta;
-         essence=lift 0 (n+1) t2.essence})
+  match List.nth gamma n with (* no exception (if the code is bug-free) *)
+  | DefAxiom (_, t) ->
+     ({delta=Var(dummy_loc, n);
+       essence=Var(dummy_loc, n)},
+      {delta=lift 0 (n+1) t.delta;
+       essence=lift 0 (n+1) t.essence})
+  | DefEssence (_, e,t) ->
+     ({delta=Var(dummy_loc, n);
+       essence=lift 0 (n+1) e},
+      {delta=lift 0 (n+1) t.delta;
+       essence=lift 0 (n+1) t.essence})
+  | DefLet (_, t1, t2) ->
+     ({delta=lift 0 (n+1) t1.delta;
+       essence=lift 0 (n+1) t1.essence},
+      {delta=lift 0 (n+1) t2.delta;
+       essence=lift 0 (n+1) t2.essence})
