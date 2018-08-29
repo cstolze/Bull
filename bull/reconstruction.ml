@@ -10,8 +10,19 @@ exception Error of string
 
 let type_of_sort s =
   match s with
-  | Type -> Some ({delta=Sort Type, essence=Sort Type}, {delta=Sort Kind, essence=Sort Kind})
+  | Type -> Some ({delta=Sort(dummy_loc, Type); essence=Sort(dummy_loc, Type)}, {delta=Sort(dummy_loc, Kind); essence=Sort(dummy_loc, Kind)})
   | Kind -> None
+
+let meta_add_sort (n,meta) = (n, (n+1, IsSort n :: meta))
+
+let meta_add (n,meta) ctx t = (n, (n+1, DefMeta (ctx, n, t) :: meta))
+
+let get_meta (_,meta) n =
+  let rec foo = function
+    | [] -> assert false
+    | IsSort m :: l -> ...
+
+let is_sort n
 
 (* returns the sort of Pi x : A. B, where A:s1 and b:s2 *)
 (* TODO: rewrite so it can take meta-variables as input *)

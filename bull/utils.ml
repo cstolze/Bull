@@ -62,7 +62,7 @@ Meta-environment: list of 4 possible things:
 - Gamma |- ?n := x : T
 *)
 type metadeclaration =
-  | Issort of int
+  | IsSort of int
   | SubstSort of sort
   | DefMeta of declaration list * int * fulltype
   | Subst of declaration list * int * fullterm * fulltype
