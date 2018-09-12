@@ -20,23 +20,41 @@ let meta_add (n,meta) ctx t = (n, (n+1, DefMeta (ctx, n, t) :: meta))
 let get_meta (_,meta) n =
   let rec foo = function
     | [] -> assert false
-    | IsSort m :: l -> ...
-
-let is_sort n
+    | IsSort m :: l ->
+       if m = n then IsSort n else foo l
+    | DefMeta (l1, m, t) :: l -> if m = n then DefMeta (l1, m, t) else
+                                   foo l
+    | SubstSort (m,s) :: l -> if m = n then SubstSort (m,s) else foo l
+    | Subst (l1,m,t1,t2) :: l -> if m = n then Subst (l1, m, t1, t2)
+                                 else foo l
+    | SubstEssence (l1, m, t1, t2) :: l
+      -> if m = n then SubstEssence (l1, m, t1, t2) else foo l
+  in
+  foo meta
 
 (* returns the sort of Pi x : A. B, where A:s1 and b:s2 *)
-(* TODO: rewrite so it can take meta-variables as input *)
+(* pre-condition: s1 and s2 have to be sorts (or sort meta-vars) *)
 let principal_type_system meta env ctx s1 s2 =
   match (s1, s2) with
-  | (Sort Type, Sort Type) -> Type (* terms depending on terms *)
-  | (Sort Type, Sort Kind) -> Kind (* types depending on terms *)
-  | _ -> Error "PTS" (* we are doing lambdaP (aka LF) for now *)
+  | (Sort (_,Type), t) -> (meta, t)
+  | (t1, t2) -> let meta = unification meta env t1
+                                       {delta=Sort(dummy_loc,Type);
+                                        essence=Sort(dummy_loc,Type)}
+                in (meta, t2)
 
 (* same as principal type system, but for A | B and A & B *)
-let principal_set_system s1 s2 =
+let principal_set_system meta env ctx s1 s2 =
   match (s1, s2) with
-  | (Type, Type) -> Type
-  | _ -> Error "PSS"
+  | (Sort (_,Type), Sort(l,Type)) -> (meta, Sort(l,Type))
+  | (t1, t2) -> let meta = unification meta env t1
+                                       {delta=Sort(dummy_loc,Type);
+                                        essence=Sort(dummy_loc,Type)}
+                in
+                let meta = unification meta env t2
+                                       {delta=Sort(dummy_loc,Type);
+                                        essence=Sort(dummy_loc,Type)}
+                in (meta, Sort(dummy_loc,Type))
+
 
 (*
 4 algorithms:
