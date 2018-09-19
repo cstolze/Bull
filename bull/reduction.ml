@@ -45,7 +45,8 @@ let is_eta t =
        aux k t1 && aux k t2 && aux (k+1) t3
     | Prod (l, id1, t1, t2) | Abs (l, id1, t1, t2)
      -> aux k t1 && aux (k+1) t2
-    | App (l, t1, t2) | Inter (l, t1, t2) | Union (l, t1, t2) | SPair (l, t1, t2)
+    | App (l, t1, l2) -> List.for_all (aux k) (t1 :: l2)
+    | Inter (l, t1, t2) | Union (l, t1, t2) | SPair (l, t1, t2)
     | Coercion (l, t1, t2) | SInLeft (l, t1, t2)
     | SInRight (l, t1, t2) -> aux k t1 && aux k t2
     | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
@@ -66,7 +67,7 @@ let rec strongly_normalize gamma t =
   let t = sn_children t in
   match t with
   (* Beta-redex *)
-  | App (l, Abs (l',_,_, t1), t2)
+  | App (l, Abs (l',_,_, t1), t2 :: [])
     -> strongly_normalize gamma (beta_redex t1 t2)
   | Let (l, _, t1, t2, t3) -> strongly_normalize gamma (beta_redex t2 t1)
   (* Delta-redex *)
@@ -75,10 +76,11 @@ let rec strongly_normalize gamma t =
 	      | Var _ -> t1.delta
 	      | _ -> strongly_normalize gamma t1.delta)
   (* Eta-redex *)
-  | Abs (l,_, _, App (l',t1, Var (_,0))) -> if is_eta t1 then
-			               strongly_normalize gamma (lift 0 (-1) t1)
-		                     else
-			               t
+  | Abs (l,_, _, App (l',t1, Var (_,0) :: l2))
+    -> if is_eta (App (l', t1, l2)) then
+	 strongly_normalize gamma (lift 0 (-1) t1)
+       else
+	 t
   (* Pair-redex *)
   | SPrLeft (l, SPair (l', x,_)) -> x
   | SPrRight (l, SPair (l', _, x)) -> x
@@ -88,3 +90,11 @@ let rec strongly_normalize gamma t =
   | SMatch (l, SInRight(l',_,t1), _, id1, _, _, id2, _, t2) ->
      strongly_normalize gamma (beta_redex t2 t1)
   | _ -> t
+
+
+let apply_all_substitution_full meta {delta; essence}
+  = {delta=apply_all_substitution meta delta; essence (* dummy *) }
+let strongly_normalize_full env {delta; essence} =
+  {delta=strongly_normalize env delta;
+         essence=strongly_normalize env essence (* problem with
+  DefEssence *) }

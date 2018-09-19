@@ -1,7 +1,12 @@
 %{open Utils
   let get_loc () = (Parsing.symbol_start_pos (), Parsing.symbol_end_pos ())
   let unquote s = String.trim (String.map (fun c -> if c = '"' then ' '
-						  else c) s)
+						    else c) s)
+  let to_spine t1 t2 =
+    match t1 with
+    | App (_, t, l) -> App (get_loc (), t, t2 :: l) (* args are from
+  last to first *)
+    | _ -> App(get_loc (), t1, [t2])
 
 %}
 
@@ -96,7 +101,7 @@ term4:
     ;
 
 term5:
-    | term5 term6 { App (get_loc (), $1, $2) } /* applications are left-
+    | term5 term6 { to_spine $1 $2 } /* applications are left-
       to-right */
     | term6 { $1 }
     ;

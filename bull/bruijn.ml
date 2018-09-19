@@ -14,7 +14,7 @@ let visit_term f g h = function
   | Let (l, id1, t1, t2, t3) -> Let (l, h id1 t3, f t1, f t2, g (h id1 t3) t3)
   | Prod (l, id1, t1, t2) -> Prod (l, h id1 t2, f t1, g (h id1 t2) t2)
   | Abs (l, id1, t1, t2) -> Abs (l, h id1 t2, f t1, g (h id1 t2) t2)
-  | App (l, t1, t2) -> App (l, f t1, f t2)
+  | App (l, t1, l2) -> App (l, f t1, List.map f l2)
   | Inter (l, t1, t2) -> Inter (l, f t1, f t2)
   | Union (l, t1, t2) -> Union (l, f t1, f t2)
   | SPair (l, t1, t2) -> SPair (l, f t1, f t2)
@@ -83,7 +83,8 @@ let is_const id t =
     | Prod (l, id1, t1, t2) | Abs (l, id1, t1, t2)
       -> aux t1 || (if id1 = id then false
 		    else aux t2)
-    | App (l, t1, t2) | Inter (l, t1, t2) | Union (l, t1, t2) | SPair (l, t1, t2)
+    | App (l, t1, l2) -> aux t1 || List.exists aux l2
+    | Inter (l, t1, t2) | Union (l, t1, t2) | SPair (l, t1, t2)
     | Coercion (l, t1, t2) | SInLeft (l, t1, t2)
     | SInRight (l, t1, t2) -> aux t1 || aux t2
     | _ -> false

@@ -19,7 +19,7 @@ type term =
   | Let of location * string * term * term * term (* let s : t1 := t2 in t3 *)
   | Prod of location * string * term * term (* forall s : t1, t2 *)
   | Abs of location * string * term * term (* fun s : t1 => t2 *)
-  | App of location * term * term (* t1 t2 *)
+  | App of location * term * term list (* t1 t2 *)
   | Inter of location * term * term (* t1 & t2 *)
   | Union of location * term * term (* t1 | t2 *)
   | SPair of location * term * term (* < t1, t2 > *)

@@ -6,16 +6,16 @@ open Printer
 
 (* returns the essence and the type of a term *)
 
-exception Error of string
+exception Err of string
 
-let type_of_sort s =
-  match s with
-  | Type -> Some ({delta=Sort(dummy_loc, Type); essence=Sort(dummy_loc, Type)}, {delta=Sort(dummy_loc, Kind); essence=Sort(dummy_loc, Kind)})
-  | Kind -> None
+(* dummy *)
+let unification meta env t1 t2 = meta
 
-let meta_add_sort (n,meta) = (n, (n+1, IsSort n :: meta))
+let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), {delta=Meta(l,n,[]);essence=Meta(l,n,[])})
 
-let meta_add (n,meta) ctx t = (n, (n+1, DefMeta (ctx, n, t) :: meta))
+let meta_add (n,meta) ctx t l =
+  let s = List.map (fun _ -> Var(dummy_loc,0)) ctx in
+  ((n+1, DefMeta (ctx, n, t) :: meta), {delta=Meta(l,n,s);essence=Meta(l,n,s)})
 
 let get_meta (_,meta) n =
   let rec foo = function
@@ -32,20 +32,25 @@ let get_meta (_,meta) n =
   in
   foo meta
 
+let type_of_sort s =
+  match s with
+  | Type -> Some ({delta=Sort(dummy_loc, Kind); essence=Sort(dummy_loc, Kind)})
+  | Kind -> None
+
 (* returns the sort of Pi x : A. B, where A:s1 and b:s2 *)
 (* pre-condition: s1 and s2 have to be sorts (or sort meta-vars) *)
 let principal_type_system meta env ctx s1 s2 =
   match (s1, s2) with
-  | (Sort (_,Type), t) -> (meta, t)
+  | (Sort (_,Type), t) -> (meta, {delta=t;essence=t})
   | (t1, t2) -> let meta = unification meta env t1
                                        {delta=Sort(dummy_loc,Type);
                                         essence=Sort(dummy_loc,Type)}
-                in (meta, t2)
+                in (meta, {delta=t2;essence=t2})
 
 (* same as principal type system, but for A | B and A & B *)
 let principal_set_system meta env ctx s1 s2 =
   match (s1, s2) with
-  | (Sort (_,Type), Sort(l,Type)) -> (meta, Sort(l,Type))
+  | (Sort (_,Type), Sort(l,Type)) -> (meta, {delta=Sort(l,Type); essence=Sort(l,Type)})
   | (t1, t2) -> let meta = unification meta env t1
                                        {delta=Sort(dummy_loc,Type);
                                         essence=Sort(dummy_loc,Type)}
@@ -53,7 +58,7 @@ let principal_set_system meta env ctx s1 s2 =
                 let meta = unification meta env t2
                                        {delta=Sort(dummy_loc,Type);
                                         essence=Sort(dummy_loc,Type)}
-                in (meta, Sort(dummy_loc,Type))
+                in (meta, {delta=Sort(dummy_loc,Type); essence=Sort(dummy_loc,Type)})
 
 
 (*
@@ -88,8 +93,8 @@ let rec reconstruct meta env ctx t =
   | Sort (l, s) ->
      begin
        match type_of_sort s with
-       | Some x -> x
-       | None -> Error (error_kind)
+       | Some x -> (meta, {delta=t; essence=t}, x)
+       | None -> raise (Err error_kind)
      end
 
   | Let (l, id, t1, t2, t3) ->
@@ -103,8 +108,8 @@ let rec reconstruct meta env ctx t =
      let (meta, t2, t2') =
        let decl = DefAxiom(id, t1) in
        force_type meta (decl :: env) (decl :: ctx) t2 in
-     let tt = principal_type_system meta env ctx t1' t2' in
-     (meta, {delta=Prod(l,id,t1.delta,l2.delta); essence=Prod(l,id,t1.essencce,t2.essence)},
+     let (meta, tt) = principal_type_system meta env ctx t1' t2' in
+     (meta, {delta=Prod(l,id,t1.delta,t2.delta); essence=Prod(l,id,t1.essence,t2.essence)},
       tt)
 
   | Abs (l, id, t1, t2) ->
@@ -112,124 +117,166 @@ let rec reconstruct meta env ctx t =
      let (meta, t2, t2') =
        let decl = DefAxiom(id, t1) in
        reconstruct meta (decl :: env) (decl :: ctx) t2 in
-     let (meta,typ,_) = reconstruct meta env ctx (Prod (l, id, t1, t2')) in
+     let (meta,typ,_) = force_type meta env ctx (Prod (l, id, t1.delta, t2'.delta)) in
      (meta, {delta=Abs(l, id, t1.delta, t2.delta); essence=Abs(l, id, nothing, t2.essence)},
       typ)
 
-  | App (l, t1, t2) ->
-     let (meta, t1, t1') = reconstruct meta env ctx t1 in
-     let t1' = strongly_normalize_full env @@ apply_all_substitution_full meta t' in
+  | App (l, t1, l2) ->
      begin
-     match t1'.delta, t1'.essence with
-     | Prod (l, u1, u2), Prod(l, eu1, eu2) -> (* case 1: we know the type of t1 *)
-        let (meta, t2, t2') = reconstruct_with_type meta env ctx t2 u1 in
-        (meta, {delta = App(l, t1.delta, t2.delta); essence = App(l, t1.essence, t2.essence)},
-         {delta = beta_redex u2 t2.delta; essence = beta_redex eu2 t2.essence})
-     | _ -> (* case 2: we do not know the type of t1 *)
-        let (meta, t2, t2') = reconstruct meta env ctx t2 in
-        let (meta, s) = meta_add_sort meta in
-        let (meta, k) = meta_add meta ctx s.delta in
-        let meta = unification meta env t1' {delta=Prod(l, "x", t2'.delta, k.delta); essence=Prod(l,"x",t2'.essence, k.essence)} in
-        (meta, subst k.delta t2.delta, subst k.essence t2.essence)
+       match l2 with
+       | [] -> reconstruct meta env ctx t1
+       | t2 :: l2 ->
+          let (meta, t1, t1') = reconstruct meta env ctx (App (l,t1,l2)) in
+          let t1, l2, et1, el2 =
+            match t1.delta, t1.essence with
+            | App(_,t1,l2), App(_,et1,el2) -> t1,l2,et1,el2
+            | _ -> t1.delta, [], t1.essence, []
+          in
+          let t1' = strongly_normalize_full env @@ apply_all_substitution_full meta t1' in
+          begin
+            match t1'.delta, t1'.essence with
+            | Prod (l, id, u1, u2), Prod(_, _, eu1, eu2) -> (* case 1: we know the type of t1 *)
+               let (meta, t2, t2') =
+                 reconstruct_with_type meta env ctx t2 u1 in
+               (meta, {delta = App(l, t1, t2.delta :: l2);
+                       essence = App(l, et1, t2.essence :: el2)},
+                {delta = beta_redex u2 t2.delta;
+                 essence = beta_redex eu2 t2.essence})
+            | _ -> (* case 2: we do not know the type of t1 *)
+               let (meta, t2, t2') = reconstruct meta env ctx t2 in
+               let (meta, s) = meta_add_sort meta dummy_loc in
+               let (meta, k) = meta_add meta ctx s dummy_loc in
+               let meta = unification meta env t1' {delta=Prod(l, "x", t2'.delta, k.delta); essence=Prod(l,"x",t2'.essence, k.essence)} in
+               (meta, {delta = App(l, t1, t2.delta :: l2);
+                       essence = App(l, et1, t2.essence :: el2)},
+                {delta=beta_redex k.delta t2.delta; essence=beta_redex k.essence t2.essence})
+          end
      end
 
   | Inter (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = force_type meta env ctx t2 in
-     (meta, {delta=Inter(l,t1.delta,t2.delta);essence=(l,t1.essence,t2.essence)},
-      principal_set_system meta env ctx t1' t2')
+     let (meta, tt) = principal_set_system meta env ctx t1' t2' in
+     (meta, {delta=Inter(l,t1.delta,t2.delta);essence=Inter(l,t1.essence,t2.essence)},
+      tt)
 
   | Union (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = force_type meta env ctx t2 in
-     (meta, {delta=Union(l,t1.delta,t2.delta);Union=(l,t1.essence,t2.essence)},
-      principal_set_system meta env ctx t1' t2')
+     let (meta, tt) = principal_set_system meta env ctx t1' t2' in
+     (meta, {delta=Union(l,t1.delta,t2.delta);essence=Union(l,t1.essence,t2.essence)},
+      tt)
 
   | SPair (l, t1, t2) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
-     let (meta, t2, t2') = reconstruct_with_essence env ctx t2 t1.essence in
-     let (meta, t', _) = force_type meta env (Inter (l, t1'.delta, t2'.delta)) in
-     (meta, {delta=Spair(l,t1.delta,t2.delta) essence=t1.essence},
+     let (meta, t2, t2') = reconstruct_with_essence meta env ctx t2 t1.essence in
+     let (meta, t', _) = force_type meta env ctx (Inter (l, t1'.delta, t2'.delta)) in
+     (meta, {delta=SPair(l,t1.delta,t2.delta); essence=t1.essence},
       t')
   | SPrLeft (l, t1) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
-     let t1' = strongly_normalize_full env @@ apply_all_substitution_full meta t.delta in
+     let t1' = strongly_normalize_full env @@ apply_all_substitution_full meta t1 in
      begin
        match t1'.delta, t1'.essence with
-       | Inter(l,t',_), Inter(l,et',_) ->
-          (meta, {delta=SprLeft(l,t1.delta), essence=t1.essence},
-           {delta=t', essence=et'})
+       | Inter(l,t',_), Inter(_,et',_) ->
+          (meta, {delta=SPrLeft(l,t1.delta); essence=t1.essence},
+           {delta=t'; essence=et'})
        | _ ->
-          let (meta, s) = meta_add_sor meta in
-          let (meta, a) = meta_add meta ctx s.delta in
-          let (meta, b) = meta_add meta ctx s.delta in
-          let meta = unification meta env t1' {delta=Inter(l,a.essence,b.essence), essence=Inter(l,c.essence,d.essence)} in
-          (meta, {delta=SprLeft(l,t1.delta), essence=t1.essence}, a)
+          let (meta, s) = meta_add_sort meta dummy_loc in
+          let (meta, a) = meta_add meta ctx s dummy_loc in
+          let (meta, b) = meta_add meta ctx s dummy_loc in
+          let meta = unification meta env t1' {delta=Inter(l,a.essence,b.essence); essence=Inter(l,a.essence,b.essence)} in
+          (meta, {delta=SPrLeft(l,t1.delta); essence=t1.essence}, a)
      end
   | SPrRight (l, t1) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
-     let t1' = strongly_normalize_full env @@ apply_all_substitution_full meta t.delta in
+     let t1' = strongly_normalize_full env @@ apply_all_substitution_full meta t1 in
      begin
        match t1'.delta, t1'.essence with
-       | Inter(l,_,t'), Inter(l,_,et') ->
-          (meta, {delta=SprLeft(l,t1.delta), essence=t1.essence},
-           {delta=t', essence=et'})
+       | Inter(l,_,t'), Inter(_,_,et') ->
+          (meta, {delta=SPrRight(l,t1.delta); essence=t1.essence},
+           {delta=t'; essence=et'})
        | _ ->
-          let (meta, s) = meta_add_sor meta in
-          let (meta, a) = meta_add meta ctx s.delta in
-          let (meta, b) = meta_add meta ctx s.delta in
-          let meta = unification meta env t1' {delta=Inter(l,a.essence,b.essence), essence=Inter(l,c.essence,d.essence)} in
-          (meta, {delta=SprLeft(l,t1.delta), essence=t1.essence}, b)
+          let (meta, s) = meta_add_sort meta dummy_loc in
+          let (meta, a) = meta_add meta ctx s dummy_loc in
+          let (meta, b) = meta_add meta ctx s dummy_loc in
+          let meta = unification meta env t1' {delta=Inter(l,a.essence,b.essence); essence=Inter(l,a.essence,b.essence)} in
+          (meta, {delta=SPrRight(l,t1.delta); essence=t1.essence}, b)
      end
 
   | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
-     let (meta, t2, t2') = reconstruct_with_type meta env ctx (Prod(dummy_loc, t1'.delta, Sort(Type))) in
-     let (meta, t3, t3') = reconstruct_with_type meta env ctx (Sort(dummy_loc, Type)) in
-     let (meta, t5, t5') = reconstruct_with_type meta env ctx (Sort(dummy_loc, Type)) in
+     let (meta, t2, t2') =
+       reconstruct_with_type meta env ctx t2 (Prod(dummy_loc, id1, t1'.delta, Sort(l,Type))) in
+     let (meta, t3, t3') = reconstruct_with_type meta env ctx t3 (Sort(dummy_loc, Type)) in
+     let (meta, t5, t5') = reconstruct_with_type meta env ctx t5 (Sort(dummy_loc, Type)) in
      let meta = unification meta env t1' (Union(dummy_loc, t3.delta, t5.delta)) in
-     let (meta, t4, t4') = reconstruct_with_type meta env (DefEssence("x", t1.essence, t3) :: ctx) t4 (App(dummy_loc, t2.delta, SInLeft(dummy_loc, t5.delta, t3.delta))) in
-     let (meta, t6, t6') = reconstruct_with_all meta env (DefEssence("x", t1.essence, t5) :: ctx) t6 t4.essence (App(dummy_loc, t2.delta, SInRight(dummy_loc, t3.delta, t5.delta))) in
+     let (meta, t4, t4') =
+       reconstruct_with_type meta env (DefEssence("x", t1.essence, t3)
+                                       :: ctx)
+                             t4 (App(dummy_loc, t2.delta,
+                                     SInLeft(dummy_loc, t5.delta,
+                                             t3.delta) :: [])) in (* TO FIX: case where there is a spine in a spine *)
+     let (meta, t6, t6') =
+       reconstruct_with_all meta env (DefEssence("x", t1.essence, t5)
+                                      :: ctx) t6
+                            t4.essence (App(dummy_loc, t2.delta,
+                                            SInRight(dummy_loc,
+                                                     t3.delta,
+                                                     t5.delta) :: []))
+                            (* TO FIX *)
+     in
      (meta,
       {delta=SMatch (l, t1.delta, t2.delta, id1, t3.delta, t4.delta, id2, t5.delta, t6.delta);
        essence=SMatch (l, t1.essence, t2.essence, id1, t3.essence, t4.essence, id2, t5.essence, t6.essence)},
-      {delta=App(dummy_loc,t2.delta,t1.delta); essence=App(dummy_loc,t2.essence,t1.essence)})
+      {delta=App(dummy_loc,t2.delta,t1.delta :: []);
+       essence=App(dummy_loc,t2.essence,t1.essence :: [])}) (* to fix *)
 
   | SInLeft (l, t1, t2) ->
-     let (meta, t2, t2') = reconstruction meta env ctx t2 in
+     let (meta, t1, _) = force_type meta env ctx t1 in
+     let (meta, t2, t2') = reconstruct meta env ctx t2 in
      let (meta, tt, _) = force_type meta env ctx (Union(l,t1.delta,t2'.delta)) in
-     (meta, {delta=SInLeft(l,t1.delta,t2.delta); essence=SInLeft(l,t1.essence,t2.essence)}
+     (meta, {delta=SInLeft(l,t1.delta,t2.delta); essence=SInLeft(l,t1.essence,t2.essence)},
      tt)
 
   | SInRight (l, t1, t2) ->
-     let (meta, t2, t2') = reconstruction meta env ctx t2 in
+     let (meta, t1, _) = force_type meta env ctx t1 in
+     let (meta, t2, t2') = reconstruct meta env ctx t2 in
      let (meta, tt, _) = force_type meta env ctx (Union(l,t2'.delta,t1.delta)) in
-     (meta, {delta=SInRight(l,t1.delta,t2.delta); essence=SInRight(l,t1.essence,t2.essence)}
+     (meta, {delta=SInRight(l,t1.delta,t2.delta); essence=SInRight(l,t1.essence,t2.essence)},
      tt)
 
   | Coercion (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = reconstruct meta env ctx t2 in
-     let (meta, t2', _) = reconstruct_with_type meta env ctx t1'.delta in (* force both type to be on the same level *)
-     if is_subtype t1.essence t2'.essence then
+     let (meta, t2', _) = reconstruct_with_type meta env ctx t2'.delta t1' in (* force both type to be on the same level *)
+     if is_subtype env t1.essence t2'.essence then
        (meta, {delta = Coercion(l,t1.delta,t2.delta); essence=t2.essence},
         t1)
-     else Error "coercion"
+     else raise (Err "coercion")
 
   | Var (l, n) -> let (t1,t1') = get_from_context ctx n in
                   (meta, t1, t1')
 
-  | Const (l, id) -> Error "const"
+  | Const (l, id) -> raise (Err "const")
 
   | Underscore l ->
-     let (meta, s) = meta_add_sort meta in
-     let (meta, v) = meta_add meta ctx s.delta in
-     let (meta, u) = meta_add meta ctx v.delta in
+     let (meta, s) = meta_add_sort meta l in
+     let (meta, v) = meta_add meta ctx s l in
+     let (meta, u) = meta_add meta ctx v l in
      (meta, u, v)
 
   | Meta (l, n, subst) ->
      let (t1, t1') = get_from_meta meta n in
-     (meta, t1, t1')
+     (meta, t1, t1') (* dummy (TODO: ADD SUBST) *)
+and force_type meta env ctx t =
+  reconstruct meta env ctx t (* dummy *)
+and reconstruct_with_type meta env ctx t1 t2 =
+  reconstruct meta env ctx t1 (* dummy *)
+and reconstruct_with_essence meta env ctx t1 e =
+  reconstruct meta env ctx t1 (* dummy *)
+and reconstruct_with_all meta env ctx t1 e1 t2 =
+  reconstruct meta env ctx t1 (* dummy *)
 
 
 (*
@@ -280,7 +327,7 @@ The meta-variable environment comes with an integer being the maximum meta-var i
 (* **************************************************************************************************** *)
 (* ******************************************** TO REMOVE ********************************************* *)
 (* **************************************************************************************************** *)
-
+(*
 let rec reconstruction str id_list gamma l t =
   let r0 = reconstruction str in
   let getloc = (* get location *)
@@ -416,3 +463,4 @@ let check_axiom str id_list gamma l t =
 	      (fun (s,et,_) -> match s with
 			       | Sort s -> Result.Ok (et)
 			       | _ -> Result.Error error_axiom)
+  *)
