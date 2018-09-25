@@ -32,6 +32,17 @@ let get_meta (_,meta) n =
   in
   foo meta
 
+let get_from_meta meta env l n subst =
+  match get_meta meta n with
+  | IsSort n -> raise (Err "should not happen? 1")
+  | SubstSort (n,Type) -> (meta, {delta=Sort(l,Type); essence=Sort(l,Type)}
+                           , {delta=Sort(l,Kind); essence=Sort(l,Kind)})
+  | SubstSort (n,Kind) -> raise (Err "should not happen? 2")
+  | DefMeta (l1,n,t2) | Subst (l1,n,_,t2) | SubstEssence (l1,n,_,t2)
+    -> (meta, {delta = Meta(l,n,subst); essence = Meta(l,n,subst)},
+        {delta=apply_substitution t2.delta subst;
+         essence=apply_substitution t2.essence subst})
+
 let type_of_sort s =
   match s with
   | Type -> Some ({delta=Sort(dummy_loc, Kind); essence=Sort(dummy_loc, Kind)})
@@ -99,7 +110,8 @@ let rec reconstruct meta env ctx t =
 
   | Let (l, id, t1, t2, t3) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
-     let (meta, t2, t2') = reconstruct_with_type meta env ctx t2 t1.delta in
+     let (meta, t2, t2') = reconstruct_with_type
+                              meta env ctx t2 t1.delta in
      let decl = DefLet(id, t2, t2') in
      reconstruct meta (decl :: env) (decl :: ctx) t3
 
@@ -108,7 +120,7 @@ let rec reconstruct meta env ctx t =
      let (meta, t2, t2') =
        let decl = DefAxiom(id, t1) in
        force_type meta (decl :: env) (decl :: ctx) t2 in
-     let (meta, tt) = principal_type_system meta env ctx t1' t2' in
+     let (meta, tt) = principal_type_system meta env ctx t1'.delta t2'.delta in
      (meta, {delta=Prod(l,id,t1.delta,t2.delta); essence=Prod(l,id,t1.essence,t2.essence)},
       tt)
 
@@ -156,14 +168,14 @@ let rec reconstruct meta env ctx t =
   | Inter (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = force_type meta env ctx t2 in
-     let (meta, tt) = principal_set_system meta env ctx t1' t2' in
+     let (meta, tt) = principal_set_system meta env ctx t1'.delta t2'.delta in
      (meta, {delta=Inter(l,t1.delta,t2.delta);essence=Inter(l,t1.essence,t2.essence)},
       tt)
 
   | Union (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = force_type meta env ctx t2 in
-     let (meta, tt) = principal_set_system meta env ctx t1' t2' in
+     let (meta, tt) = principal_set_system meta env ctx t1'.delta t2'.delta in
      (meta, {delta=Union(l,t1.delta,t2.delta);essence=Union(l,t1.essence,t2.essence)},
       tt)
 
@@ -249,7 +261,7 @@ let rec reconstruct meta env ctx t =
   | Coercion (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = reconstruct meta env ctx t2 in
-     let (meta, t2', _) = reconstruct_with_type meta env ctx t2'.delta t1' in (* force both type to be on the same level *)
+     let (meta, t2', _) = reconstruct_with_type meta env ctx t2'.delta t1'.delta in (* force both type to be on the same level *)
      if is_subtype env t1.essence t2'.essence then
        (meta, {delta = Coercion(l,t1.delta,t2.delta); essence=t2.essence},
         t1)
@@ -267,8 +279,7 @@ let rec reconstruct meta env ctx t =
      (meta, u, v)
 
   | Meta (l, n, subst) ->
-     let (t1, t1') = get_from_meta meta n in
-     (meta, t1, t1') (* dummy (TODO: ADD SUBST) *)
+     get_from_meta meta ctx l n subst
 and force_type meta env ctx t =
   reconstruct meta env ctx t (* dummy *)
 and reconstruct_with_type meta env ctx t1 t2 =
