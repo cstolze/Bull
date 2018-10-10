@@ -85,7 +85,7 @@ type sentence =
   | Load of string
   | Proof of string * term
   | Axiom of string * term
-  | Definition of string * term * (term option)
+  | Definition of string * term * term
   | Print of string
   | Print_all
   | Compute of string

@@ -57,11 +57,11 @@ let rec print_all id_list sigma =
      end
   | _ -> assert false
 
-let proof id str l t id_list sigma verbose =
+let proof id str t id_list sigma verbose =
   prerr_endline "Error: proof system not implemented.\n"; (id_list, sigma)
 
 
-let add_axiom id str l t id_list sigma verbose =
+let add_axiom id str t id_list sigma verbose =
   match find id id_list with
   | Some n -> prerr_endline (error_declared id); (id_list, sigma)
   | None -> let t = (fix_index id_list t) in
@@ -79,54 +79,30 @@ let add_axiom id str l t id_list sigma verbose =
 	        prerr_endline reason; (id_list, sigma)
               end
 
-let add_let id str l d o id_list sigma verbose =
+let add_let id str d o id_list sigma verbose =
   match find id id_list with
   | Some n -> prerr_endline (error_declared id); (id_list, sigma)
   | None -> let d = (fix_index id_list d) in
 	    try
-              let (m, t1, t2) = reconstruct (0,[]) sigma [] d in
-	    | Result.Ok (t, e, et) ->
-	       match o with
-	       | None ->
-		  begin
-		    if verbose then
-		      print_endline (let_message id)
-		    else ();
-		    (id :: id_list, DefLet (d,t,e,et) :: sigma)
-		  end
-	       | Some (l', t') ->
-		  match reconstruct str id_list sigma
-				       l' (fix_index id_list t') with
-		  | Result.Error (reason) ->
-		     prerr_endline reason; (id_list, sigma)
-		  | Result.Ok (_,et',_)
-		    -> if is_equal sigma et et'
-		       then
-			 begin
-			   if verbose then
-			     print_endline (let_message id)
-			   else ();
-			   (id :: id_list, DefLet(d,t',e,et')::sigma)
-			 end
-		       else
-			 begin
-			   prerr_endline (let_error t t' id_list);
-			   (id_list, sigma)
-			 end
+              let (m, t1, t2) = reconstruct_with_type (0,[]) sigma [] d o in
+	      if verbose then
+		print_endline (let_message id)
+	      else ();
+	      (id :: id_list, DefLet (id, t1, t2) :: sigma)
             with
               Err reason -> prerr_endline reason; (id_list, sigma)
 
 let normalize id id_list sigma =
   match find id id_list with
   | None -> prerr_endline (error_not_declared id)
-  | Some n -> let (d, t, e, et) = get_from_context sigma n in
-	      let d = strongly_normalize sigma d in
-	      let t = strongly_normalize sigma t in
-	      let e = strongly_normalize sigma e in
-	      let et = strongly_normalize sigma et in
-	      print_endline (pretty_print_let (d,t,e,et) id_list)
+  | Some n -> let (t1, t2) = get_from_context sigma n in
+	      let t1 = strongly_normalize_full sigma t1 in
+	      let t2 = strongly_normalize_full sigma t2 in
+	      print_endline (pretty_print_let (t1,t2) id_list)
 
 (* repl *)
+
+exception Exc_quit
 
 let rec repl lx id_list sigma verbose =
   let rec loop (id_list,sigma) =
@@ -136,32 +112,33 @@ let rec repl lx id_list sigma verbose =
 	let buf = Buffer.create 80 in
 	let rule = Parser.s (Lexer.read buf) lx in
 	let str = Buffer.contents buf in
-	match rule with
-	| Quit -> (id_list, sigma)
-	| Load id -> loop (let lx = Lexing.from_channel (open_in id)
-			   in
-			   begin
-			     lx.lex_curr_p <- {lx.lex_curr_p with Lexing.pos_fname = id};
-			     repl lx id_list sigma false
-			   end
-			  )
-	| Proof (id, l, t) -> loop (proof id str l t id_list sigma verbose)
-	| Axiom (id, l, t) -> loop (add_axiom id str l t id_list sigma verbose)
-	| Definition (id, l, t, o)
-	  -> loop (add_let id str l t o id_list sigma verbose)
-	| Print id -> print id id_list sigma; loop (id_list, sigma)
-	| Print_all -> print_all id_list sigma; loop (id_list, sigma)
-	| Compute id -> normalize id id_list sigma;
-			loop (id_list, sigma)
-	| Help -> help (); loop (id_list, sigma)
-	| Error -> prerr_endline (syntaxerror str lx);
-		   Lexing.flush_input lx;
-		   loop (id_list, sigma)
+        let foo (id_list, sigma) rule =
+          match rule with
+	  | Quit -> raise Exc_quit
+	  | Load id -> let lx = Lexing.from_channel (open_in id)
+		       in
+		       begin
+		         lx.lex_curr_p <- {lx.lex_curr_p with Lexing.pos_fname = id};
+		         repl lx id_list sigma false
+		       end
+	  | Proof (id, t) -> proof id str t id_list sigma verbose
+	  | Axiom (id, t) -> add_axiom id str t id_list sigma verbose
+	  | Definition (id, t, o)
+	    -> add_let id str t o id_list sigma verbose
+	  | Print id -> print id id_list sigma; (id_list, sigma)
+	  | Print_all -> print_all id_list sigma; (id_list, sigma)
+	  | Compute id -> normalize id id_list sigma; (id_list, sigma)
+	  | Help -> help (); (id_list, sigma)
+	  | Error -> prerr_endline (syntaxerror str lx);
+		     Lexing.flush_input lx; (id_list, sigma)
+        in
+        loop (List.fold_left foo (id_list, sigma) rule)
       with
       | Failure a -> prerr_endline (failure a);
 		     loop (id_list, sigma)
       | Sys_error a -> prerr_endline (syserror a);
 		       loop (id_list, sigma)
+      | Exc_quit -> (id_list, sigma)
       | e -> prerr_endline (Printexc.to_string e);
 	     loop (id_list, sigma)
     end

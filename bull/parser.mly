@@ -63,8 +63,8 @@ s:
     | LEMMA ID COLON term DOT { [Proof ($2,$4)] }
     | AXIOM ID COLON term DOT { [Axiom ($2, $4)] }
     | DEFINITION ID COLON term ASSIGN term
-		 DOT { [Definition ($2, $6, Some($4))] }
-    | DEFINITION ID ASSIGN term DOT { [Definition ($2, $4, None)] }
+		 DOT { [Definition ($2, $6, $4)] }
+    | DEFINITION ID ASSIGN term DOT { [Definition ($2, $4, Underscore dummy_loc)] }
     | PRINT ID DOT { [Print $2] }
     | SIG DOT { [Print_all] }
     | COMPUTE ID DOT { [Compute $2] }
