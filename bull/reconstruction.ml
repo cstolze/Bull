@@ -267,7 +267,7 @@ let rec reconstruct meta env ctx t =
         t1)
      else raise (Err "coercion")
 
-  | Var (l, n) -> let (t1,t1') = get_from_context ctx n in
+  | Var (l, n) -> let (t1,t1') = get_from_context env n in
                   (meta, t1, t1')
 
   | Const (l, id) -> raise (Err "const")
