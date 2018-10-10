@@ -475,3 +475,9 @@ let check_axiom str id_list gamma l t =
 			       | Sort s -> Result.Ok (et)
 			       | _ -> Result.Error error_axiom)
   *)
+
+let check_axiom str id_list gamma l t =
+  let (meta, t1, t2) = reconstruct (0,[]) gamma [] t in
+  match t2.delta with
+  | Sort (_,s) -> t2
+  | _ -> raise (Err "check_axiom")

@@ -98,7 +98,7 @@ let pretty_print_term =
 let pretty_print_essence =
   string_of_term true
 
-let pretty_print_let (t1,t2,t3,t4) id_list =
+let pretty_print_let ({delta=t1;essence=t3},{delta=t2;essence=t4}) id_list =
   pretty_print_term id_list t1 ^ " : " ^ pretty_print_term id_list t2
   ^ "\n\tessence = "
   ^ pretty_print_essence id_list t3 ^ " : "

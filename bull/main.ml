@@ -45,15 +45,15 @@ let print id id_list sigma =
 let rec print_all id_list sigma =
   match (id_list, sigma) with
   | ([],[]) -> ()
-  | (id::l',DefAxiom (t1,t2)::s') ->
+  | (id::l',DefAxiom (_,t)::s') ->
      begin
        print_all l' s';
-       print_endline (string_of_axiom id t1 t2 l');
+       print_endline (string_of_axiom id t.delta t.essence l');
      end
-  | (id::l',DefLet (t1,t2,t3,t4)::s') ->
+  | (id::l',DefLet (_,t1,t2)::s') ->
      begin
        print_all l' s';
-       print_endline (string_of_let id (t1,t2,t3,t4) l');
+       print_endline (string_of_let id (t1,t2) l');
      end
   | _ -> assert false
 
@@ -65,24 +65,26 @@ let add_axiom id str l t id_list sigma verbose =
   match find id id_list with
   | Some n -> prerr_endline (error_declared id); (id_list, sigma)
   | None -> let t = (fix_index id_list t) in
-	    match check_axiom str id_list sigma l t with
-	    | Result.Ok (t') ->
-	       begin
-		 if verbose then
-		   print_endline (axiom_message id)
-		 else ();
-		 (id :: id_list, DefAxiom (t,t') :: sigma)
-	       end
-	    | Result.Error (reason) ->
-		 prerr_endline reason; (id_list, sigma)
+            try
+	      let (m,t,t') = force_type (0,[]) sigma [] t in
+	      begin
+		if verbose then
+		  print_endline (axiom_message id)
+		else ();
+		(id :: id_list, DefAxiom (id,t) :: sigma)
+	      end
+            with
+              Err (reason) ->
+              begin
+	        prerr_endline reason; (id_list, sigma)
+              end
 
 let add_let id str l d o id_list sigma verbose =
   match find id id_list with
   | Some n -> prerr_endline (error_declared id); (id_list, sigma)
   | None -> let d = (fix_index id_list d) in
-	    match reconstruction str id_list sigma l d with
-	    | Result.Error (reason) ->
-	       prerr_endline reason; (id_list, sigma)
+	    try
+              let (m, t1, t2) = reconstruct (0,[]) sigma [] d in
 	    | Result.Ok (t, e, et) ->
 	       match o with
 	       | None ->
@@ -93,7 +95,7 @@ let add_let id str l d o id_list sigma verbose =
 		    (id :: id_list, DefLet (d,t,e,et) :: sigma)
 		  end
 	       | Some (l', t') ->
-		  match reconstruction str id_list sigma
+		  match reconstruct str id_list sigma
 				       l' (fix_index id_list t') with
 		  | Result.Error (reason) ->
 		     prerr_endline reason; (id_list, sigma)
@@ -111,6 +113,8 @@ let add_let id str l d o id_list sigma verbose =
 			   prerr_endline (let_error t t' id_list);
 			   (id_list, sigma)
 			 end
+            with
+              Err reason -> prerr_endline reason; (id_list, sigma)
 
 let normalize id id_list sigma =
   match find id id_list with
