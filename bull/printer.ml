@@ -45,7 +45,18 @@ let error_loc (l1,l2) str =
 
 (* for the precedences, see parser.mly *)
 (* when calling aux, the precedence is (precedence-1) *)
-let string_of_term is_essence id_list t =
+let rec string_of_term is_essence id_list t =
+  let rec metacontext n id_list l =
+    match l with
+    | [] -> ""
+    | x :: l -> let ns = "$" ^ (string_of_int n) in
+                let id_list = ns :: id_list in
+                ns ^ " := " ^ (string_of_term
+                                 is_essence id_list x) ^
+                  match l with
+                  | [] -> ""
+                  | _ -> "; " ^ metacontext (n+1) id_list l
+  in
   let rec aux t precedence =
     let parentheseme trigger text =
       if precedence < trigger then text else "(" ^ text ^ ")"
@@ -86,7 +97,9 @@ let string_of_term is_essence id_list t =
     | Var _ -> assert false
     | Const (l, id) -> id
     | Underscore l -> "_"
-    | Meta (l,n,s) -> "?" ^ string_of_int n ^ "[???]" (* TODO: FIXME *)
+    | Meta (l,n,s) -> "?" ^ string_of_int n ^ "["
+                      ^ (metacontext 0 id_list s)
+                      ^ "]" (* TODO: FIXME *)
   in
   aux (fix_id id_list t) 0
 

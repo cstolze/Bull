@@ -10,9 +10,13 @@ open Printer
 open Reduction
 #load "subtyping.cmo"
 open Subtyping
+#load "unification.cmo"
+open Unification
 #load "reconstruction.cmo"
 open Reconstruction
-
 #load "parser.cmo"
+open Parser
 #load "lexer.cmo"
-#load "main.cmo"
+open Lexer
+#load "interface.cmo"
+open Interface

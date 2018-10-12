@@ -115,6 +115,7 @@ term6:
 
     | OPENP term CLOSP { $2 } /* highest precedence */
     | ID { Const (get_loc (), $1) }
+    | UNDERSCORE { Underscore (get_loc ()) }
     | TYPE { Sort (get_loc (), Type) }
     | LT term COMMA term GT { SPair (get_loc (), $2, $4) }
     | SMATCH term RETURN term WITH ID COLON term ENDLAMBDA term COMMA ID COLON term ENDLAMBDA term END { SMatch (get_loc (), $2, $4, $6, $8, $10, $12, $14, $16) }

@@ -4,9 +4,11 @@ open Reduction
 open Subtyping
 open Printer
 
-let meta_add_sort (n,meta) = (n, (n+1, IsSort n :: meta))
+let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), {delta=Meta(l,n,[]);essence=Meta(l,n,[])})
 
-let meta_add (n,meta) ctx t = (n, (n+1, DefMeta (ctx, n, t) :: meta))
+let meta_add (n,meta) ctx t l =
+  let s = List.map (fun _ -> Var(dummy_loc,0)) ctx in
+  ((n+1, DefMeta (ctx, n, t) :: meta), {delta=Meta(l,n,s);essence=Meta(l,n,s)})
 
 let get_meta (_,meta) n =
   let rec foo = function
@@ -25,14 +27,19 @@ let get_meta (_,meta) n =
 
 let is_instanced meta n =
   match get_meta meta n with
-  | SubstSort _ | Subst _ -> true
+  | SubstSort _ -> | Subst _ -> true
   | _ -> false
 
-let instantiate meta env n l =
-  
+let unification (meta : int * Utils.metadeclaration list
+                ) (env : Utils.declaration list
+                  ) (t1 : Utils.fullterm) (t2 : Utils.term) = meta
 
-exception Error of string
-
+(* we suppose is_instanced has returned true *)
+let instantiate meta n l =
+  match get_meta meta n with
+  | SubstSort (m,s) -> Sort(dummy_loc, s)
+  | Subst (l1,m,t1,t2) -> apply_substitution t1.delta l
+  | _ -> assert false
 
 
 (* TODO : 2 functions:
@@ -42,7 +49,7 @@ exception Error of string
 functions takes one term as input (not a fullterm)
  *)
 
-let unification meta env ctx t1 t2 =
+let unification meta env t1 t2 =
   let norm t =
     let t = {delta=apply_all_substitution meta t.delta;
              essence=apply_all_substition meta t.essence} in
@@ -120,8 +127,12 @@ let unification meta env ctx t1 t2 =
            | _ -> assert false
          in bar meta l2 l2'
        with
+       | ???
+     else
+       ???
   | Meta (l, n), t | t, Meta (l,n) ->
      begin
        (* TODO: find if meta has already been instantiated
         if yes, unify instantiate(meta) and t. Other case: pattern *)
      end
+

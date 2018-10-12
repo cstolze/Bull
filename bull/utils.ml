@@ -91,3 +91,6 @@ type sentence =
   | Compute of string
   | Help
   | Error
+
+(* Error during type reconstruction or unification *)
+exception Err of string
