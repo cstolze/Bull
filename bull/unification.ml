@@ -27,12 +27,12 @@ let get_meta (_,meta) n =
 
 let is_instanced meta n =
   match get_meta meta n with
-  | SubstSort _ -> | Subst _ -> true
+  | SubstSort _ | Subst _ -> true
   | _ -> false
 
-let unification (meta : int * Utils.metadeclaration list
-                ) (env : Utils.declaration list
-                  ) (t1 : Utils.fullterm) (t2 : Utils.term) = meta
+(* let unification (meta : int * Utils.metadeclaration list *)
+(*                 ) (env : Utils.declaration list *)
+(*                   ) (t1 : Utils.fullterm) (t2 : Utils.term) = meta *)
 
 (* we suppose is_instanced has returned true *)
 let instantiate meta n l =
@@ -49,26 +49,124 @@ let instantiate meta n l =
 functions takes one term as input (not a fullterm)
  *)
 
+let rec same_term t1 t2 =
+  match t1, t2 with
+  | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then true
+                              else false
+  | Prod(l,_,t1,t2), Prod(_,_,t1',t2') | Abs(l,_,t1,t2), Abs(_,_,t1',t2') | Inter(l,t1,t2), Inter(_,t1',t2') | Union(l,t1,t2), Union(_,t1',t2') | SPair(l,t1,t2), SPair(_,t1',t2') | SInLeft(l,t1,t2), SInLeft(_,t1',t2') | SInRight(l,t1,t2), SInRight(_,t1',t2') | Coercion(l,t1,t2), Coercion(_,t1',t2') ->
+     if same_term t1 t1' then
+       same_term t2 t2'
+     else false
+  | App(l, t1, l1), App(_, t1', l1') ->
+     if same_term t1 t1' then
+       same_list l1 l1'
+     else false
+  | SPrLeft(l,t1), SPrLeft(_,t1') | SPrRight(l,t1), SPrRight(_,t1') ->
+     same_term t1 t1'
+  | Var(l,x), Var(_,y) -> x = y
+  | Meta(l,n,s1), Meta(_,m,s2) ->
+     if m = n then
+       same_list s1 s2
+     else false
+  | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
+    SMatch (_, t1', t2', _, t3', t4', _, t5', t6') ->
+     if same_term t1 t1' then
+       if same_term t2 t2' then
+         if same_term t3 t3' then
+           if same_term t4 t4' then
+             if same_term t5 t5' then
+               same_term t6 t6'
+             else false
+           else false
+         else false
+       else false
+     else false
+  | _ -> false
+and same_list s1 s2 =
+  match s1, s2 with
+  | [], [] -> true
+  | x :: s1, y :: s2 -> if same_term x y then same_list s1 s2
+                        else false
+  | _ -> false
+
+(* returns true iff the free variables of t are in tl *)
+let rec is_sane t tl =
+  let tl' = List.map (fun n -> n+1) tl in
+  match t with
+  | Sort (_,t) -> true
+  | Let (_,_,t1,t2,t3) -> is_sane t1 tl && is_sane t2 tl &&
+                            is_sane t3 tl'
+  | Prod (_,_,t1,t2) | Abs (_,_,t1,t2) -> is_sane t1 tl && is_sane t2 tl'
+  | App (_,t1,l1) -> List.fold_left (fun x y -> x && is_sane x tl)
+                                    (is_sane t1 tl) l1
+  | Inter (_,t1,t2) -> is_sane t1 tl && is_sane t2 tl
+  | Union (_,t1,t2)
+  | SPair (_,t1,t2)
+  | SPrLeft (_,t1)
+  | SPrRight (_,t1)
+  | SMatch (_,t1,t2,_,t3,t4,_,t5,t6)
+  | SInLeft (_,t1,t2)
+  | SInRight (_,t1,t2)
+  | Coercion (_,t1,t2)
+  | Var (_,n)
+  | Const (_,_) -> assert false
+  | Underscore _ -> assert false
+  | Meta (_,_,l) -> ????????
+
+
+let rec intersect l1 l2 =
+  match l1, l2 with
+  | [], [] -> []
+  | x :: l1, y :: l2
+    -> let tl = List.map (fun n -> n + 1) (intersect l1 l2) in
+                        if same_term x y then
+                          tl
+                        else
+                          0 :: tl
+  | _ -> assert false
+
 let unification meta env t1 t2 =
   let norm t =
-    let t = {delta=apply_all_substitution meta t.delta;
-             essence=apply_all_substition meta t.essence} in
-    {delta=strongly_normalize env t.delta;
-     essence=strongly_normalize env t.essence}
+    let t = apply_all_substitution meta t
+    in
+    strongly_normalize env t
   in
   let t1 = norm t1 in
   let t2 = norm t2 in
-  let rec unify_delta meta env t1 t2 =
+  let rec foo meta env t1 t2 =
     match (t1,t2) with
+    (* Meta-redL *)
+    | Meta(l,n,s), _ when is_instanced meta n ->
+       foo meta env (instantiate meta n s) t2
+    | App(l,Meta(l',n,s),t'), _ when is_instanced meta n ->
+       foo meta env (norm @@ App(l, instantiate meta n s, t')) t2
+    (* Meta-redR *)
+    | _, Meta(l,n,s) when is_instanced meta n ->
+       foo meta env t1 (instantiate meta n s)
+    | _, App(l,Meta(l',n,s),t') when is_instanced meta n ->
+       foo meta env t1 (norm @@ App(l, instantiate meta n s, t'))
+    (* Meta-Same-Same and Meta-Same *)
+    | Meta(l,n,s1), Meta(l',m,s2) when m = n ->
+       (* Meta-Same-Same *)
+       if same_list s1 s2 then meta else
+         (* Meta-Same *)
+         failwith "Meta-Same 1 not implemented"
+    | App(l,Meta(l',n,s1),t1), App(ll,Meta(ll',m,s2), t2) ->
+       (* Meta-Same-Same *)
+       if same_list s1 s2 then
+         bar meta env t1 t2
+       else
+         (* Meta-Same *)
+         failwith "Meta-Same 2 not implemented"
     | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then meta
-                                else Error "Sort"
+                                else raise (Err "Sort")
     | Prod(l,id,t1,t2), Prod(_,_,t1',t2') ->
        let meta = foo meta env t1 t1' in
-       let t2 = foo meta ({delta=t1;essence=nothing} :: env) t2 t2' in
+       let meta = foo meta (DefAxiom(id,{delta=t1;essence=nothing}) :: env) t2 t2' in
        meta
     | Abs(l,id,t1,t2), Abs(_,_,t1',t2') ->
        let meta = foo meta env t1 t1' in
-       let meta = foo meta ({delta=t1;essence=nothing} :: env) t2 t2' in
+       let meta = foo meta (DefAxiom(id,{delta=t1;essence=nothing}) :: env) t2 t2' in
        meta
     | Inter(l,t1,t2), Inter(_,t1',t2') ->
        let meta = foo meta env t1 t1' in
@@ -84,11 +182,9 @@ let unification meta env t1 t2 =
        meta
     | SPrLeft(l,t1), SPrLeft(_,t1') ->
        let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
        meta
     | SPrRight(l,t1), SPrRight(_,t1') ->
        let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
        meta
     | SInLeft(l,t1,t2), SInLeft(_,t1',t2') ->
        let meta = foo meta env t1 t1' in
@@ -102,7 +198,7 @@ let unification meta env t1 t2 =
        let meta = foo meta env t1 t1' in
        let meta = foo meta env t2 t2' in
        meta
-  | Var(l,x), Var(_,y) -> if x = y then meta else Error "Var"
+  | Var(l,x), Var(_,y) -> if x = y then meta else raise (Err "Var")
   | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
     SMatch (_, t1', t2', _, t3', t4', _, t5', t6') ->
      let meta = foo meta env t1 t1' in
@@ -118,21 +214,22 @@ let unification meta env t1 t2 =
   | App(l,t1,l2), App(_,t1',l2') ->
      if List.length l2 = List.length l2' then
        try
-         let meta = foo env t1 t1' in
-         let rec bar meta l l' =
-           match l, l' with
-           | x :: l, y :: l' -> let meta = foo meta env x y
-                                in bar meta l l'
-           | [], [] -> meta
-           | _ -> assert false
-         in bar meta l2 l2'
+         let meta = foo meta env t1 t1' in
+         bar meta env l2 l2'
        with
-       | ???
+       | _ -> failwith "Not implemented 1"
      else
-       ???
-  | Meta (l, n), t | t, Meta (l,n) ->
-     begin
+       failwith "Not implemented 2"
+  | Meta (l, n, s), t | t, Meta (l, n, s) ->
+     failwith "Not implemented 3"
        (* TODO: find if meta has already been instantiated
         if yes, unify instantiate(meta) and t. Other case: pattern *)
-     end
-
+  | _ -> failwith "Not implemented 4"
+  and bar meta env l l' =
+    match l, l' with
+    | x :: l, y :: l' -> let meta = foo meta env x y
+                         in bar meta env l l'
+    | [], [] -> meta
+    | _ -> assert false
+  in
+  foo meta env t1 t2

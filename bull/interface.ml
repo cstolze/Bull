@@ -84,7 +84,12 @@ let add_let id str d o id_list sigma verbose =
   | Some n -> prerr_endline (error_declared id); (id_list, sigma)
   | None -> let d = (fix_index id_list d) in
 	    try
-              let (m, t1, t2) = reconstruct_with_type (0,[]) sigma [] d o in
+              let (m, t1, t2) =
+                match o with
+                | Underscore _ -> reconstruct (0,[]) sigma [] d
+                | _ -> let (m, t1, t2) = force_type (0,[]) sigma [] o in
+                       reconstruct_with_type (0,[]) sigma [] d t1.delta
+              in
 	      if verbose then
 		print_endline (let_message id)
 	      else ();
