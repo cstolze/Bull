@@ -63,7 +63,7 @@ Meta-environment: list of 4 possible things:
 *)
 type metadeclaration =
   | IsSort of int
-  | SubstSort of int * sort
+  | SubstSort of int * fullterm
   | DefMeta of declaration list * int * fulltype
   | Subst of declaration list * int * fullterm * fulltype
   | SubstEssence of declaration list * int * term * fulltype

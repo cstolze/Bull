@@ -66,6 +66,9 @@ let rec strongly_normalize gamma t =
   (* Normalize the children *)
   let t = sn_children t in
   match t with
+  (* Spine fix *)
+  | App(l, App(l',t1,t2), t3) ->
+     strongly_normalize gamma (App(l, t1, List.append t2 t3))
   (* Beta-redex *)
   | App (l, Abs (l',_,_, t1), t2 :: [])
     -> strongly_normalize gamma (beta_redex t1 t2)

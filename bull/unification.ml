@@ -6,8 +6,13 @@ open Printer
 
 let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), {delta=Meta(l,n,[]);essence=Meta(l,n,[])})
 
+let rec enumerate min max =
+  if min > max then [] else
+    min :: (enumerate (min+1) max)
+
 let meta_add (n,meta) ctx t l =
-  let s = List.map (fun _ -> Var(dummy_loc,0)) ctx in
+  let s = List.map (fun n -> Var(dummy_loc,n))
+                   (enumerate 0 (List.length ctx - 1)) in
   ((n+1, DefMeta (ctx, n, t) :: meta), {delta=Meta(l,n,s);essence=Meta(l,n,s)})
 
 let get_meta (_,meta) n =
@@ -37,10 +42,16 @@ let is_instanced meta n =
 (* we suppose is_instanced has returned true *)
 let instantiate meta n l =
   match get_meta meta n with
-  | SubstSort (m,s) -> Sort(dummy_loc, s)
+  | SubstSort (m,s) -> s.delta
   | Subst (l1,m,t1,t2) -> apply_substitution t1.delta l
   | _ -> assert false
 
+let rec solution (n,meta) m t =
+  match meta with
+  | [] -> []
+  | IsSort a :: meta when a = m -> SubstSort (m,t) :: meta
+  | DefMeta (ctx, a, t2) :: meta when a = m -> Subst(ctx, m, t, t2) :: meta
+  | x :: meta -> x :: (solution (n,meta) m t)
 
 (* TODO : 2 functions:
 - unification_delta
@@ -97,33 +108,104 @@ let rec is_sane t tl =
   | Let (_,_,t1,t2,t3) -> is_sane t1 tl && is_sane t2 tl &&
                             is_sane t3 tl'
   | Prod (_,_,t1,t2) | Abs (_,_,t1,t2) -> is_sane t1 tl && is_sane t2 tl'
-  | App (_,t1,l1) -> List.fold_left (fun x y -> x && is_sane x tl)
+  | App (_,t1,l1) -> List.fold_left (fun x y -> x && is_sane y tl)
                                     (is_sane t1 tl) l1
-  | Inter (_,t1,t2) -> is_sane t1 tl && is_sane t2 tl
-  | Union (_,t1,t2)
-  | SPair (_,t1,t2)
-  | SPrLeft (_,t1)
-  | SPrRight (_,t1)
-  | SMatch (_,t1,t2,_,t3,t4,_,t5,t6)
-  | SInLeft (_,t1,t2)
-  | SInRight (_,t1,t2)
-  | Coercion (_,t1,t2)
-  | Var (_,n)
+  | Inter (_,t1,t2) | Union (_,t1,t2) | SPair (_,t1,t2)
+    | SInLeft (_,t1,t2) | SInRight (_,t1,t2) | Coercion (_,t1,t2)
+    -> is_sane t1 tl && is_sane t2 tl
+  | SPrLeft (_,t1) | SPrRight (_,t1) -> is_sane t1 tl
+  | SMatch (_,t1,t2,_,t3,t4,_,t5,t6) ->
+     is_sane t1 tl && is_sane t2 tl && is_sane t3 tl && is_sane t4 tl'
+     && is_sane t5 tl && is_sane t6 tl'
   | Const (_,_) -> assert false
   | Underscore _ -> assert false
-  | Meta (_,_,l) -> ????????
+  | Meta (_,_,l1) -> List.fold_left (fun x y -> x && is_sane y tl)
+                                   true l1
+  | Var (_,n) ->
+     match tl with
+     | [] -> true
+     | x :: _ ->
+        let min = List.fold_left (fun x y -> if x < y then x else y)
+                                 x tl in
+        let max = List.fold_left (fun x y -> if x > y then x else y)
+                                 x tl in
+        if n < min || n > max then true else
+          List.mem n tl
 
+let rec occur l n =
+  match l with
+  | [] -> assert false
+  | m :: l -> if m = n then 0 else 1 + occur l n
 
-let rec intersect l1 l2 =
-  match l1, l2 with
-  | [], [] -> []
-  | x :: l1, y :: l2
-    -> let tl = List.map (fun n -> n + 1) (intersect l1 l2) in
-                        if same_term x y then
-                          tl
-                        else
-                          0 :: tl
+(* fix the de Bruijn indices in the newly formed
+terms of the context *)
+(* the full environment is :
+- list of global free variables (case n > max):
+their indices are updated because some meta-context
+variables are removed
+- list of free meta-context variables:
+the kept indices are stored in tl
+- list of local bound variables (case n < min):
+their indices do not change *)
+let rec fix_intersect tl t =
+  let tl' = List.map (fun n -> n+1) tl in
+  match t with
+  | Var (l, n) ->
+     begin
+       match tl with
+       | [] -> Var(l, n)
+       | x :: _ ->
+          let min = List.fold_left (fun x y -> if x < y then x else y)
+                                 x tl in
+          let max = List.fold_left (fun x y -> if x > y then x else y)
+                                   x tl in
+          if n < min then
+            Var(l, n) else
+            if n > max then
+              Var(l, n + min - max + List.length tl - 1)
+            else
+              Var(l,min + occur tl n)
+     end
+  | _ -> visit_term (fix_intersect tl) (fun _ -> fix_intersect tl')
+                    (fun id _ -> id) t
+
+let rec intersect ctx l1 l2 =
+  match ctx, l1, l2 with
+  | [], [], [] -> [], []
+  | a :: ctx, x :: l1, y :: l2
+    -> let ctx, tl = intersect ctx l1 l2 in
+       let tl = List.map (fun n -> n + 1) tl in
+       if same_term x y then
+         ctx, tl
+       else
+         if is_sane x tl then
+           match a with
+           | DefAxiom (id, t) ->
+              DefAxiom(id, {delta=fix_intersect tl t.delta;
+                       essence=fix_intersect tl t.essence}) :: ctx, 0 :: tl
+           | DefEssence (id, t1, t2) ->
+              DefEssence(id, fix_intersect tl t1
+                         , {delta=fix_intersect tl t2.delta;
+                            essence=fix_intersect
+                                      tl t2.essence}) :: ctx,
+              0 :: tl
+           | DefLet (id, t1, t2) ->
+              DefLet(id, {delta=fix_intersect tl t1.delta;
+                          essence=fix_intersect tl t1.essence},
+                     {delta=fix_intersect tl t2.delta;
+                      essence=fix_intersect tl t2.essence}) :: ctx,
+              0 :: tl
+         else
+           ctx, tl
   | _ -> assert false
+
+(* TODO *)
+let meta_same (n, meta) m ctx l1 l2 =
+  let ctx, tl = intersect ctx l1 l2 in
+  let meta = (n+1, DefMeta (ctx, n, ???) :: meta) in
+  let s = List.map (fun n -> Var(dummy_loc,n))
+                   tl in
+  solution meta m {delta=Meta(dummy_loc, n, s); essence=Meta(dummy_loc, n, s)}
 
 let unification meta env t1 t2 =
   let norm t =
@@ -233,3 +315,5 @@ let unification meta env t1 t2 =
     | _ -> assert false
   in
   foo meta env t1 t2
+
+let unification meta env t1 t2 = meta

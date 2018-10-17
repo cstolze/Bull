@@ -50,7 +50,6 @@ let rec string_of_term is_essence id_list t =
     match l with
     | [] -> ""
     | x :: l -> let ns = "$" ^ (string_of_int n) in
-                let id_list = ns :: id_list in
                 ns ^ " := " ^ (string_of_term
                                  is_essence id_list x) ^
                   match l with
