@@ -46,11 +46,18 @@ let instantiate meta n l =
   | Subst (l1,m,t1,t2) -> apply_substitution t1.delta l
   | _ -> assert false
 
-let rec solution (n,meta) m t =
+let rec solution (n,meta) m t is_essence =
   match meta with
   | [] -> []
   | IsSort a :: meta when a = m -> SubstSort (m,t) :: meta
-  | DefMeta (ctx, a, t2) :: meta when a = m -> Subst(ctx, m, t, t2) :: meta
+  | DefMeta (ctx, a, t2) :: meta when a = m -> if is_essence then
+                                                 SubstEssence(ctx, m,
+                                                              t, t2)
+                                                 :: meta
+                                               else
+                                                 Subst(ctx, m, t, t2)
+                                                 :: meta
+  | 
   | x :: meta -> x :: (solution (n,meta) m t)
 
 (* TODO : 2 functions:
