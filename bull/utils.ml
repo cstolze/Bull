@@ -36,15 +36,10 @@ type term =
 
 let nothing = Underscore dummy_loc
 
-type fullterm = { delta : term; essence : term }
-type fulltype = fullterm
-let dummy_term = {delta=nothing ; essence=nothing}
-
 (* In the contexts, there are let-ins and axioms *)
 type declaration =
-  | DefAxiom of string * fulltype (* x : A *)
-  | DefEssence of string * term * fulltype (* x {essence=t} : A *)
-  | DefLet of string * fullterm * fulltype (* x := t : A *)
+  | DefAxiom of string * term (* x : A *)
+  | DefLet of string * term * term (* x := t : A *)
 
 (* Indices for meta-variables are integers (not de Bruijn indices) *)
 
@@ -63,10 +58,9 @@ Meta-environment: list of 4 possible things:
 *)
 type metadeclaration =
   | IsSort of int
-  | SubstSort of int * fullterm
-  | DefMeta of declaration list * int * fulltype
-  | Subst of declaration list * int * fullterm * fulltype
-  | SubstEssence of declaration list * int * term * fulltype
+  | SubstSort of int * term
+  | DefMeta of declaration list * int * term
+  | Subst of declaration list * int * term * term
 
 type metaenv = int * (metadeclaration list)
 
@@ -76,7 +70,7 @@ let find id id_list =
   let rec aux l n =
     match l with
     | [] -> None
-    | id' :: l' -> if id = id' then Some n else (aux l' (n+1))
+    | DefAxiom(id',_) :: l' | DefLet(id',_,_) :: l' -> if id = id' then Some n else (aux l' (n+1))
   in aux id_list 0
 
 (* Commands from the REPL *)

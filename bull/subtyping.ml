@@ -49,6 +49,6 @@ let is_subtype gamma a b =
   | (Inter(_,a1,a2),_) -> foo gamma a1 b || foo gamma a2 b
   | (_,Union(_,b1,b2)) -> foo gamma a b1 || foo gamma a b2
   | (Prod(_,_,a1,a2),Prod(_,_,b1,b2))
-    -> foo gamma b1 a1 && foo (DefAxiom("",dummy_term)::gamma) a2 b2
+    -> foo gamma b1 a1 && foo (DefAxiom("",nothing)::gamma) a2 b2
   | _ -> true (* is_equal gamma a b *) (* TODO: FIXME *)
   in foo gamma a b

@@ -4,7 +4,7 @@ open Reduction
 open Subtyping
 open Printer
 
-let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), {delta=Meta(l,n,[]);essence=Meta(l,n,[])})
+let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), Meta(l,n,[]))
 
 let rec enumerate min max =
   if min > max then [] else
@@ -13,7 +13,7 @@ let rec enumerate min max =
 let meta_add (n,meta) ctx t l =
   let s = List.map (fun n -> Var(dummy_loc,n))
                    (enumerate 0 (List.length ctx - 1)) in
-  ((n+1, DefMeta (ctx, n, t) :: meta), {delta=Meta(l,n,s);essence=Meta(l,n,s)})
+  ((n+1, DefMeta (ctx, n, t) :: meta), Meta(l,n,s))
 
 let get_meta (_,meta) n =
   let rec foo = function
@@ -25,8 +25,6 @@ let get_meta (_,meta) n =
     | SubstSort (m,s) :: l -> if m = n then SubstSort (m,s) else foo l
     | Subst (l1,m,t1,t2) :: l -> if m = n then Subst (l1, m, t1, t2)
                                  else foo l
-    | SubstEssence (l1, m, t1, t2) :: l
-      -> if m = n then SubstEssence (l1, m, t1, t2) else foo l
   in
   foo meta
 
@@ -42,10 +40,11 @@ let is_instanced meta n =
 (* we suppose is_instanced has returned true *)
 let instantiate meta n l =
   match get_meta meta n with
-  | SubstSort (m,s) -> s.delta
-  | Subst (l1,m,t1,t2) -> apply_substitution t1.delta l
+  | SubstSort (m,s) -> s
+  | Subst (l1,m,t1,t2) -> apply_substitution t1 l
   | _ -> assert false
 
+       (*
 let rec solution (n,meta) m t is_essence =
   match meta with
   | [] -> []
@@ -59,6 +58,7 @@ let rec solution (n,meta) m t is_essence =
                                                  :: meta
   | 
   | x :: meta -> x :: (solution (n,meta) m t)
+        *)
 
 (* TODO : 2 functions:
 - unification_delta
@@ -188,31 +188,24 @@ let rec intersect ctx l1 l2 =
          if is_sane x tl then
            match a with
            | DefAxiom (id, t) ->
-              DefAxiom(id, {delta=fix_intersect tl t.delta;
-                       essence=fix_intersect tl t.essence}) :: ctx, 0 :: tl
-           | DefEssence (id, t1, t2) ->
-              DefEssence(id, fix_intersect tl t1
-                         , {delta=fix_intersect tl t2.delta;
-                            essence=fix_intersect
-                                      tl t2.essence}) :: ctx,
-              0 :: tl
+              DefAxiom(id, fix_intersect tl t) :: ctx, 0 :: tl
            | DefLet (id, t1, t2) ->
-              DefLet(id, {delta=fix_intersect tl t1.delta;
-                          essence=fix_intersect tl t1.essence},
-                     {delta=fix_intersect tl t2.delta;
-                      essence=fix_intersect tl t2.essence}) :: ctx,
+              DefLet(id, fix_intersect tl t1,
+                     fix_intersect tl t2) :: ctx,
               0 :: tl
          else
            ctx, tl
   | _ -> assert false
 
 (* TODO *)
+       (*
 let meta_same (n, meta) m ctx l1 l2 =
   let ctx, tl = intersect ctx l1 l2 in
   let meta = (n+1, DefMeta (ctx, n, ???) :: meta) in
   let s = List.map (fun n -> Var(dummy_loc,n))
                    tl in
   solution meta m {delta=Meta(dummy_loc, n, s); essence=Meta(dummy_loc, n, s)}
+        *)
 
 let unification meta env t1 t2 =
   let norm t =
@@ -251,11 +244,11 @@ let unification meta env t1 t2 =
                                 else raise (Err "Sort")
     | Prod(l,id,t1,t2), Prod(_,_,t1',t2') ->
        let meta = foo meta env t1 t1' in
-       let meta = foo meta (DefAxiom(id,{delta=t1;essence=nothing}) :: env) t2 t2' in
+       let meta = foo meta (DefAxiom(id,t1) :: env) t2 t2' in
        meta
     | Abs(l,id,t1,t2), Abs(_,_,t1',t2') ->
        let meta = foo meta env t1 t1' in
-       let meta = foo meta (DefAxiom(id,{delta=t1;essence=nothing}) :: env) t2 t2' in
+       let meta = foo meta (DefAxiom(id,t1) :: env) t2 t2' in
        meta
     | Inter(l,t1,t2), Inter(_,t1',t2') ->
        let meta = foo meta env t1 t1' in
@@ -323,4 +316,4 @@ let unification meta env t1 t2 =
   in
   foo meta env t1 t2
 
-let unification meta env t1 t2 = meta
+      (* let unification meta env t1 t2 = meta *)

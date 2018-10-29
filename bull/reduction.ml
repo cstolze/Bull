@@ -29,7 +29,7 @@ let rec apply_all_substitution (n, meta) t =
   | Meta (l, n, subst) ->
      begin
        match find_subst n meta with
-       | Some (_,t,_) -> apply_substitution t.delta subst
+       | Some (_,t,_) -> apply_substitution t subst
        | None -> t
      end
   | _ -> visit_term (apply_all_substitution (n, meta))
@@ -59,7 +59,7 @@ let rec strongly_normalize gamma t =
   let sn_children = visit_term (strongly_normalize gamma)
 			       (fun _
 				->
-				 strongly_normalize ((DefAxiom ("",dummy_term))
+				 strongly_normalize ((DefAxiom ("",nothing))
 						     :: gamma))
 			       (fun id _ -> id)
   in
@@ -75,9 +75,9 @@ let rec strongly_normalize gamma t =
   | Let (l, _, t1, t2, t3) -> strongly_normalize gamma (beta_redex t2 t1)
   (* Delta-redex *)
   | Var (l, n) -> let (t1, _) = get_from_context gamma n in
-	     (match t1.delta with
-	      | Var _ -> t1.delta
-	      | _ -> strongly_normalize gamma t1.delta)
+	     (match t1 with
+	      | Var _ -> t1
+	      | _ -> strongly_normalize gamma t1)
   (* Eta-redex *)
   | Abs (l,_, _, App (l',t1, Var (_,0) :: l2))
     -> if is_eta (App (l', t1, l2)) then
@@ -93,11 +93,3 @@ let rec strongly_normalize gamma t =
   | SMatch (l, SInRight(l',_,t1), _, id1, _, _, id2, _, t2) ->
      strongly_normalize gamma (beta_redex t2 t1)
   | _ -> t
-
-
-let apply_all_substitution_full meta {delta; essence}
-  = {delta=apply_all_substitution meta delta; essence (* dummy *) }
-let strongly_normalize_full env {delta; essence} =
-  {delta=strongly_normalize env delta;
-         essence=strongly_normalize env essence (* problem with
-  DefEssence *) }
