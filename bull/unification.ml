@@ -217,27 +217,22 @@ let unification meta env t1 t2 =
   let t2 = norm t2 in
   let rec foo meta env t1 t2 =
     match (t1,t2) with
+    (* Hack so we can suppose meta-vars are always
+       head-terms of some spine *)
+    | Meta(l,n,s), t -> foo meta env (App (l, Meta(l,n,s), [])) t
+    | t, Meta(l,n,s) -> foo meta env t (App (l, Meta(l,n,s), []))
     (* in the foo loop, the terms are supposed to be in normal form,
        except when meta-variables are instanced. We do the corresponding
      reductions first. *)
     (* Meta-redL *)
-    | Meta(l,n,s), _ when is_instanced meta n ->
-       foo meta env (instantiate meta n s) t2
     | App(l,Meta(l',n,s),t'), _ when is_instanced meta n ->
-       foo meta env (norm @@ App(l, instantiate meta n s, t')) t2
+       foo meta env (norm @@ app' l (instantiate meta n s) t') t2
     (* Meta-redR *)
-    | _, Meta(l,n,s) when is_instanced meta n ->
-       foo meta env t1 (instantiate meta n s)
     | _, App(l,Meta(l',n,s),t') when is_instanced meta n ->
-       foo meta env t1 (norm @@ App(l, instantiate meta n s, t'))
+       foo meta env t1 (norm @@ app' l (instantiate meta n s) t')
 
     (* Unifying twice the same meta-variable. *)
     (* Meta-Same-Same and Meta-Same *)
-    | Meta(l,n,s1), Meta(l',m,s2) when m = n ->
-       (* Meta-Same-Same *)
-       if same_list s1 s2 then meta else
-         (* Meta-Same *)
-         failwith "Meta-Same 1 not implemented"
     | App(l,Meta(l',n,s1),t1), App(ll,Meta(ll',m,s2), t2) ->
        (* Meta-Same-Same *)
        if same_list s1 s2 then
@@ -245,13 +240,8 @@ let unification meta env t1 t2 =
        else
          (* Meta-Same *)
          failwith "Meta-Same 2 not implemented"
-    | t, Meta(l,n,s1) ->
-       failwith "Not implemented 1"
-      (* try Meta-InstR, Meta-FOR, MetaReduceR, Meta-DelDepsR, Lam-etaR *)
-    (* if t has a meta-var in its head, Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
-    | Meta(l,n,s1), t ->
-       failwith "Not implemented 2"
-       (* try Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
+
+    (* Unifying a meta-variable with another term *)
     | t, App(l,Meta(l',n,s1),t1) ->
        failwith "Not implemented 3"
       (* try Meta-InstR, Meta-FOR, MetaReduceR, Meta-DelDepsR, Lam-etaR *)
@@ -312,6 +302,8 @@ let unification meta env t1 t2 =
      let meta = foo meta env t6 t6' in
      meta
 
+  | Underscore _, Underscore _ -> meta (* case where we want to unify
+                                          nothing and nothing *)
   | Const (_,_), _ | _, Const (_,_)
     | Underscore _, _ | _, Underscore _
     | Let (_,_,_,_,_), _ | _, Let (_,_,_,_,_) -> assert false
@@ -329,7 +321,9 @@ let unification meta env t1 t2 =
   | Abs(l,id,t1,t2), t -> (* t's head is not an abstraction *)
      foo meta (DefAxiom(id,t1) :: env) t2 (app dummy_loc t (Var(dummy_loc, 0)))
 
+  (* other cases *)
   | _ -> raise (Err "not unifiable")
+
   and bar meta env l l' =
     match l, l' with
     | x :: l, y :: l' -> let meta = foo meta env x y
@@ -339,4 +333,3 @@ let unification meta env t1 t2 =
   in
   foo meta env t1 t2
 
-      (* let unification meta env t1 t2 = meta *)

@@ -122,7 +122,9 @@ let rec reconstruct meta env ctx t : ((int * Utils.metadeclaration list) * Utils
      let (meta, t2, t2') = reconstruct_with_type
                               meta env ctx t2 t1 in
      let decl = DefLet(id, t2, t2') in
-     reconstruct meta (decl :: env) (decl :: ctx) t3
+     let (meta, t3, t3') =
+       reconstruct meta (decl :: env) (decl :: ctx) t3 in
+     (meta, Let(l, id, t2', t2, t3), beta_redex t3' t2)
 
   | Prod (l, id, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
@@ -154,7 +156,7 @@ let rec reconstruct meta env ctx t : ((int * Utils.metadeclaration list) * Utils
           let t1' = strongly_normalize env @@ apply_all_substitution meta t1' in
           begin
             match t1' with
-            | Prod (l, id, u1, u2) -> (* case 1: we know the type of t1 *)
+            | Prod (_, _, u1, u2) -> (* case 1: we know the type of t1 *)
                let (meta, t2, t2') =
                  reconstruct_with_type meta env ctx t2 u1 in
                (meta, App(l, t1, t2 :: l2),
@@ -187,6 +189,8 @@ let rec reconstruct meta env ctx t : ((int * Utils.metadeclaration list) * Utils
      let (meta, t2, t2') = reconstruct meta env ctx t2 in
      let (meta, t', _) = force_type meta env ctx (Inter (l, t1', t2')) in
      (meta, SPair(l,t1,t2), t')
+  (* TODO: rewrite the rules for SPrLeft and SPrRight so that the
+     knowledge that the argument is an intersection is propagated *)
   | SPrLeft (l, t1) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
      let t1' = strongly_normalize env @@ apply_all_substitution meta t1 in
@@ -291,8 +295,48 @@ and force_type meta env ctx t =
   | None, Some meta -> (meta, t, t')
   | None, None -> raise (Err "force_type")
 and reconstruct_with_type meta env ctx t1 t2 = (* dummy *)
-  let (meta, t1, t1') = reconstruct meta env ctx t1 in
-  (unification meta env t1' t2, t1, t1')
+  let default () =
+    let (meta, t1, t1') = reconstruct meta env ctx t1 in
+    (unification meta env t1' t2, t1, t1')
+  in
+  match t1 with
+  | Let(l,id,t1,t2,t3) ->
+   let (meta, t1, t1') =
+     force_type meta env ctx t1 in
+   let (meta, t2, t2') =
+     reconstruct_with_type
+       meta env ctx t2 t1 in
+   let decl = DefLet(id, t2, t2') in
+   let (meta, t3, t3') =
+     (* lift 0 1 t2 is technically correct *)
+     reconstruct_with_type
+       meta (decl :: env) (decl :: ctx) t3 (lift 0 1 t2) in
+   (meta, Let(l,id,t2',t2,t3), t3')
+  | Abs(l,id,t1,t2) ->
+       let t2 = strongly_normalize env
+                @@ apply_all_substitution meta t2 in
+     begin
+       match t2 with
+       | Prod(_,_,u1,u2) ->
+          let (meta,t1,t1') = force_type meta env ctx t1 in
+          let meta = unification meta env t1 u1 in
+          let decl = DefAxiom(id,t1) in
+          let (meta, t2, t2') =
+            reconstruct_with_type meta (decl :: env)
+                                  (decl :: ctx) t2 u2 in
+          (meta, Abs(l,id,t1,t2), Prod(l,id,t1,t2'))
+       | _ -> default ()
+     end
+  | SPair
+    | SPrLeft
+    | SPrRight
+    | SInLeft
+    | SInRight
+    | Coercion
+  | Underscore l -> let (meta, k) = meta_add meta ctx t2 l in
+                    (meta, k, t2)
+  | _ -> default ()
+
 
 let rec essence meta env t1 =
   match t1 with
@@ -315,13 +359,13 @@ let rec essence meta env t1 =
   | Let (l,id,t1,t2,t3) -> let (meta,t1) = essence meta env t1 in
                            let (meta,t2) = essence meta env t2 in
                            let (meta,t3) = essence meta (DefLet(id,t1,t2) :: env) t3 in
-                           meta, Let(l,id,t1,t2,t3)
+                           meta, Let(l,id,nothing,t2,t3)
   | Prod (l,id,t1,t2) -> let (meta,t1) = essence meta env t1 in
                          let (meta,t2) = essence meta (DefAxiom(id,t1) :: env) t2 in
                          meta, Prod(l,id,t1,t2)
   | Abs (l,id,t1,t2) -> let (meta,t1) = essence meta env t1 in
                         let (meta,t2) = essence meta (DefAxiom(id,t1) :: env) t2 in
-                        meta, Abs(l,id,t1,t2)
+                        meta, Abs(l,id,nothing,t2)
   | App (l,t1,ll) -> let (meta,t1) = essence meta env t1 in
                      let rec foo meta l =
                        match l with

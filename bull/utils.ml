@@ -38,8 +38,13 @@ type term =
 (* putting spines in spines *)
 let app l t1 t2 =
   match t1 with
-  | App(l, t1,l1) -> App(l, t1, t2 :: l1)
+  | App(l, t1, l1) -> App(l, t1, t2 :: l1)
   | _ -> App (l, t1, t2 :: [])
+
+let app' l t1 t2 =
+  match t1 with
+  | App(l, t1, l1) -> App(l, t1, t2 @ l1)
+  | _ -> App(l, t1, t2)
 
 let nothing = Underscore dummy_loc
 
