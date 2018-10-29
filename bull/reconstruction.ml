@@ -5,12 +5,6 @@ open Subtyping
 open Printer
 open Unification
 
-(* putting spines in spines *)
-let app l t1 t2 =
-  match t1 with
-  | App(l, t1,l1) -> App(l, t1, t2 :: l1)
-  | _ -> App (l, t1, t2 :: [])
-
 (* returns the essence and the type of a term *)
 
 let get_from_meta meta env l n subst =

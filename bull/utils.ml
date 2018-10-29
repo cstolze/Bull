@@ -34,6 +34,13 @@ type term =
   | Underscore of location (* meta-variables before analysis *)
   | Meta of location * int * (term list) (* index and substitution *)
 
+(* This is the safe way to construct an application *)
+(* putting spines in spines *)
+let app l t1 t2 =
+  match t1 with
+  | App(l, t1,l1) -> App(l, t1, t2 :: l1)
+  | _ -> App (l, t1, t2 :: [])
+
 let nothing = Underscore dummy_loc
 
 (* In the contexts, there are let-ins and axioms *)

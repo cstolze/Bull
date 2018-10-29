@@ -217,6 +217,9 @@ let unification meta env t1 t2 =
   let t2 = norm t2 in
   let rec foo meta env t1 t2 =
     match (t1,t2) with
+    (* in the foo loop, the terms are supposed to be in normal form,
+       except when meta-variables are instanced. We do the corresponding
+     reductions first. *)
     (* Meta-redL *)
     | Meta(l,n,s), _ when is_instanced meta n ->
        foo meta env (instantiate meta n s) t2
@@ -227,6 +230,8 @@ let unification meta env t1 t2 =
        foo meta env t1 (instantiate meta n s)
     | _, App(l,Meta(l',n,s),t') when is_instanced meta n ->
        foo meta env t1 (norm @@ App(l, instantiate meta n s, t'))
+
+    (* Unifying twice the same meta-variable. *)
     (* Meta-Same-Same and Meta-Same *)
     | Meta(l,n,s1), Meta(l',m,s2) when m = n ->
        (* Meta-Same-Same *)
@@ -240,6 +245,22 @@ let unification meta env t1 t2 =
        else
          (* Meta-Same *)
          failwith "Meta-Same 2 not implemented"
+    | t, Meta(l,n,s1) ->
+       failwith "Not implemented 1"
+      (* try Meta-InstR, Meta-FOR, MetaReduceR, Meta-DelDepsR, Lam-etaR *)
+    (* if t has a meta-var in its head, Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
+    | Meta(l,n,s1), t ->
+       failwith "Not implemented 2"
+       (* try Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
+    | t, App(l,Meta(l',n,s1),t1) ->
+       failwith "Not implemented 3"
+      (* try Meta-InstR, Meta-FOR, MetaReduceR, Meta-DelDepsR, Lam-etaR *)
+    (* if t has a meta-var in its head, Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
+    | App(l,Meta(l',n,s1),t1), t ->
+       failwith "Not implemented 4"
+       (* try Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
+
+    (* Structural unification *)
     | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then meta
                                 else raise (Err "Sort")
     | Prod(l,id,t1,t2), Prod(_,_,t1',t2') ->
@@ -290,23 +311,25 @@ let unification meta env t1 t2 =
      let meta = foo meta env t5 t5' in
      let meta = foo meta env t6 t6' in
      meta
+
   | Const (_,_), _ | _, Const (_,_)
     | Underscore _, _ | _, Underscore _
     | Let (_,_,_,_,_), _ | _, Let (_,_,_,_,_) -> assert false
-  | App(l,t1,l2), App(_,t1',l2') ->
+
+  (* first-order unification for applications *)
+  | App(l,t1,l2), App(_,t1',l2') -> (* t1 and t1' are not meta-variables *)
      if List.length l2 = List.length l2' then
-       try
-         let meta = foo meta env t1 t1' in
-         bar meta env l2 l2'
-       with
-       | _ -> failwith "Not implemented 1"
-     else
-       failwith "Not implemented 2"
-  | Meta (l, n, s), t | t, Meta (l, n, s) ->
-     failwith "Not implemented 3"
-       (* TODO: find if meta has already been instantiated
-        if yes, unify instantiate(meta) and t. Other case: pattern *)
-  | _ -> failwith "Not implemented 4"
+       let meta = foo meta env t1 t1' in
+       bar meta env l2 l2'
+     else raise (Err "not unifiable")
+
+  (* eta-expansion if only one term is a lambda-abstraction *)
+  | t, Abs(l,id,t1,t2) -> (* t's head is not an abstraction *)
+     foo meta (DefAxiom(id,t1) :: env) (app dummy_loc t (Var(dummy_loc, 0))) t2
+  | Abs(l,id,t1,t2), t -> (* t's head is not an abstraction *)
+     foo meta (DefAxiom(id,t1) :: env) t2 (app dummy_loc t (Var(dummy_loc, 0)))
+
+  | _ -> raise (Err "not unifiable")
   and bar meta env l l' =
     match l, l' with
     | x :: l, y :: l' -> let meta = foo meta env x y
