@@ -29,7 +29,8 @@ let rec apply_all_substitution (n, meta) t =
   | Meta (l, n, subst) ->
      begin
        match find_subst n meta with
-       | Some (_,t,_) -> apply_substitution t subst
+       | Some (_,t,_) -> apply_all_substitution (n,meta) @@
+                           apply_substitution t subst
        | None -> t
      end
   | _ -> visit_term (apply_all_substitution (n, meta))
