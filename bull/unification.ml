@@ -198,14 +198,14 @@ let rec intersect ctx l1 l2 =
   | _ -> assert false
 
 (* TODO *)
-       (*
+
 let meta_same (n, meta) m ctx l1 l2 =
   let ctx, tl = intersect ctx l1 l2 in
-  let meta = (n+1, DefMeta (ctx, n, ???) :: meta) in
+  let meta = (n+1, DefMeta (ctx, n, tl) :: meta) in
   let s = List.map (fun n -> Var(dummy_loc,n))
                    tl in
   solution meta m {delta=Meta(dummy_loc, n, s); essence=Meta(dummy_loc, n, s)}
-        *)
+
 
 let unification meta env t1 t2 =
   let norm t =

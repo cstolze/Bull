@@ -39,59 +39,11 @@ let principal_set_system meta env ctx s1 s2 =
                 in (meta, Sort(dummy_loc,Type))
 
 
-(*
-4 algorithms:
-reconstruct
-
-reconstruct_with_essence
-
-reconstruct_with_type
-
-reconstruct_with_all
-
-These function takes as input:
-- a meta-environment
-- a local environment
-- a full environment
-- a term
-- eventually an essence and/or a type
-
-These functions return:
-- a new meta-environment
-- a new fullterm
-- a new fulltype
-
-These functions can throw an exception
-
- *)
-
 
 (*
   force-type takes is like reconstruct, except that
 it forces the returned type to be either Type, Kind, or a meta-variable with
 the property is_sort
- *)
-(*
-  cast takes as input
-  - a meta-variable environment
-  - a fullterm t
-  - a fulltype t1
-  - a fulltype t2
-
-and returns
-  - a new meta-var env
-  - a new fullterm
-  - a new fulltype
- *)
-
-(*
-  unification function takes as input:
-  - a meta-variable environment
-  - a fullterm t
-  - a fullterm t'
-
-and returns
-  - a new meta-var env
  *)
 
 (*
@@ -435,7 +387,7 @@ let rec essence meta env t1 =
                        meta, Union(l,t1,t2)
   | _ -> (meta, t1)
 
-and essence_with_hint meta env t1 t = (* dummy *)
+and essence_with_hint meta env t1 t =
   let default () =
     let (meta, t1) = essence meta env t1 in
     let meta = unification meta env t1 t in
