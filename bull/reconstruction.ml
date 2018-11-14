@@ -5,16 +5,6 @@ open Subtyping
 open Printer
 open Unification
 
-(* returns the essence and the type of a term *)
-
-let get_from_meta meta env l n subst =
-  match get_meta meta n with
-  | IsSort n -> raise (Err "should not happen? 1")
-  | SubstSort (n,Sort(l,Type)) -> meta, Sort(l,Type), Sort(l,Kind)
-  | SubstSort (n,_) -> raise (Err "should not happen? 2")
-  | DefMeta (l1,n,t2) | Subst (l1,n,_,t2)
-    -> (meta, Meta(l,n,subst), apply_substitution t2 subst)
-
 let type_of_sort s =
   match s with
   | Type -> Some (dummy_loc, Kind)
@@ -225,7 +215,7 @@ let rec reconstruct meta env ctx t : ((int * Utils.metadeclaration list) * Utils
      (meta, u, v)
 
   | Meta (l, n, subst) ->
-     get_from_meta meta ctx l n subst
+     get_from_meta meta l n subst
 and force_type meta env ctx t =
   let (meta, t, t') = reconstruct meta env ctx t in
   let x =

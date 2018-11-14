@@ -4,6 +4,15 @@ open Reduction
 open Subtyping
 open Printer
 
+(* returns the type of a term *)
+let get_from_meta meta l n subst =
+  match get_meta meta n with
+  | IsSort n -> raise (Err "should not happen? 1")
+  | SubstSort (n,Sort(l,Type)) -> meta, Sort(l,Type), Sort(l,Kind)
+  | SubstSort (n,_) -> raise (Err "should not happen? 2")
+  | DefMeta (l1,n,t2) | Subst (l1,n,_,t2)
+    -> (meta, Meta(l,n,subst), apply_substitution t2 subst)
+
 let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), Meta(l,n,[]))
 
 let rec enumerate min max =
@@ -44,28 +53,13 @@ let instantiate meta n l =
   | Subst (l1,m,t1,t2) -> apply_substitution t1 l
   | _ -> assert false
 
-       (*
-let rec solution (n,meta) m t is_essence =
+let rec solution (n,meta) m t =
   match meta with
   | [] -> []
   | IsSort a :: meta when a = m -> SubstSort (m,t) :: meta
-  | DefMeta (ctx, a, t2) :: meta when a = m -> if is_essence then
-                                                 SubstEssence(ctx, m,
-                                                              t, t2)
+  | DefMeta (ctx, a, t2) :: meta when a = m -> Subst(ctx, m, t, t2)
                                                  :: meta
-                                               else
-                                                 Subst(ctx, m, t, t2)
-                                                 :: meta
-  | 
   | x :: meta -> x :: (solution (n,meta) m t)
-        *)
-
-(* TODO : 2 functions:
-- unification_delta
-- unification_essence
-
-functions takes one term as input (not a fullterm)
- *)
 
 let rec same_term t1 t2 =
   match t1, t2 with
@@ -199,13 +193,15 @@ let rec intersect ctx l1 l2 =
 
 (* TODO *)
 
-let meta_same (n, meta) m ctx l1 l2 =
-  let ctx, tl = intersect ctx l1 l2 in
-  let meta = (n+1, DefMeta (ctx, n, tl) :: meta) in
-  let s = List.map (fun n -> Var(dummy_loc,n))
-                   tl in
-  solution meta m {delta=Meta(dummy_loc, n, s); essence=Meta(dummy_loc, n, s)}
-
+let meta_same (n, meta) m l1 l2 =
+  match get_meta (n,meta) m with
+  | DefMeta (ctx, _, t) ->
+     let ctx, tl = intersect ctx l1 l2 in
+     let meta = DefMeta (ctx, n, fix_intersect tl t) :: meta in
+     let s = List.map (fun n -> Var(dummy_loc,n))
+               tl in
+     (n+1, solution (n+1,meta) m (Meta(dummy_loc, n, s)))
+  | _ -> failwith "should not happen meta-same"
 
 let unification meta env t1 t2 =
   let norm t =
@@ -239,7 +235,8 @@ let unification meta env t1 t2 =
          bar meta env t1 t2
        else
          (* Meta-Same *)
-         failwith "Meta-Same 2 not implemented"
+         let meta = meta_same meta n s1 s2 in
+         bar meta env t1 t2
 
     (* Unifying a meta-variable with another term *)
     | t, App(l,Meta(l',n,s1),t1) ->
@@ -332,4 +329,3 @@ let unification meta env t1 t2 =
     | _ -> assert false
   in
   foo meta env t1 t2
-
