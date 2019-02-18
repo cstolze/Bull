@@ -421,7 +421,7 @@ and essence_with_hint meta env t1 t =
           let (meta,t1) = essence_with_hint meta env t1 t1' in
           let (meta,t2) = essence_with_hint
                             meta (DefAxiom(id,t1) :: env) t2 t2' in
-          meta, Abs(l,id,t1,t2)
+          meta, Abs(l,id,nothing,t2)
        | _ -> default ()
      end
   | Inter (l,t1,t2) ->

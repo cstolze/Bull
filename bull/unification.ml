@@ -4,26 +4,6 @@ open Reduction
 open Subtyping
 open Printer
 
-(* returns the type of a term *)
-let get_from_meta meta l n subst =
-  match get_meta meta n with
-  | IsSort n -> raise (Err "should not happen? 1")
-  | SubstSort (n,Sort(l,Type)) -> meta, Sort(l,Type), Sort(l,Kind)
-  | SubstSort (n,_) -> raise (Err "should not happen? 2")
-  | DefMeta (l1,n,t2) | Subst (l1,n,_,t2)
-    -> (meta, Meta(l,n,subst), apply_substitution t2 subst)
-
-let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), Meta(l,n,[]))
-
-let rec enumerate min max =
-  if min > max then [] else
-    min :: (enumerate (min+1) max)
-
-let meta_add (n,meta) ctx t l =
-  let s = List.map (fun n -> Var(dummy_loc,n))
-                   (enumerate 0 (List.length ctx - 1)) in
-  ((n+1, DefMeta (ctx, n, t) :: meta), Meta(l,n,s))
-
 let get_meta (_,meta) n =
   let rec foo = function
     | [] -> assert false
@@ -37,6 +17,27 @@ let get_meta (_,meta) n =
   in
   foo meta
 
+(* returns the type of a term *)
+let get_from_meta meta l n subst =
+  match get_meta meta n with
+  | IsSort n -> raise (Err "should not happen? 1")
+  | SubstSort (n,Sort(l,Type)) -> meta, Sort(l,Type), Sort(l,Kind)
+  | SubstSort (n,_) -> raise (Err "should not happen? 2")
+  | DefMeta (l1,n,t2) | Subst (l1,n,_,t2)
+    -> (meta, Meta(l,n,subst), apply_substitution t2 subst)
+
+let meta_add_sort (n,meta) l = ((n+1, IsSort n :: meta), Meta(l,n,[]))
+
+(* enumerate a b == [a;a+1;a+2;...;b-1;b] *)
+let rec enumerate min max =
+  if min > max then [] else
+    min :: (enumerate (min+1) max)
+
+let meta_add (n,meta) ctx t l =
+  let s = List.map (fun n -> Var(dummy_loc,n))
+                   (enumerate 0 (List.length ctx - 1)) in
+  ((n+1, DefMeta (ctx, n, t) :: meta), Meta(l,n,s))
+
 let is_instanced meta n =
   match get_meta meta n with
   | SubstSort _ | Subst _ -> true
@@ -47,12 +48,14 @@ let is_instanced meta n =
 (*                   ) (t1 : Utils.fullterm) (t2 : Utils.term) = meta *)
 
 (* we suppose is_instanced has returned true *)
+(* compute definition expansion of ?n[l] *)
 let instantiate meta n l =
   match get_meta meta n with
   | SubstSort (m,s) -> s
   | Subst (l1,m,t1,t2) -> apply_substitution t1 l
   | _ -> assert false
 
+(* replace Ctx |- ?m : T with Ctx |- ?m := t : T in the meta-environment *)
 let rec solution (n,meta) m t =
   match meta with
   | [] -> []
@@ -61,6 +64,8 @@ let rec solution (n,meta) m t =
                                                  :: meta
   | x :: meta -> x :: (solution (n,meta) m t)
 
+(* META-SAME-SAME *)
+(* This is a helper function that checks if t1 and t2 are the same term *)
 let rec same_term t1 t2 =
   match t1, t2 with
   | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then true
@@ -101,116 +106,211 @@ and same_list s1 s2 =
                         else false
   | _ -> false
 
-(* returns true iff the free variables of t are in tl *)
-let rec is_sane t tl =
-  let tl' = List.map (fun n -> n+1) tl in
-  match t with
-  | Sort (_,t) -> true
-  | Let (_,_,t1,t2,t3) -> is_sane t1 tl && is_sane t2 tl &&
-                            is_sane t3 tl'
-  | Prod (_,_,t1,t2) | Abs (_,_,t1,t2) -> is_sane t1 tl && is_sane t2 tl'
-  | App (_,t1,l1) -> List.fold_left (fun x y -> x && is_sane y tl)
-                                    (is_sane t1 tl) l1
-  | Inter (_,t1,t2) | Union (_,t1,t2) | SPair (_,t1,t2)
-    | SInLeft (_,t1,t2) | SInRight (_,t1,t2) | Coercion (_,t1,t2)
-    -> is_sane t1 tl && is_sane t2 tl
-  | SPrLeft (_,t1) | SPrRight (_,t1) -> is_sane t1 tl
-  | SMatch (_,t1,t2,_,t3,t4,_,t5,t6) ->
-     is_sane t1 tl && is_sane t2 tl && is_sane t3 tl && is_sane t4 tl'
-     && is_sane t5 tl && is_sane t6 tl'
-  | Const (_,_) -> assert false
-  | Underscore _ -> assert false
-  | Meta (_,_,l1) -> List.fold_left (fun x y -> x && is_sane y tl)
-                                   true l1
-  | Var (_,n) ->
-     match tl with
-     | [] -> true
-     | x :: _ ->
-        let min = List.fold_left (fun x y -> if x < y then x else y)
-                                 x tl in
-        let max = List.fold_left (fun x y -> if x > y then x else y)
-                                 x tl in
-        if n < min || n > max then true else
-          List.mem n tl
-
-let rec occur l n =
-  match l with
-  | [] -> assert false
-  | m :: l -> if m = n then 0 else 1 + occur l n
+(* META-SAME *)
 
 (* fix the de Bruijn indices in the newly formed
 terms of the context *)
-(* the full environment is :
-- list of global free variables (case n > max):
-their indices are updated because some meta-context
-variables are removed
-- list of free meta-context variables:
-the kept indices are stored in tl
-- list of local bound variables (case n < min):
-their indices do not change *)
-let rec fix_intersect tl t =
-  let tl' = List.map (fun n -> n+1) tl in
-  match t with
-  | Var (l, n) ->
-     begin
-       match tl with
-       | [] -> Var(l, n)
-       | x :: _ ->
-          let min = List.fold_left (fun x y -> if x < y then x else y)
-                                 x tl in
-          let max = List.fold_left (fun x y -> if x > y then x else y)
-                                   x tl in
-          if n < min then
-            Var(l, n) else
-            if n > max then
-              Var(l, n + min - max + List.length tl - 1)
-            else
-              Var(l,min + occur tl n)
-     end
-  | _ -> visit_term (fix_intersect tl) (fun _ -> fix_intersect tl')
-                    (fun id _ -> id) t
+let fix_indices f t =
+  (map_term 0 (fun k l m -> Var(l, f k m))) t
 
-let rec intersect ctx l1 l2 =
-  match ctx, l1, l2 with
-  | [], [], [] -> [], []
-  | a :: ctx, x :: l1, y :: l2
-    -> let ctx, tl = intersect ctx l1 l2 in
-       let tl = List.map (fun n -> n + 1) tl in
-       if same_term x y then
-         ctx, tl
-       else
-         if is_sane x tl then
-           match a with
-           | DefAxiom (id, t) ->
-              DefAxiom(id, fix_intersect tl t) :: ctx, 0 :: tl
-           | DefLet (id, t1, t2) ->
-              DefLet(id, fix_intersect tl t1,
-                     fix_intersect tl t2) :: ctx,
-              0 :: tl
+(*
+ Solve ctx |- ?m : t with ctx |- ?m := ?n[tl] : t,
+ where ?n is the pruned version of ?m. The l argument is a bool list
+ stating which variable is kept.
+*)
+let create_pruned (n,meta) ctx m t l =
+  let default_fix_indices k m = m in
+  (* create new context, new subst list, and fix-indices function *)
+  let rec foo ctx l =
+    match ctx, l with
+    | [], [] -> [], [], default_fix_indices
+    | a :: ctx, b :: l ->
+       let ctx, tl, f = foo ctx l in
+       let ctx =
+         if b then (* variable is kept *)
+           let a = (* fix the indices in a *)
+               match a with
+               | DefAxiom (id, t) ->
+                  DefAxiom (id, fix_indices f t)
+               | DefLet (id, t1, t2) ->
+                  DefLet (id, fix_indices f t1, fix_indices f t2)
+           in a :: ctx
          else
-           ctx, tl
+           ctx
+       in
+       let tl = List.map (fun n -> n + 1) tl in
+       let tl = if b then 0 :: tl else tl in
+       (* new function for fixing indices *)
+       let f k m = if b then (* variable is kept *)
+                     if m < k then m (* bound variable *)
+                     else if m = k then k
+                     else f k (m-1) + 1
+                   else (* the variable is pruned *)
+                     if m < k then m (* bound variable *)
+                                     (* case k = m should not happen *)
+                     else f k (m-1)
+       in ctx, tl, f
+    | _ -> assert false
+  in
+  let ctx, tl, f = foo ctx l in
+  let t = fix_indices f t in
+  let meta = DefMeta (ctx, n, t) :: meta in
+  (n+1, solution (n+1, meta) m (Meta(dummy_loc, n, List.map (fun n -> Var(dummy_loc, n)) tl)))
+
+(* find the common terms in substitution s1 and s2 *)
+let rec intersection s1 s2 =
+  match s1, s2 with
+  | [], [] -> []
+  | x :: s1, y :: s2 ->
+     same_term x y :: intersection s1 s2
   | _ -> assert false
 
-(* TODO *)
-
-let meta_same (n, meta) m l1 l2 =
-  match get_meta (n,meta) m with
+let meta_same meta n s1 s2 =
+  match get_meta meta n with
   | DefMeta (ctx, _, t) ->
-     let ctx, tl = intersect ctx l1 l2 in
-     let meta = DefMeta (ctx, n, fix_intersect tl t) :: meta in
-     let s = List.map (fun n -> Var(dummy_loc,n))
-               tl in
-     (n+1, solution (n+1,meta) m (Meta(dummy_loc, n, s)))
+     let l = intersection s1 s2 in
+     create_pruned meta ctx n t l
   | _ -> failwith "should not happen meta-same"
 
-let unification meta env t1 t2 =
-  let norm t =
-    let t = apply_all_substitution meta t
-    in
-    strongly_normalize env t
+(* HIGHER ORDER PATTERN UNIFICATION *)
+
+(* check if the arguments are all distinct variables *)
+let rec strong_pattern tl aux =
+  match tl with
+  | [] -> aux
+  | Var (_,n) :: tl ->
+     begin
+       try
+         ignore @@ List.find (fun m -> m = n) aux; raise (Err "HOPU impossible")
+       with
+       | Not_found -> is_strong_pattern tl (n :: aux)
+     end
+  | _ -> raise (Err "HOPU impossible")
+
+let rec is_offending ctx m xi t =
+  match t with
+  | Sort (l,m) -> true
+  | Let (l1,id,t1,t2,t3) -> assert false
+  | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) ->
+     is_offending ctx m xi t1 &&
+       is_offending (DefAxiom(id,t1) :: ctx) m (List.map (fun x -> x+1) xi) t2
+  | App (l,t1,l1) ->
+     List.fold_left
+       (fun meta t -> is_offending ctx m xi t)
+       (is_offending ctx m xi t1)
+       l1
+  | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2)
+    | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
+     is_offending ctx m xi t1 &&
+       is_offending ctx m xi t2
+  | SPrLeft (l,t) | SPrRight (l,t) ->
+     is_offending ctx m xi t
+  | SMatch (l,t1,t2,id1,t3,t4,id2,t5,t6) ->
+     is_offending ctx m xi t1 &&
+       is_offending ctx m xi t2 &&
+         is_offending ctx m xi t3 &&
+           is_offending (DefAxiom(id1,t3)::ctx) m (List.map (fun x -> x+1) xi) t4 &&
+             is_offending ctx m xi t5 &&
+               is_offending (DefAxiom(id2,t5)::ctx) m (List.map (fun x -> x+1) xi) t6
+  | Var (l,n) -> if n < List.length ctx then
+                   begin
+                    try
+                      ignore @@ List.find (fun m -> m = n) xi;
+                      true
+                    with
+                    | Not_found -> false
+                   end
+                 else true
+  | Const (l,id) -> assert false
+  | Underscore l -> true
+  | Meta (l,n,s) -> if m = n then false
+                    else
+                      List.fold_left (fun x y -> x && is_offending ctx m xi y)
+                        true s
+
+let norm meta env t =
+  let t = apply_all_substitution meta t
   in
-  let t1 = norm t1 in
-  let t2 = norm t2 in
+  strongly_normalize env t
+
+(* update the meta-environment, in order to remove all offending terms from t *)
+(* raise Not_found in case of error *)
+let rec prune meta ctx m xi t =
+  let t =  norm meta env t in
+  match t with
+  | Sort (l,m) -> meta
+  | Let (l1,id,t1,t2,t3) -> assert false
+  | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) ->
+     let meta = prune meta ctx m xi t1 in
+     prune meta (DefAxiom(id,t1) :: ctx) m (List.map (fun x -> x+1) xi) t2
+  | App (l,t1,l1) ->
+     List.fold_left
+       (fun meta t -> prune meta ctx m xi t)
+       (prune meta ctx m xi t1)
+       l1
+  | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2)
+    | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
+     let meta = prune meta ctx m xi t1 in
+     prune meta ctx m xi t2
+  | SPrLeft (l,t) | SPrRight (l,t) ->
+     prune meta ctx m xi t
+  | SMatch (l,t1,t2,id1,t3,t4,id2,t5,t6) ->
+     let meta = prune meta ctx m xi t1 in
+     let meta = prune meta ctx m xi t2 in
+     let meta = prune meta ctx m xi t3 in
+     let meta = prune meta (DefAxiom(id1,t3)::ctx) m (List.map (fun x -> x+1) xi) t4 in
+     let meta = prune meta ctx m xi t5 in
+     prune meta (DefAxiom(id2,t5)::ctx) m (List.map (fun x -> x+1) xi) t6
+  | Var (l,n) -> (if n < List.length ctx then
+                    ignore @@ List.find (fun m -> m = n) xi);
+                 meta
+  | Const (l,id) -> assert false
+  | Underscore l -> meta
+  | Meta (l,n,s) -> if m = n then raise Not_found
+                    else
+                      let l = List.map (is_offending ctx m xi) s in
+                      try
+                        ignore @@ List.find (fun m -> m = false) l;
+                        match get_meta meta n with (* we have to prune n *)
+                        | DefMeta (ctx, _, t) ->
+                           create_pruned meta ctx n t l
+                        | _ -> failwith "should not happen prune"
+                      with
+                      | Not_found ->
+                         meta (* nothing to do *)
+
+let rec create_hopu env t xi =
+  let update k l n =
+    if n = x+k then Var (l,0)
+    else Var(l,n+1) in
+  match xi with
+  | [] -> t
+  | x :: xi ->
+     let (_, tt) = get_from_context env x in
+     let tt = map_term 0 update tt in (* replace x by Var 0 *)
+     let env = map_env 0 update tt in (* same, but in the context *)
+     Abs(dummy_loc,"x",tt, create_hopu (DefAxiom("",tt)::env) tt (List.map (fun x -> x+1) xi))
+and update tt x =
+  map_term 0
+    (fun k l n ->
+      if n = x+k then Var (l,0)
+      else Var(l,n+1))
+    tt
+
+(* dummy *)
+let meta_inst meta env ctx t n s1 t1 =
+  let xi = strong_pattern (List.concat [s1;t1]) [] in
+  let meta = prune meta ctx n xi t in
+  let t = norm meta env t in
+  let res = create_hopu env t xi in
+  (* TODO : SOLUTION *)
+
+
+(* MAIN UNIFICATION ALGORITHM *)
+
+let unification meta env ctx t1 t2 =
+  let t1 = norm meta env t1 in
+  let t2 = norm meta env t2 in
   let rec foo meta env t1 t2 =
     match (t1,t2) with
     (* Hack so we can suppose meta-vars are always
@@ -229,7 +329,7 @@ let unification meta env t1 t2 =
 
     (* Unifying twice the same meta-variable. *)
     (* Meta-Same-Same and Meta-Same *)
-    | App(l,Meta(l',n,s1),t1), App(ll,Meta(ll',m,s2), t2) ->
+    | App(l,Meta(l',n,s1),t1), App(ll,Meta(ll',m,s2), t2) when m = n ->
        (* Meta-Same-Same *)
        if same_list s1 s2 then
          bar meta env t1 t2
@@ -240,12 +340,30 @@ let unification meta env t1 t2 =
 
     (* Unifying a meta-variable with another term *)
     | t, App(l,Meta(l',n,s1),t1) ->
-       failwith "Not implemented 3"
-      (* try Meta-InstR, Meta-FOR, MetaReduceR, Meta-DelDepsR, Lam-etaR *)
-    (* if t has a meta-var in its head, Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
+       (* not implemented: Meta-DelDeps (future work) *)
+       begin
+         try meta_inst meta env t n s1 t1 with
+         | Err _ ->
+            match t with
+            | App(_,t,l2) -> (* first-order unification *)
+               if List.length l2  = List.length t1 then
+                 let meta = foo meta env t (App(l,Meta(l',n,s1),[])) in
+                 bar meta env l2 t1
+               else raise (Err "not unifiable")
+            | _ -> raise (Err "not unifiable")
+       end
     | App(l,Meta(l',n,s1),t1), t ->
-       failwith "Not implemented 4"
-       (* try Meta-InstL, Meta-FOL, MetaLeduceL, Meta-DelDepsL, Lam-etaL *)
+       begin
+         try meta_inst meta env t n s1 t1 with
+         | Err _ ->
+            match t with (* first-order unification *)
+            | App(_,t,l2) ->
+               if List.length l2  = List.length t1 then
+                 let meta = foo meta env (App(l,Meta(l',n,s1),[])) t in
+                 bar meta env t1 l2
+               else raise (Err "not unifiable")
+            | _ -> raise (Err "not unifiable")
+       end
 
     (* Structural unification *)
     | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then meta
@@ -294,9 +412,9 @@ let unification meta env t1 t2 =
      let meta = foo meta env t1 t1' in
      let meta = foo meta env t2 t2' in
      let meta = foo meta env t3 t3' in
-     let meta = foo meta env t4 t4' in
+     let meta = foo meta (DefAxiom(id1,t3)::env) t4 t4' in
      let meta = foo meta env t5 t5' in
-     let meta = foo meta env t6 t6' in
+     let meta = foo meta (DefAxiom(id2,t5)::env) t6 t6' in
      meta
 
   | Underscore _, Underscore _ -> meta (* case where we want to unify

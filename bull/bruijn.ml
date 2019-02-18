@@ -32,6 +32,7 @@ let visit_term f g h = function
 
 (* Map iterator *)
 (* f is a function that maps De Bruijn indexes to terms *)
+(* k states how deep we are in the term *)
 
 let map_term k f t =
   let rec aux k t =
@@ -39,6 +40,11 @@ let map_term k f t =
     | Var (l, n) -> f k l n
     | _ -> visit_term (aux k) (fun _ -> aux (k + 1)) (fun id _ -> id) t
   in aux k t
+
+let rec map_context k f env =
+  match env with
+  | [] -> []
+  | t :: env -> map_term (k-1) f t :: map_context (k-1) f env
 
 (* k is the index from which the context is changed *)
 (* n is the shift *)
