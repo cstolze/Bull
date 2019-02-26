@@ -92,7 +92,7 @@ s:
     /* For debugging purpose */
     | META DOT { [Beginmeta] }
     | ENDMETA DOT { [Endmeta] }
-    | UNIFY term term DOT { [Unify($2,$3)] }
+    | UNIFY term WITH term DOT { [Unify($2,$4)] }
     | ADD decl_list TURNSTILE term DOT { [Add ($2,$4)] }
     | AXIOM UNTYPED decl_list DOT { List.map (fun (x,y) -> UAxiom (x,y)) $3 }
     | DEFINITION UNTYPED ID paren_decl_list COLON term ASSIGN term
@@ -163,4 +163,10 @@ term6:
     | TYPE { Sort (get_loc (), Type) }
     | LT term COMMA term GT { SPair (get_loc (), $2, $4) }
     | SMATCH term RETURN term WITH ID COLON term ENDLAMBDA term COMMA ID COLON term ENDLAMBDA term END { SMatch (get_loc (), $2, $4, $6, $8, $10, $12, $14, $16) }
+    | QUESTION ID OPENB tlist CLOSB { Meta(get_loc (), int_of_string $2, $4) }
     ;
+
+tlist:
+    | { [] }
+    | term { [$1] }
+    | term COMMA tlist { $1 :: $3 }

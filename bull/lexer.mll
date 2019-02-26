@@ -26,9 +26,11 @@ rule read buf = parse
 
    | '|' { begin Buffer.add_char buf '|'; SOR end }
    | '_' { begin Buffer.add_char buf '_'; UNDERSCORE end }
+
    | '?' { begin Buffer.add_char buf '?'; QUESTION end }
    | '{' { begin Buffer.add_char buf '{'; OPENB end }
    | '}' { begin Buffer.add_char buf '}'; CLOSB end }
+
    | "smatch" { begin Buffer.add_string buf "smatch"; SMATCH end }
    | "return" { begin Buffer.add_string buf "return"; RETURN end }
    | "with" { begin Buffer.add_string buf "with"; WITH end }

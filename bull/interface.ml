@@ -49,9 +49,9 @@ let rec print_meta id_list sigma e_sigma (n,meta) =
     match ctx with
     | [] -> print_string ("|- ?" ^ (string_of_int n) ^ " : ");
             print_endline (string_of_term false id_list t)
-    | DefAxiom(id,t) :: ctx ->
+    | DefAxiom(id,t') :: ctx ->
        print_string (id ^ " : ");
-       print_string (string_of_term false id_list t);
+       print_string (string_of_term false id_list t');
        print_string " ";
        print_evar (id :: id_list) ctx n t
     | _ -> failwith "TODO"
@@ -66,7 +66,7 @@ let rec print_meta id_list sigma e_sigma (n,meta) =
        print_string (id ^ " : ");
        print_string (string_of_term false id_list t);
        print_string " ";
-       print_evar (id :: id_list) ctx n t
+       print_subst (id :: id_list) ctx n t1 t2
     | _ -> failwith "TODO"
   in
   match meta with
@@ -77,7 +77,7 @@ let rec print_meta id_list sigma e_sigma (n,meta) =
   | SubstSort (m,t) :: meta -> print_endline ("|- ?" ^ (string_of_int m) ^
                                                 " := " ^ (string_of_term false id_list t));
                 print_meta id_list sigma e_sigma (n,meta)
-  | DefMeta(ctx,m,t) :: meta -> print_evar id_list ctx n t;
+  | DefMeta(ctx,m,t) :: meta -> print_evar id_list ctx m t;
                                 print_meta id_list sigma e_sigma (n,meta)
   | Subst(ctx,m,t1,t2) :: meta -> print_subst id_list ctx m t1 t2;
                                   print_meta id_list sigma e_sigma (n,meta)
@@ -138,7 +138,7 @@ let add_let id str d o id_list sigma esigma verbose =
             with
               Err reason -> prerr_endline reason; (id_list, sigma, esigma)
 
-let normalize d id_list sigma esigma =
+let normalize d str id_list sigma esigma =
   let d = (fix_index id_list d) in
   try
     let (m, em, t1, t2, et1, et2) =
@@ -149,6 +149,8 @@ let normalize d id_list sigma esigma =
     let t3 = strongly_normalize esigma et1 in
     let t4 = strongly_normalize esigma et2 in
     print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
+  with
+    Err reason -> prerr_endline reason
 
 (* repl *)
 
@@ -180,7 +182,7 @@ let rec repl lx id_list sigma esigma verbose : (string list * Utils.declaration 
 	  | Print_all -> print_all id_list sigma esigma; ((id_list, sigma, esigma), meta)
           | Show -> print_meta id_list sigma esigma meta; ((id_list, sigma, esigma), meta)
           (* TODO : change for proofs *)
-	  | Compute t -> normalize t id_list sigma esigma; ((id_list, sigma, esigma), meta)
+	  | Compute t -> normalize t str id_list sigma esigma; ((id_list, sigma, esigma), meta)
 	  | Help -> help (); ((id_list, sigma, esigma), meta)
 	  | Error -> prerr_endline (syntaxerror str lx);
 		     Lexing.flush_input lx; ((id_list, sigma, esigma), meta)
@@ -197,7 +199,7 @@ let rec repl lx id_list sigma esigma verbose : (string list * Utils.declaration 
                let id_list_old = id_list in
                let rec tmp id_list =
                  function
-                 | [] -> [], id_list
+                 | [] -> [], id_list_old
                  | (x,t) :: l -> let a, b = tmp (x :: id_list) l in
                                  DefAxiom(x,fix_index id_list t) :: a, x :: b
                in
