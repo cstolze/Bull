@@ -464,6 +464,7 @@ let check_term str id_list env t1 t2 =
 
 let check_axiom str id_list env t =
   let (meta, t1, t2) = force_type (0,[]) env [] t in
+  let t1 = apply_all_substitution meta t1 in
   let meta = clean_meta meta in
   let (emeta, et1) = essence meta env t1 in
   (meta, emeta, t1, et1)

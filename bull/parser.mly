@@ -78,9 +78,9 @@ s:
     | LOAD QUOTE DOT { [Load (unquote $2)] }
     | LEMMA ID COLON term DOT { [Proof($2,$4)] }
     | AXIOM decl_list DOT { List.map (fun (x,y) -> Axiom (x,y)) $2 }
-    | DEFINITION ID paren_decl_list COLON term ASSIGN term
+    | DEFINITION ID pdl_opt COLON term ASSIGN term
 		 DOT { [Definition ($2, add_args $3 $7, $5)] }
-    | DEFINITION ID paren_decl_list ASSIGN term DOT { [Definition ($2, add_args $3 $5, Underscore dummy_loc)] }
+    | DEFINITION ID pdl_opt ASSIGN term DOT { [Definition ($2, add_args $3 $5, Underscore dummy_loc)] }
     | PRINT id_list DOT { List.map (fun x -> Print x) $2 }
     | SIG DOT { [Print_all] }
     | SHOW DOT { [Show] }
@@ -93,9 +93,9 @@ s:
     | META DOT { [Beginmeta] }
     | ENDMETA DOT { [Endmeta] }
     | UNIFY term WITH term DOT { [Unify($2,$4)] }
-    | ADD decl_list TURNSTILE term DOT { [Add ($2,$4)] }
+    | ADD pdl_opt TURNSTILE term DOT { [Add ($2,$4)] }
     | AXIOM UNTYPED decl_list DOT { List.map (fun (x,y) -> UAxiom (x,y)) $3 }
-    | DEFINITION UNTYPED ID paren_decl_list COLON term ASSIGN term
+    | DEFINITION UNTYPED ID pdl_opt COLON term ASSIGN term
 		 DOT { [UDefinition ($3, add_args $4 $8, $6)] }
     ;
 
@@ -115,6 +115,11 @@ paren_decl_list:
 
 decl_list :
   | decl {$1}
+  | paren_decl_list {$1}
+  ;
+
+pdl_opt :
+  | { [] }
   | paren_decl_list {$1}
   ;
 

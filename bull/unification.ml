@@ -242,7 +242,7 @@ let rec prune meta env ctx m xi t =
   | Let (l1,id,t1,t2,t3) -> assert false
   | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) ->
      let meta = prune meta env ctx m xi t1 in
-     prune meta (DefAxiom(id,t1) :: env) (DefAxiom(id,t1) :: ctx) m (List.map (fun x -> x+1) xi) t2
+     prune meta (DefAxiom(id,t1) :: env) (DefAxiom(id,t1) :: ctx) m (0 :: (List.map (fun x -> x+1) xi)) t2
   | App (l,t1,l1) ->
      List.fold_left
        (fun meta t -> prune meta env ctx m xi t)
@@ -280,7 +280,7 @@ let rec prune meta env ctx m xi t =
                       | Not_found ->
                          meta (* nothing to do *)
 
-let rec create_hopu env t xi =
+let rec create_hopu env t xi n =
   let update x k l n =
     if n = x+k then Var (l,0)
     else Var(l,n+1) in
@@ -288,17 +288,26 @@ let rec create_hopu env t xi =
   | [] -> t
   | x :: xi ->
      let (_, tt) = get_from_context env x in
-     let tt = map_term 0 (update x) tt in (* replace x by Var 0 *)
+     let t = map_term 0 (update x) t in (* replace x by Var 0 *)
      let env = map_context 0 (update x) env in (* same, but in the context *)
-     Abs(dummy_loc,"x",tt, create_hopu (DefAxiom("",tt)::env) tt (List.map (fun x -> x+1) xi))
+     if n <> 0 then
+       Abs(dummy_loc,"x",tt, create_hopu (DefAxiom("",tt)::env) t (List.map (fun x -> x+1) xi) (n-1))
+     else
+       create_hopu (DefAxiom("",tt)::env) t (List.map (fun x -> x+1) xi) 0
 
 (* dummy *)
 let meta_inst meta env ctx t n s1 t1 =
-  let xi = strong_pattern (List.concat [s1;t1]) [] in
+  let xi = strong_pattern (List.concat [t1;s1]) [] in
   let meta = prune meta env ctx n xi t in
   let t = norm meta env t in
-  let res = create_hopu env t xi in
-  (n, solution meta n res)
+  let res = create_hopu env t xi (List.length t1) in
+  let diff = List.length ctx - List.length s1 in
+  (* NONONO: how to fix the indices properly??? *)
+  let update k l n =
+    if n >= k + List.length ctx then Var(l, n-diff)
+    else Var(l,n)
+  in
+  (n, solution meta n (map_term 0 update res))
 
 (* MAIN UNIFICATION ALGORITHM *)
 

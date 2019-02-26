@@ -45,29 +45,30 @@ let print id id_list sigma esigma =
               print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
 
 let rec print_meta id_list sigma e_sigma (n,meta) =
-  let rec print_evar id_list ctx n t =
+  let rec list_2_string id_list ctx =
     match ctx with
-    | [] -> print_string ("|- ?" ^ (string_of_int n) ^ " : ");
-            print_endline (string_of_term false id_list t)
-    | DefAxiom(id,t') :: ctx ->
-       print_string (id ^ " : ");
-       print_string (string_of_term false id_list t');
-       print_string " ";
-       print_evar (id :: id_list) ctx n t
+    | [] -> "", id_list
+    | [DefAxiom(id,t)] ->
+       id ^ " : " ^ (string_of_term false id_list t) ^ ", ", id :: id_list
+    | DefAxiom(id,t) :: ctx ->
+       let s, id_list = list_2_string id_list ctx in
+       s ^ id ^ " : " ^ (string_of_term false id_list t) ^ ", ", id :: id_list
     | _ -> failwith "TODO"
+  in
+  let rec print_evar id_list ctx n t =
+    let s,id_list = list_2_string id_list ctx in
+    print_string s;
+    print_string ("|- ?" ^ (string_of_int n));
+    print_string " : ";
+    print_endline (string_of_term false id_list t)
   in (* TODO: factorize code *)
   let rec print_subst id_list ctx n t1 t2 =
-    match ctx with
-    | [] -> print_string ("|- ?" ^ (string_of_int n) ^ " := ");
-            print_string (string_of_term false id_list t1);
-            print_string " : ";
-            print_endline (string_of_term false id_list t2)
-    | DefAxiom(id,t) :: ctx ->
-       print_string (id ^ " : ");
-       print_string (string_of_term false id_list t);
-       print_string " ";
-       print_subst (id :: id_list) ctx n t1 t2
-    | _ -> failwith "TODO"
+    let s,id_list = list_2_string id_list ctx in
+    print_string s;
+    print_string ("|- ?" ^ (string_of_int n) ^ " := ");
+    print_string (string_of_term false id_list t1);
+    print_string " : ";
+    print_endline (string_of_term false id_list t2)
   in
   match meta with
   | [] -> ()
@@ -197,13 +198,14 @@ let rec repl lx id_list sigma esigma verbose : (string list * Utils.declaration 
           | Add (l,t) ->
              begin
                let id_list_old = id_list in
-               let rec tmp id_list =
+               let rec tmp (id_list,ctx) =
                  function
-                 | [] -> [], id_list_old
-                 | (x,t) :: l -> let a, b = tmp (x :: id_list) l in
-                                 DefAxiom(x,fix_index id_list t) :: a, x :: b
+                 | [] -> (id_list, ctx)
+                 | (x,t) :: l ->
+                    let id_list,ctx = x :: id_list, DefAxiom(x,fix_index id_list t) :: ctx in
+                    tmp (id_list,ctx) l
                in
-               let (l, id_list) = tmp id_list l in
+               let (id_list, l) = tmp (id_list,[]) l in
                let t = fix_index id_list t in
                let (meta, _) = Unification.meta_add meta l t dummy_loc in
                ((id_list_old, sigma, esigma), meta)

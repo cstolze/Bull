@@ -81,7 +81,7 @@ let rec string_of_term is_essence id_list t =
     | App (l, t1, l2)
       -> parentheseme 5 (aux t1 4 ^ " "
                          ^ String.concat
-                             " " (List.map (fun x -> aux x 5) l2))
+                             " " (List.map (fun x -> aux x 5) @@ List.rev l2))
     | Inter (l, t1, t2) -> parentheseme 4 (aux t1 4 ^ " & " ^ aux t2 3)
     | Union (l, t1, t2) -> parentheseme 3 (aux t1 3 ^ " | " ^ aux t2 2)
     | SPair (l, t1, t2) -> "< " ^  aux t1 0 ^ ", " ^ aux t2 0 ^ " >"
