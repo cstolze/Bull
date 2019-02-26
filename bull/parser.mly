@@ -8,6 +8,11 @@
   last to first *)
     | _ -> App(get_loc (), t1, [t2])
 
+  let rec add_args l t =
+    match l with
+    | [] -> t
+    | (id,t1) :: l -> Abs(dummy_loc, id, t1, add_args l t)
+
 %}
 
 %token OPENP
@@ -48,9 +53,20 @@
 %token PRINT
 %token SIG
 %token HELP
+%token SHOW
 %token <string> QUOTE
 %token <string> ID
 %token EOF
+
+%token QUESTION
+%token OPENB
+%token CLOSB
+%token META
+%token ENDMETA
+%token ADD
+%token UNIFY
+%token UNTYPED
+%token TURNSTILE
 
 %start s
 %type <Utils.sentence list> s
@@ -60,18 +76,47 @@
 s:
     | QUIT DOT { [Quit] }
     | LOAD QUOTE DOT { [Load (unquote $2)] }
-    | LEMMA ID COLON term DOT { [Proof ($2,$4)] }
-    | AXIOM ID COLON term DOT { [Axiom ($2, $4)] }
-    | DEFINITION ID COLON term ASSIGN term
-		 DOT { [Definition ($2, $6, $4)] }
-    | DEFINITION ID ASSIGN term DOT { [Definition ($2, $4, Underscore dummy_loc)] }
-    | PRINT ID DOT { [Print $2] }
+    | LEMMA ID COLON term DOT { [Proof($2,$4)] }
+    | AXIOM decl_list DOT { List.map (fun (x,y) -> Axiom (x,y)) $2 }
+    | DEFINITION ID paren_decl_list COLON term ASSIGN term
+		 DOT { [Definition ($2, add_args $3 $7, $5)] }
+    | DEFINITION ID paren_decl_list ASSIGN term DOT { [Definition ($2, add_args $3 $5, Underscore dummy_loc)] }
+    | PRINT id_list DOT { List.map (fun x -> Print x) $2 }
     | SIG DOT { [Print_all] }
-    | COMPUTE ID DOT { [Compute $2] }
+    | SHOW DOT { [Show] }
+    | COMPUTE term DOT { [Compute $2] }
     | HELP DOT { [Help] }
     | error { [Error] }
     | EOF { [Quit] }
+
+    /* For debugging purpose */
+    | META DOT { [Beginmeta] }
+    | ENDMETA DOT { [Endmeta] }
+    | UNIFY term term DOT { [Unify($2,$3)] }
+    | ADD decl_list TURNSTILE term DOT { [Add ($2,$4)] }
+    | AXIOM UNTYPED decl_list DOT { List.map (fun (x,y) -> UAxiom (x,y)) $3 }
+    | DEFINITION UNTYPED ID paren_decl_list COLON term ASSIGN term
+		 DOT { [UDefinition ($3, add_args $4 $8, $6)] }
     ;
+
+id_list :
+  | ID {[$1]}
+  | ID id_list {$1 :: $2}
+  ;
+
+decl :
+  | id_list COLON term { List.map (fun x -> (x, $3)) $1 }
+  ;
+
+paren_decl_list:
+  | OPENP decl CLOSP {$2}
+  | OPENP decl CLOSP paren_decl_list {List.append $2 $4}
+  ;
+
+decl_list :
+  | decl {$1}
+  | paren_decl_list {$1}
+  ;
 
       /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the "application operator" (which does not exist, haha) automatically */
 
@@ -101,8 +146,7 @@ term4:
     ;
 
 term5:
-    | term5 term6 { to_spine $1 $2 } /* applications are left-
-      to-right */
+    | term5 term6 { to_spine $1 $2 } /* applications are left-to-right */
     | term6 { $1 }
     ;
 

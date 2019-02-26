@@ -183,7 +183,7 @@ let rec strong_pattern tl aux =
        try
          ignore @@ List.find (fun m -> m = n) aux; raise (Err "HOPU impossible")
        with
-       | Not_found -> is_strong_pattern tl (n :: aux)
+       | Not_found -> strong_pattern tl (n :: aux)
      end
   | _ -> raise (Err "HOPU impossible")
 
@@ -235,32 +235,33 @@ let norm meta env t =
 
 (* update the meta-environment, in order to remove all offending terms from t *)
 (* raise Not_found in case of error *)
-let rec prune meta ctx m xi t =
+let rec prune meta env ctx m xi t =
   let t =  norm meta env t in
   match t with
   | Sort (l,m) -> meta
   | Let (l1,id,t1,t2,t3) -> assert false
   | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) ->
-     let meta = prune meta ctx m xi t1 in
-     prune meta (DefAxiom(id,t1) :: ctx) m (List.map (fun x -> x+1) xi) t2
+     let meta = prune meta env ctx m xi t1 in
+     prune meta (DefAxiom(id,t1) :: env) (DefAxiom(id,t1) :: ctx) m (List.map (fun x -> x+1) xi) t2
   | App (l,t1,l1) ->
      List.fold_left
-       (fun meta t -> prune meta ctx m xi t)
-       (prune meta ctx m xi t1)
+       (fun meta t -> prune meta env ctx m xi t)
+       (prune meta env ctx m xi t1)
        l1
   | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2)
     | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
-     let meta = prune meta ctx m xi t1 in
-     prune meta ctx m xi t2
+     let meta = prune meta env ctx m xi t1 in
+     prune meta env ctx m xi t2
   | SPrLeft (l,t) | SPrRight (l,t) ->
-     prune meta ctx m xi t
+     prune meta env ctx m xi t
   | SMatch (l,t1,t2,id1,t3,t4,id2,t5,t6) ->
-     let meta = prune meta ctx m xi t1 in
-     let meta = prune meta ctx m xi t2 in
-     let meta = prune meta ctx m xi t3 in
-     let meta = prune meta (DefAxiom(id1,t3)::ctx) m (List.map (fun x -> x+1) xi) t4 in
-     let meta = prune meta ctx m xi t5 in
-     prune meta (DefAxiom(id2,t5)::ctx) m (List.map (fun x -> x+1) xi) t6
+     let meta = prune meta env ctx m xi t1 in
+     let meta = prune meta env ctx m xi t2 in
+     let meta = prune meta env ctx m xi t3 in
+     let meta = prune meta (DefAxiom(id1,t3) :: env)
+                  (DefAxiom(id1,t3)::ctx) m (List.map (fun x -> x+1) xi) t4 in
+     let meta = prune meta env ctx m xi t5 in
+     prune meta (DefAxiom(id2,t5) :: env) (DefAxiom(id2,t5)::ctx) m (List.map (fun x -> x+1) xi) t6
   | Var (l,n) -> (if n < List.length ctx then
                     ignore @@ List.find (fun m -> m = n) xi);
                  meta
@@ -280,31 +281,24 @@ let rec prune meta ctx m xi t =
                          meta (* nothing to do *)
 
 let rec create_hopu env t xi =
-  let update k l n =
+  let update x k l n =
     if n = x+k then Var (l,0)
     else Var(l,n+1) in
   match xi with
   | [] -> t
   | x :: xi ->
      let (_, tt) = get_from_context env x in
-     let tt = map_term 0 update tt in (* replace x by Var 0 *)
-     let env = map_env 0 update tt in (* same, but in the context *)
+     let tt = map_term 0 (update x) tt in (* replace x by Var 0 *)
+     let env = map_context 0 (update x) env in (* same, but in the context *)
      Abs(dummy_loc,"x",tt, create_hopu (DefAxiom("",tt)::env) tt (List.map (fun x -> x+1) xi))
-and update tt x =
-  map_term 0
-    (fun k l n ->
-      if n = x+k then Var (l,0)
-      else Var(l,n+1))
-    tt
 
 (* dummy *)
 let meta_inst meta env ctx t n s1 t1 =
   let xi = strong_pattern (List.concat [s1;t1]) [] in
-  let meta = prune meta ctx n xi t in
+  let meta = prune meta env ctx n xi t in
   let t = norm meta env t in
   let res = create_hopu env t xi in
-  (* TODO : SOLUTION *)
-
+  (n, solution meta n res)
 
 (* MAIN UNIFICATION ALGORITHM *)
 
@@ -322,10 +316,10 @@ let unification meta env ctx t1 t2 =
      reductions first. *)
     (* Meta-redL *)
     | App(l,Meta(l',n,s),t'), _ when is_instanced meta n ->
-       foo meta env (norm @@ app' l (instantiate meta n s) t') t2
+       foo meta env (norm meta env @@ app' l (instantiate meta n s) t') t2
     (* Meta-redR *)
     | _, App(l,Meta(l',n,s),t') when is_instanced meta n ->
-       foo meta env t1 (norm @@ app' l (instantiate meta n s) t')
+       foo meta env t1 (norm meta env @@ app' l (instantiate meta n s) t')
 
     (* Unifying twice the same meta-variable. *)
     (* Meta-Same-Same and Meta-Same *)
@@ -342,7 +336,7 @@ let unification meta env ctx t1 t2 =
     | t, App(l,Meta(l',n,s1),t1) ->
        (* not implemented: Meta-DelDeps (future work) *)
        begin
-         try meta_inst meta env t n s1 t1 with
+         try meta_inst meta env ctx t n s1 t1 with
          | Err _ ->
             match t with
             | App(_,t,l2) -> (* first-order unification *)
@@ -354,7 +348,7 @@ let unification meta env ctx t1 t2 =
        end
     | App(l,Meta(l',n,s1),t1), t ->
        begin
-         try meta_inst meta env t n s1 t1 with
+         try meta_inst meta env ctx t n s1 t1 with
          | Err _ ->
             match t with (* first-order unification *)
             | App(_,t,l2) ->

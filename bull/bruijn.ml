@@ -44,7 +44,11 @@ let map_term k f t =
 let rec map_context k f env =
   match env with
   | [] -> []
-  | t :: env -> map_term (k-1) f t :: map_context (k-1) f env
+  | DefAxiom (id,t) :: env ->
+     DefAxiom(id, map_term (k-1) f t) :: map_context (k-1) f env
+  | DefLet (id,t1,t2) :: env ->
+     DefLet(id, map_term (k-1) f t1, map_term (k-1) f t2)
+     :: map_context (k-1) f env
 
 (* k is the index from which the context is changed *)
 (* n is the shift *)

@@ -94,9 +94,16 @@ type sentence =
   | Definition of string * term * term
   | Print of string
   | Print_all
-  | Compute of string
+  | Show
+  | Compute of term
   | Help
   | Error
+  | Beginmeta
+  | Endmeta
+  | Unify of term * term
+  | Add of (string * term) list * term
+  | UAxiom of string * term
+  | UDefinition of string * term * term
 
 (* Error during type reconstruction or unification *)
 exception Err of string

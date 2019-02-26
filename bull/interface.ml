@@ -42,7 +42,46 @@ let print id id_list sigma esigma =
   | None -> prerr_endline (error_not_declared id)
   | Some n -> let t1, t2 = get_from_context sigma n in
               let t3, t4 = get_from_context esigma n in
-     print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
+              print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
+
+let rec print_meta id_list sigma e_sigma (n,meta) =
+  let rec print_evar id_list ctx n t =
+    match ctx with
+    | [] -> print_string ("|- ?" ^ (string_of_int n) ^ " : ");
+            print_endline (string_of_term false id_list t)
+    | DefAxiom(id,t) :: ctx ->
+       print_string (id ^ " : ");
+       print_string (string_of_term false id_list t);
+       print_string " ";
+       print_evar (id :: id_list) ctx n t
+    | _ -> failwith "TODO"
+  in (* TODO: factorize code *)
+  let rec print_subst id_list ctx n t1 t2 =
+    match ctx with
+    | [] -> print_string ("|- ?" ^ (string_of_int n) ^ " := ");
+            print_string (string_of_term false id_list t1);
+            print_string " : ";
+            print_endline (string_of_term false id_list t2)
+    | DefAxiom(id,t) :: ctx ->
+       print_string (id ^ " : ");
+       print_string (string_of_term false id_list t);
+       print_string " ";
+       print_evar (id :: id_list) ctx n t
+    | _ -> failwith "TODO"
+  in
+  match meta with
+  | [] -> ()
+  | IsSort m :: meta -> print_endline ("|- ?" ^ (string_of_int m) ^
+                                         " is a sort");
+                print_meta id_list sigma e_sigma (n,meta)
+  | SubstSort (m,t) :: meta -> print_endline ("|- ?" ^ (string_of_int m) ^
+                                                " := " ^ (string_of_term false id_list t));
+                print_meta id_list sigma e_sigma (n,meta)
+  | DefMeta(ctx,m,t) :: meta -> print_evar id_list ctx n t;
+                                print_meta id_list sigma e_sigma (n,meta)
+  | Subst(ctx,m,t1,t2) :: meta -> print_subst id_list ctx m t1 t2;
+                                  print_meta id_list sigma e_sigma (n,meta)
+
 
 let rec print_all id_list sigma esigma =
   match (id_list, sigma, esigma) with
@@ -99,30 +138,32 @@ let add_let id str d o id_list sigma esigma verbose =
             with
               Err reason -> prerr_endline reason; (id_list, sigma, esigma)
 
-let normalize id id_list sigma esigma =
-  match find id sigma with
-  | None -> prerr_endline (error_not_declared id)
-  | Some n -> let (t1, t2) = get_from_context sigma n in
-              let (t3, t4) = get_from_context esigma n in
-	      let t1 = strongly_normalize sigma t1 in
-	      let t2 = strongly_normalize sigma t2 in
-	      let t3 = strongly_normalize esigma t3 in
-	      let t4 = strongly_normalize esigma t4 in
-	      print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
+let normalize d id_list sigma esigma =
+  let d = (fix_index id_list d) in
+  try
+    let (m, em, t1, t2, et1, et2) =
+      check_term str id_list sigma d None
+    in
+    let t1 = strongly_normalize sigma t1 in
+    let t2 = strongly_normalize sigma t2 in
+    let t3 = strongly_normalize esigma et1 in
+    let t4 = strongly_normalize esigma et2 in
+    print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
 
 (* repl *)
 
 exception Exc_quit
 
-let rec repl lx id_list sigma esigma verbose =
-  let rec loop (id_list, sigma, esigma) =
+let rec repl lx id_list sigma esigma verbose : (string list * Utils.declaration list * Utils.declaration list) *
+         (int * Utils.metadeclaration list) =
+  let rec loop ((id_list, sigma, esigma), meta) =
     begin
       try
 	if verbose then (Lexing.flush_input lx; print_string prompt; flush stdout) else ();
 	let buf = Buffer.create 80 in
 	let rule = Parser.s (Lexer.read buf) lx in
 	let str = Buffer.contents buf in
-        let foo (id_list, sigma, esigma) rule =
+        let foo ((id_list, sigma, esigma), meta) rule =
           match rule with
 	  | Quit -> raise Exc_quit
 	  | Load id -> let lx = Lexing.from_channel (open_in id)
@@ -131,28 +172,69 @@ let rec repl lx id_list sigma esigma verbose =
 		         lx.lex_curr_p <- {lx.lex_curr_p with Lexing.pos_fname = id};
 		         repl lx id_list sigma esigma false
 		       end
-	  | Proof (id, t) -> proof id str t id_list sigma esigma verbose
-	  | Axiom (id, t) -> add_axiom id str t id_list sigma esigma verbose
+	  | Proof (id, t) -> (proof id str t id_list sigma esigma verbose, meta)
+	  | Axiom (id, t) -> (add_axiom id str t id_list sigma esigma verbose, meta)
 	  | Definition (id, t, o)
-	    -> add_let id str t o id_list sigma esigma verbose
-	  | Print id -> print id id_list sigma esigma; (id_list, sigma, esigma)
-	  | Print_all -> print_all id_list sigma esigma; (id_list, sigma, esigma)
-	  | Compute id -> normalize id id_list sigma esigma; (id_list, sigma, esigma)
-	  | Help -> help (); (id_list, sigma, esigma)
+	    -> (add_let id str t o id_list sigma esigma verbose, meta)
+	  | Print id -> print id id_list sigma esigma; ((id_list, sigma, esigma), meta)
+	  | Print_all -> print_all id_list sigma esigma; ((id_list, sigma, esigma), meta)
+          | Show -> print_meta id_list sigma esigma meta; ((id_list, sigma, esigma), meta)
+          (* TODO : change for proofs *)
+	  | Compute t -> normalize t id_list sigma esigma; ((id_list, sigma, esigma), meta)
+	  | Help -> help (); ((id_list, sigma, esigma), meta)
 	  | Error -> prerr_endline (syntaxerror str lx);
-		     Lexing.flush_input lx; (id_list, sigma, esigma)
+		     Lexing.flush_input lx; ((id_list, sigma, esigma), meta)
+
+          | Beginmeta -> ((id_list, sigma, esigma), (0,[]))
+          | Endmeta -> ((id_list, sigma, esigma), (0,[]))
+          | Unify (t1,t2) ->
+             begin
+               let (t1,t2) = (fix_index id_list t1, fix_index id_list t2) in
+               ((id_list, sigma, esigma), Unification.unification meta sigma [] t1 t2)
+             end
+          | Add (l,t) ->
+             begin
+               let id_list_old = id_list in
+               let rec tmp id_list =
+                 function
+                 | [] -> [], id_list
+                 | (x,t) :: l -> let a, b = tmp (x :: id_list) l in
+                                 DefAxiom(x,fix_index id_list t) :: a, x :: b
+               in
+               let (l, id_list) = tmp id_list l in
+               let t = fix_index id_list t in
+               let (meta, _) = Unification.meta_add meta l t dummy_loc in
+               ((id_list_old, sigma, esigma), meta)
+             end
+          | UAxiom (id,t)->
+             begin
+               match find id sigma with
+               | Some n -> prerr_endline (error_declared id); ((id_list, sigma, esigma),meta)
+               | None -> let t = (fix_index id_list t) in
+                         ((id :: id_list, DefAxiom(id,t) :: sigma, DefAxiom(id,t) :: esigma), meta)
+             end
+          | UDefinition (id,t1,t2) ->
+             begin
+               match find id sigma with
+               | Some n -> prerr_endline (error_declared id); ((id_list, sigma, esigma),meta)
+               | None -> let (t1,t2) = (fix_index id_list t1, fix_index id_list t2) in
+                         ((id :: id_list, DefLet(id,t1,t2) :: sigma, DefLet(id,t1,t2) :: esigma), meta)
+             end
         in
-        loop (List.fold_left foo (id_list, sigma, esigma) rule)
+        (* TODO: better error management,
+           e.g. what if a type-checking error cancels only
+         one axiom when we declared several ones. *)
+        loop (List.fold_left foo ((id_list, sigma, esigma),meta) rule)
       with
       | Failure a -> prerr_endline (failure a);
-		     loop (id_list, sigma, esigma)
+		     loop ((id_list, sigma, esigma), meta)
       | Sys_error a -> prerr_endline (syserror a);
-		       loop (id_list, sigma, esigma)
-      | Exc_quit -> (id_list, sigma, esigma)
+		       loop ((id_list, sigma, esigma), meta)
+      | Exc_quit -> ((id_list, sigma, esigma), meta)
       | e -> prerr_endline (Printexc.to_string e);
-	     loop (id_list, sigma, esigma)
+	     loop ((id_list, sigma, esigma), meta)
     end
-  in loop (id_list, sigma, esigma)
+  in loop ((id_list, sigma, esigma), (0,[]))
 
 (* main *)
 
@@ -162,14 +244,14 @@ let main () =
   begin
     Arg.parse options arg_file usage;
     print_endline welcome_message;
-    let (id_list, sigma, esigma) =
+    let ((id_list, sigma, esigma), meta) =
       if (!initfile) = "" then
-	([],[],[])
+	(([],[],[]), (0,[]))
       else
 	try
 	  repl (Lexing.from_channel (open_in !initfile)) [] [] [] false
 	with
-	| Sys_error a -> prerr_endline (syserror a); ([],[],[])
+	| Sys_error a -> prerr_endline (syserror a); (([],[],[]), (0,[]))
     in
     repl lx id_list sigma esigma true
   end

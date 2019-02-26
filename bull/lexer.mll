@@ -21,8 +21,14 @@ rule read buf = parse
    | ';' { begin Buffer.add_char buf ';'; SEMICOLON end }
    | "->" { begin Buffer.add_string buf "->"; ARROW end }
    | '&' { begin Buffer.add_char buf '&'; SAND end }
+
+   | "|-" { begin Buffer.add_string buf "|-"; TURNSTILE end }
+
    | '|' { begin Buffer.add_char buf '|'; SOR end }
    | '_' { begin Buffer.add_char buf '_'; UNDERSCORE end }
+   | '?' { begin Buffer.add_char buf '?'; QUESTION end }
+   | '{' { begin Buffer.add_char buf '{'; OPENB end }
+   | '}' { begin Buffer.add_char buf '}'; CLOSB end }
    | "smatch" { begin Buffer.add_string buf "smatch"; SMATCH end }
    | "return" { begin Buffer.add_string buf "return"; RETURN end }
    | "with" { begin Buffer.add_string buf "with"; WITH end }
@@ -44,6 +50,14 @@ rule read buf = parse
    | "Printall" { begin Buffer.add_string buf "Printall"; SIG end }
    | "Print" { begin Buffer.add_string buf "Print"; PRINT end }
    | "Help" { begin Buffer.add_string buf "Help"; HELP end }
+   | "Show" { begin Buffer.add_string buf "Show"; SHOW end }
+
+   | "Meta" { begin Buffer.add_string buf "Meta"; META end }
+   | "End_meta" { begin Buffer.add_string buf "End_meta"; ENDMETA end }
+   | "Add" { begin Buffer.add_string buf "Add"; ADD end }
+   | "Unify" { begin Buffer.add_string buf "Unify"; UNIFY end }
+   | "untyped" { begin Buffer.add_string buf "untyped"; UNTYPED end }
+
    | '"' [^ '"' '\n' ]* '"' as x { begin Buffer.add_string buf x; QUOTE x end }
    | ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x { begin Buffer.add_string buf x; ID x end }
    | eof {EOF}
