@@ -18,6 +18,7 @@
 
 open Utils
 open Parser
+open Env
 open Lexer
 open Bruijn
 open Reduction
@@ -37,14 +38,8 @@ let options = (version_option, Arg.Unit (version), version_doc) :: []
 
 let help () = print_endline help_text
 
-let print id id_list sigma esigma =
-  match find id sigma with
-  | None -> prerr_endline (error_not_declared id)
-  | Some n -> let t1, t2 = get_from_context sigma n in
-              let t3, t4 = get_from_context esigma n in
-              print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
-
-let rec print_meta id_list sigma e_sigma (n,meta) =
+(* this function is for debugging purposes *)
+let rec print_meta env (n,meta) =
   let rec list_2_string id_list ctx =
     match ctx with
     | [] -> "", id_list
@@ -74,51 +69,52 @@ let rec print_meta id_list sigma e_sigma (n,meta) =
   | [] -> ()
   | IsSort m :: meta -> print_endline ("|- ?" ^ (string_of_int m) ^
                                          " is a sort");
-                print_meta id_list sigma e_sigma (n,meta)
+                print_meta env (n,meta)
   | SubstSort (m,t) :: meta -> print_endline ("|- ?" ^ (string_of_int m) ^
-                                                " := " ^ (string_of_term false id_list t));
-                print_meta id_list sigma e_sigma (n,meta)
-  | DefMeta(ctx,m,t) :: meta -> print_evar id_list ctx m t;
-                                print_meta id_list sigma e_sigma (n,meta)
-  | Subst(ctx,m,t1,t2) :: meta -> print_subst id_list ctx m t1 t2;
-                                  print_meta id_list sigma e_sigma (n,meta)
+                                                " := " ^ (string_of_term false [] t));
+                print_meta env (n,meta)
+  | DefMeta(ctx,m,t) :: meta -> print_evar [] ctx m t;
+                                print_meta env (n,meta)
+  | Subst(ctx,m,t1,t2) :: meta -> print_subst [] ctx m t1 t2;
+                                  print_meta env (n,meta)
 
+let print env id =
+  if is_const_new env id then
+    prerr_endline (error_not_declared id)
+  else
+    match notnone @@ find_printer env id with
+    | DefAxiom(id,t1), DefAxiom(_,t2) ->
+       print_endline (string_of_axiom id t1 t2 [])
+    | DefLet(id,t1,t2), DefLet(_, t3,t4) ->
+       print_endline (string_of_let id (t1,t2,t3,t4) [])
+    | _ -> failwith "print"
 
-let rec print_all id_list sigma esigma =
-  match (id_list, sigma, esigma) with
-  | ([],[],[]) -> ()
-  | (_::ll,DefAxiom(id,t1)::l',DefAxiom (_,t2)::s') ->
-     begin
-       print_all ll l' s';
-       print_endline (string_of_axiom id t1 t2 ll);
-     end
-  | (_::ll, DefLet(id,t1,t2)::l', DefLet (_,t3,t4)::s') ->
-     begin
-       print_all ll l' s';
-       print_endline (string_of_let id (t1,t2,t3,t4) ll);
-     end
-  | _ -> assert false
+let rec print_all env =
+  List.iter (print env) (List.rev (to_id_list env))
 
-let proof id str t id_list sigma esigma verbose =
-  prerr_endline "Error: proof system not implemented.\n"; (id_list, sigma, esigma)
+let proof verbose str env id t =
+  prerr_endline "Error: proof system not implemented.\n"; env
 
-let add_axiom id str t id_list sigma esigma verbose =
-  match find id sigma with
-  | Some n -> prerr_endline (error_declared id); (id_list, sigma, esigma)
-  | None -> let t = (fix_index id_list t) in
-            try
-	      let (m,em,t,et) = check_axiom str id_list sigma t in
-	      begin
-		if verbose then
-		  print_endline (axiom_message id)
-		else ();
-		(id :: id_list, DefAxiom (id,t) :: sigma, DefAxiom(id,et) :: esigma)
-	      end
-            with
-              Err (reason) ->
-              begin
-	        prerr_endline reason; (id_list, sigma, esigma)
-              end
+(* EVERYTHING IS FINE TILL THIS VERY POINT *)
+
+let add_axiom verbose str env id t =
+  if is_const_new env id then
+    let t = fix_index [] t in
+    try
+      let (m,em,t,et) = check_axiom str id_list sigma t in
+      begin
+	if verbose then
+	  print_endline (axiom_message id)
+	else ();
+	(id :: id_list, DefAxiom (id,t) :: sigma, DefAxiom(id,et) :: esigma)
+      end
+    with
+      Err (reason) ->
+      begin
+	prerr_endline reason; (id_list, sigma, esigma)
+      end
+  else
+    prerr_endline (error_declared id); (id_list, sigma, esigma)
 
 let add_let id str d o id_list sigma esigma verbose =
   match find id sigma with

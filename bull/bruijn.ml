@@ -61,16 +61,16 @@ let lift k n =
 
 let rec fix_index id_list t =
   let get_index id l =
-  let rec aux k l =
-    match l with
-    | [] -> None
-    | x :: l' -> if x = id then Some k else aux (k+1) l'
-  in aux 0 l
+    let rec aux k l =
+      match l with
+      | [] -> None
+      | x :: l' -> if x = id then Some k else aux (k+1) l'
+    in aux 0 l
   in
   match t with
   | Const (l,id) -> (match get_index id id_list with
-		 | None -> t
-		 | Some k -> Var (l,k))
+		     | None -> t
+		     | Some k -> Var (l,k))
   | _ -> visit_term
 	   (fix_index id_list)
 	   (fun id -> fix_index (id :: id_list))
@@ -131,14 +131,4 @@ let fix_id id_list t =
     let aux id t = foo (map_id id t)
     in visit_term foo aux new_id t
   in foo t
-
-(* gives the term, term essence and type of the term of index n *)
-let get_from_context gamma n =
-  match List.nth gamma n with (* no exception (if the code is bug-free) *)
-  | DefAxiom (_, t) ->
-     Var(dummy_loc, n),
-     lift 0 (n+1) t
-  | DefLet (_, t1, t2) ->
-     lift 0 (n+1) t1,
-     lift 0 (n+1) t2
 

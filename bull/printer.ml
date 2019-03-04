@@ -3,8 +3,6 @@
 open Utils
 open Bruijn
 
-(* TODO: remove id_list *)
-
 (* error localisation *)
 (* hatstring a b returns "   ^^^", where the hats go from position a to position b *)
 let hatstring a b =

@@ -76,15 +76,6 @@ type metadeclaration =
 
 type metaenv = int * (metadeclaration list)
 
-(* find the de Bruijn index associated with an identifier *)
-(* TODO: refactor so utils only contain type declarations *)
-let find id id_list =
-  let rec aux l n =
-    match l with
-    | [] -> None
-    | DefAxiom(id',_) :: l' | DefLet(id',_,_) :: l' -> if id = id' then Some n else (aux l' (n+1))
-  in aux id_list 0
-
 (* Commands from the REPL *)
 type sentence =
   | Quit
@@ -107,3 +98,9 @@ type sentence =
 
 (* Error during type reconstruction or unification *)
 exception Err of string
+
+let notnone x =
+  match x with
+  | None -> failwith "notnone"
+  | Some x -> x
+

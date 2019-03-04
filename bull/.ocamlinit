@@ -6,6 +6,8 @@ open Utils
 open Bruijn
 #load "printer.cmo"
 open Printer
+#load "env.cmo"
+open Env
 #load "reduction.cmo"
 open Reduction
 #load "subtyping.cmo"

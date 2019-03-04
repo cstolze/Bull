@@ -39,16 +39,17 @@ and danf a =
   | _ -> anf a
 
 (* tell whether a <= b *)
-let is_subtype gamma a b =
-  let a = danf @@ strongly_normalize gamma a in
-  let b = canf @@ strongly_normalize gamma b in
-  let rec foo gamma a b =
+(* we suppose types are not essence types *)
+let is_subtype env ctx a b =
+  let a = danf @@ strongly_normalize false env ctx a in
+  let b = canf @@ strongly_normalize false env ctx b in
+  let rec foo env ctx a b =
   match (a, b) with
-  | (Union(_,a1,a2),_) -> foo gamma a1 b && foo gamma a2 b
-  | (_,Inter(_,b1,b2)) -> foo gamma a b1 && foo gamma a b2
-  | (Inter(_,a1,a2),_) -> foo gamma a1 b || foo gamma a2 b
-  | (_,Union(_,b1,b2)) -> foo gamma a b1 || foo gamma a b2
+  | (Union(_,a1,a2),_) -> foo env ctx a1 b && foo env ctx a2 b
+  | (_,Inter(_,b1,b2)) -> foo env ctx a b1 && foo env ctx a b2
+  | (Inter(_,a1,a2),_) -> foo env ctx a1 b || foo env ctx a2 b
+  | (_,Union(_,b1,b2)) -> foo env ctx a b1 || foo env ctx a b2
   | (Prod(_,_,a1,a2),Prod(_,_,b1,b2))
-    -> foo gamma b1 a1 && foo (DefAxiom("",nothing)::gamma) a2 b2
-  | _ -> true (* is_equal gamma a b *) (* TODO: FIXME *)
-  in foo gamma a b
+    -> foo env ctx b1 a1 && foo env (Env.add_var ctx (DefAxiom("",nothing))) a2 b2
+  | _ -> true (* is_equal env ctx a b *) (* TODO: FIXME *)
+  in foo env ctx a b

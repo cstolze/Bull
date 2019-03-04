@@ -1,8 +1,11 @@
 open Utils
 open Bruijn
 open Reduction
-open Subtyping
 open Printer
+
+(* TODO: move the basic meta-env functions to env.ml *)
+
+type env_meta = int * metadeclaration list
 
 let get_meta (_,meta) n =
   let rec foo = function
@@ -228,40 +231,40 @@ let rec is_offending ctx m xi t =
                       List.fold_left (fun x y -> x && is_offending ctx m xi y)
                         true s
 
-let norm meta env t =
+let norm is_essence meta env ctx t =
   let t = apply_all_substitution meta t
   in
-  strongly_normalize env t
+  strongly_normalize is_essence env ctx t
 
 (* update the meta-environment, in order to remove all offending terms from t *)
 (* raise Not_found in case of error *)
-let rec prune meta env ctx m xi t =
-  let t =  norm meta env t in
+let rec prune is_essence meta env ctx m xi t =
+  let t =  norm is_essence meta env ctx t in
   match t with
   | Sort (l,m) -> meta
   | Let (l1,id,t1,t2,t3) -> assert false
   | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) ->
-     let meta = prune meta env ctx m xi t1 in
-     prune meta (DefAxiom(id,t1) :: env) (DefAxiom(id,t1) :: ctx) m (0 :: (List.map (fun x -> x+1) xi)) t2
+     let meta = prune is_essence meta env ctx m xi t1 in
+     prune is_essence meta env (Env.add_var ctx (DefAxiom(id,t1))) m (0 :: (List.map (fun x -> x+1) xi)) t2
   | App (l,t1,l1) ->
      List.fold_left
-       (fun meta t -> prune meta env ctx m xi t)
-       (prune meta env ctx m xi t1)
+       (fun meta t -> prune is_essence meta env ctx m xi t)
+       (prune is_essence meta env ctx m xi t1)
        l1
   | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2)
     | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
-     let meta = prune meta env ctx m xi t1 in
-     prune meta env ctx m xi t2
+     let meta = prune is_essence meta env ctx m xi t1 in
+     prune is_essence meta env ctx m xi t2
   | SPrLeft (l,t) | SPrRight (l,t) ->
-     prune meta env ctx m xi t
+     prune is_essence meta env ctx m xi t
   | SMatch (l,t1,t2,id1,t3,t4,id2,t5,t6) ->
-     let meta = prune meta env ctx m xi t1 in
-     let meta = prune meta env ctx m xi t2 in
-     let meta = prune meta env ctx m xi t3 in
-     let meta = prune meta (DefAxiom(id1,t3) :: env)
-                  (DefAxiom(id1,t3)::ctx) m (List.map (fun x -> x+1) xi) t4 in
-     let meta = prune meta env ctx m xi t5 in
-     prune meta (DefAxiom(id2,t5) :: env) (DefAxiom(id2,t5)::ctx) m (List.map (fun x -> x+1) xi) t6
+     let meta = prune is_essence meta env ctx m xi t1 in
+     let meta = prune is_essence meta env ctx m xi t2 in
+     let meta = prune is_essence meta env ctx m xi t3 in
+     let meta = prune is_essence meta env
+                  (Env.add_var ctx (DefAxiom(id1,t3))) m (List.map (fun x -> x+1) xi) t4 in
+     let meta = prune is_essence meta env ctx m xi t5 in
+     prune is_essence meta env (Env.add_var ctx (DefAxiom(id2,t5))) m (List.map (fun x -> x+1) xi) t6
   | Var (l,n) -> (if n < List.length ctx then
                     ignore @@ List.find (fun m -> m = n) xi);
                  meta
@@ -280,6 +283,8 @@ let rec prune meta env ctx m xi t =
                       | Not_found ->
                          meta (* nothing to do *)
 
+(* EVERYTHING IS FINE TILL THIS VERY POINT *)
+
 let rec create_hopu env t xi n =
   let update x k l n =
     if n = x+k then Var (l,0)
@@ -296,9 +301,9 @@ let rec create_hopu env t xi n =
        create_hopu (DefAxiom("",tt)::env) t (List.map (fun x -> x+1) xi) 0
 
 (* dummy *)
-let meta_inst meta env ctx t n s1 t1 =
+let meta_inst is_essence meta env ctx t n s1 t1 =
   let xi = strong_pattern (List.concat [t1;s1]) [] in
-  let meta = prune meta env ctx n xi t in
+  let meta = prune is_essence meta env ctx n xi t in
   let t = norm meta env t in
   let res = create_hopu env t xi (List.length t1) in
   let diff = List.length ctx - List.length s1 in
