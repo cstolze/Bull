@@ -224,7 +224,7 @@ let rec is_offending ctx m xi t =
                     | Not_found -> false
                    end
                  else true
-  | Const (l,id) -> assert false
+  | Const (l,id) -> true
   | Underscore l -> true
   | Meta (l,n,s) -> if m = n then false
                     else
@@ -268,7 +268,7 @@ let rec prune is_essence meta env ctx m xi t =
   | Var (l,n) -> (if n < List.length ctx then
                     ignore @@ List.find (fun m -> m = n) xi);
                  meta
-  | Const (l,id) -> assert false
+  | Const (l,id) -> meta
   | Underscore l -> meta
   | Meta (l,n,s) -> if m = n then raise Not_found
                     else
@@ -283,92 +283,85 @@ let rec prune is_essence meta env ctx m xi t =
                       | Not_found ->
                          meta (* nothing to do *)
 
-(* EVERYTHING IS FINE TILL THIS VERY POINT *)
-
-let rec create_hopu env t xi n =
+let rec create_hopu ctx t xi n =
   let update x k l n =
     if n = x+k then Var (l,0)
     else Var(l,n+1) in
   match xi with
   | [] -> t
   | x :: xi ->
-     let (_, tt) = get_from_context env x in
+     let (_, tt) = Env.find_var ctx x in
      let t = map_term 0 (update x) t in (* replace x by Var 0 *)
-     let env = map_context 0 (update x) env in (* same, but in the context *)
+     let ctx = map_context 0 (update x) ctx in (* same, but in the context *)
      if n <> 0 then
-       Abs(dummy_loc,"x",tt, create_hopu (DefAxiom("",tt)::env) t (List.map (fun x -> x+1) xi) (n-1))
+       Abs(dummy_loc,"x",tt, create_hopu (DefAxiom("",tt)::ctx) t (List.map (fun x -> x+1) xi) (n-1))
      else
-       create_hopu (DefAxiom("",tt)::env) t (List.map (fun x -> x+1) xi) 0
+       create_hopu (DefAxiom("",tt)::ctx) t (List.map (fun x -> x+1) xi) 0
 
 (* dummy *)
 let meta_inst is_essence meta env ctx t n s1 t1 =
   let xi = strong_pattern (List.concat [t1;s1]) [] in
   let meta = prune is_essence meta env ctx n xi t in
-  let t = norm meta env t in
-  let res = create_hopu env t xi (List.length t1) in
-  let diff = List.length ctx - List.length s1 in
-  (* NONONO: how to fix the indices properly??? *)
-  let update k l n =
-    if n >= k + List.length ctx then Var(l, n-diff)
-    else Var(l,n)
-  in
-  (n, solution meta n (map_term 0 update res))
+  let t = norm is_essence meta env ctx t in
+  let res = create_hopu ctx t xi (List.length t1) in
+  (n, solution meta n res)
 
 (* MAIN UNIFICATION ALGORITHM *)
 
-let unification meta env ctx t1 t2 =
-  let t1 = norm meta env t1 in
-  let t2 = norm meta env t2 in
-  let rec foo meta env t1 t2 =
+let unification is_essence meta env ctx t1 t2 =
+  let norm = norm is_essence in
+  let t1 = norm meta env ctx t1 in
+  let t2 = norm meta env ctx t2 in
+  let rec foo meta ctx t1 t2 =
     match (t1,t2) with
     (* Hack so we can suppose meta-vars are always
        head-terms of some spine *)
-    | Meta(l,n,s), t -> foo meta env (App (l, Meta(l,n,s), [])) t
-    | t, Meta(l,n,s) -> foo meta env t (App (l, Meta(l,n,s), []))
+    | Meta(l,n,s), t -> foo meta ctx (App (l, Meta(l,n,s), [])) t
+    | t, Meta(l,n,s) -> foo meta ctx t (App (l, Meta(l,n,s), []))
     (* in the foo loop, the terms are supposed to be in normal form,
        except when meta-variables are instanced. We do the corresponding
      reductions first. *)
     (* Meta-redL *)
     | App(l,Meta(l',n,s),t'), _ when is_instanced meta n ->
-       foo meta env (norm meta env @@ app' l (instantiate meta n s) t') t2
+       foo meta ctx (norm meta env ctx @@ app' l (instantiate meta n s) t') t2
     (* Meta-redR *)
     | _, App(l,Meta(l',n,s),t') when is_instanced meta n ->
-       foo meta env t1 (norm meta env @@ app' l (instantiate meta n s) t')
+       foo meta ctx t1 (norm meta env ctx @@ app' l (instantiate meta n s) t')
 
     (* Unifying twice the same meta-variable. *)
     (* Meta-Same-Same and Meta-Same *)
     | App(l,Meta(l',n,s1),t1), App(ll,Meta(ll',m,s2), t2) when m = n ->
        (* Meta-Same-Same *)
        if same_list s1 s2 then
-         bar meta env t1 t2
+         bar meta ctx t1 t2
        else
          (* Meta-Same *)
          let meta = meta_same meta n s1 s2 in
-         bar meta env t1 t2
+         bar meta ctx t1 t2
 
     (* Unifying a meta-variable with another term *)
     | t, App(l,Meta(l',n,s1),t1) ->
        (* not implemented: Meta-DelDeps (future work) *)
        begin
-         try meta_inst meta env ctx t n s1 t1 with
+         try meta_inst is_essence meta env ctx t n s1 t1 with
          | Err _ ->
             match t with
             | App(_,t,l2) -> (* first-order unification *)
                if List.length l2  = List.length t1 then
-                 let meta = foo meta env t (App(l,Meta(l',n,s1),[])) in
-                 bar meta env l2 t1
+                 let meta = foo meta ctx t (App(l,Meta(l',n,s1),[])) in
+                 bar meta ctx l2 t1
                else raise (Err "not unifiable")
             | _ -> raise (Err "not unifiable")
        end
     | App(l,Meta(l',n,s1),t1), t ->
        begin
-         try meta_inst meta env ctx t n s1 t1 with
+         try meta_inst is_essence meta env ctx t n s1 t1 with
          | Err _ ->
             match t with (* first-order unification *)
             | App(_,t,l2) ->
                if List.length l2  = List.length t1 then
-                 let meta = foo meta env (App(l,Meta(l',n,s1),[])) t in
-                 bar meta env t1 l2
+                 let meta = foo meta ctx (App(l,Meta(l',n,s1),[])) t in
+                 bar meta ctx t1 l2
                else raise (Err "not unifiable")
             | _ -> raise (Err "not unifiable")
        end
@@ -377,81 +370,80 @@ let unification meta env ctx t1 t2 =
     | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then meta
                                 else raise (Err "Sort")
     | Prod(l,id,t1,t2), Prod(_,_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta (DefAxiom(id,t1) :: env) t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta (DefAxiom(id,t1) :: ctx) t2 t2' in
        meta
     | Abs(l,id,t1,t2), Abs(_,_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta (DefAxiom(id,t1) :: env) t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta (DefAxiom(id,t1) :: ctx) t2 t2' in
        meta
     | Inter(l,t1,t2), Inter(_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
        meta
     | Union(l,t1,t2), Union(_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
        meta
     | SPair(l,t1,t2), SPair(_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
        meta
     | SPrLeft(l,t1), SPrLeft(_,t1') ->
-       let meta = foo meta env t1 t1' in
+       let meta = foo meta ctx t1 t1' in
        meta
     | SPrRight(l,t1), SPrRight(_,t1') ->
-       let meta = foo meta env t1 t1' in
+       let meta = foo meta ctx t1 t1' in
        meta
     | SInLeft(l,t1,t2), SInLeft(_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
        meta
     | SInRight(l,t1,t2), SInRight(_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
        meta
     | Coercion(l,t1,t2), Coercion(_,t1',t2') ->
-       let meta = foo meta env t1 t1' in
-       let meta = foo meta env t2 t2' in
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
        meta
-  | Var(l,x), Var(_,y) -> if x = y then meta else raise (Err "Var")
-  | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
-    SMatch (_, t1', t2', _, t3', t4', _, t5', t6') ->
-     let meta = foo meta env t1 t1' in
-     let meta = foo meta env t2 t2' in
-     let meta = foo meta env t3 t3' in
-     let meta = foo meta (DefAxiom(id1,t3)::env) t4 t4' in
-     let meta = foo meta env t5 t5' in
-     let meta = foo meta (DefAxiom(id2,t5)::env) t6 t6' in
-     meta
+    | Var(l,x), Var(_,y) -> if x = y then meta else raise (Err "Var")
+    | Const(l,x), Const(_,y) -> if x = y then meta else raise (Err "Const")
+    | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
+      SMatch (_, t1', t2', _, t3', t4', _, t5', t6') ->
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
+       let meta = foo meta ctx t3 t3' in
+       let meta = foo meta (DefAxiom(id1,t3)::ctx) t4 t4' in
+       let meta = foo meta ctx t5 t5' in
+       let meta = foo meta (DefAxiom(id2,t5)::ctx) t6 t6' in
+       meta
 
-  | Underscore _, Underscore _ -> meta (* case where we want to unify
+    | Underscore _, Underscore _ -> meta (* case where we want to unify
                                           nothing and nothing *)
-  | Const (_,_), _ | _, Const (_,_)
-    | Underscore _, _ | _, Underscore _
     | Let (_,_,_,_,_), _ | _, Let (_,_,_,_,_) -> assert false
 
-  (* first-order unification for applications *)
-  | App(l,t1,l2), App(_,t1',l2') -> (* t1 and t1' are not meta-variables *)
-     if List.length l2 = List.length l2' then
-       let meta = foo meta env t1 t1' in
-       bar meta env l2 l2'
-     else raise (Err "not unifiable")
+    (* first-order unification for applications *)
+    | App(l,t1,l2), App(_,t1',l2') -> (* t1 and t1' are not meta-variables *)
+       if List.length l2 = List.length l2' then
+         let meta = foo meta ctx t1 t1' in
+         bar meta ctx l2 l2'
+       else raise (Err "not unifiable")
 
-  (* eta-expansion if only one term is a lambda-abstraction *)
-  | t, Abs(l,id,t1,t2) -> (* t's head is not an abstraction *)
-     foo meta (DefAxiom(id,t1) :: env) (app dummy_loc t (Var(dummy_loc, 0))) t2
-  | Abs(l,id,t1,t2), t -> (* t's head is not an abstraction *)
-     foo meta (DefAxiom(id,t1) :: env) t2 (app dummy_loc t (Var(dummy_loc, 0)))
+    (* eta-expansion if only one term is a lambda-abstraction *)
+    | t, Abs(l,id,t1,t2) -> (* t's head is not an abstraction *)
+       foo meta (DefAxiom(id,t1) :: ctx) (app dummy_loc t (Var(dummy_loc, 0))) t2
+    | Abs(l,id,t1,t2), t -> (* t's head is not an abstraction *)
+       foo meta (DefAxiom(id,t1) :: ctx) t2 (app dummy_loc t (Var(dummy_loc, 0)))
 
-  (* other cases *)
-  | _ -> raise (Err "not unifiable")
+    (* other cases *)
+    | _ -> raise (Err "not unifiable")
 
-  and bar meta env l l' =
+  and bar meta ctx l l' =
     match l, l' with
-    | x :: l, y :: l' -> let meta = foo meta env x y
-                         in bar meta env l l'
+    | x :: l, y :: l' -> let meta = foo meta ctx x y
+                         in bar meta ctx l l'
     | [], [] -> meta
     | _ -> assert false
   in
-  foo meta env t1 t2
+  foo meta ctx t1 t2

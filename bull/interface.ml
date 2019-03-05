@@ -95,57 +95,63 @@ let rec print_all env =
 let proof verbose str env id t =
   prerr_endline "Error: proof system not implemented.\n"; env
 
-(* EVERYTHING IS FINE TILL THIS VERY POINT *)
-
 let add_axiom verbose str env id t =
-  if is_const_new env id then
+  if Env.is_const_new env id then
     let t = fix_index [] t in
     try
-      let (m,em,t,et) = check_axiom str id_list sigma t in
+      let (m,em,t,et) = check_axiom env [] t in
       begin
 	if verbose then
 	  print_endline (axiom_message id)
 	else ();
-	(id :: id_list, DefAxiom (id,t) :: sigma, DefAxiom(id,et) :: esigma)
+        Env.add_const env (DefAxiom (id,t)) (DefAxiom(id,et))
       end
     with
       Err (reason) ->
       begin
-	prerr_endline reason; (id_list, sigma, esigma)
+	prerr_endline reason; env
       end
   else
-    prerr_endline (error_declared id); (id_list, sigma, esigma)
+    begin
+      prerr_endline (error_declared id);
+      env
+    end
 
-let add_let id str d o id_list sigma esigma verbose =
-  match find id sigma with
-  | Some n -> prerr_endline (error_declared id); (id_list, sigma, esigma)
-  | None -> let d = (fix_index id_list d) in
-            let t2 =
-              match o with
-              | Underscore _ -> None
-              | _ -> Some o
-            in
-	    try
-              let (m, em, t1, t2, et1, et2) =
-                check_term str id_list sigma d t2 in
-	      if verbose then
-		print_endline (let_message id)
-	      else ();
-	      (id :: id_list, DefLet (id, t1, t2) :: sigma, DefLet (id, et1, et2) :: esigma)
-            with
-              Err reason -> prerr_endline reason; (id_list, sigma, esigma)
+let add_let verbose str env id t opt =
+  if Env.is_const_new env id then
+    let t1 = (fix_index [] t) in
+    let t2 =
+      match opt with
+      | Underscore _ -> None
+      | _ -> Some (fix_index [] opt)
+    in
+    try
+      let (m, em, t1, t2, et1, et2) =
+        check_term env [] t1 t2 in
+      if verbose then
+	print_endline (let_message id)
+      else ();
+       Env.add_const env (DefLet (id, t1, t2)) (DefLet (id, et1, et2))
+    with
+      Err reason -> prerr_endline reason
+                  ; env
+  else
+    begin
+      prerr_endline (error_declared id);
+      env
+    end
 
-let normalize d str id_list sigma esigma =
-  let d = (fix_index id_list d) in
+let normalize str env t =
+  let t = fix_index [] t in
   try
     let (m, em, t1, t2, et1, et2) =
-      check_term str id_list sigma d None
+      check_term env [] t None
     in
-    let t1 = strongly_normalize sigma t1 in
-    let t2 = strongly_normalize sigma t2 in
-    let t3 = strongly_normalize esigma et1 in
-    let t4 = strongly_normalize esigma et2 in
-    print_endline (pretty_print_let (t1,t2,t3,t4) id_list)
+    let t1 = strongly_normalize false env [] t1 in
+    let t2 = strongly_normalize false env [] t2 in
+    let t3 = strongly_normalize true env [] et1 in
+    let t4 = strongly_normalize true env [] et2 in
+    print_endline (pretty_print_let (t1,t2,t3,t4) [])
   with
     Err reason -> prerr_endline reason
 
@@ -153,47 +159,47 @@ let normalize d str id_list sigma esigma =
 
 exception Exc_quit
 
-let rec repl lx id_list sigma esigma verbose : (string list * Utils.declaration list * Utils.declaration list) *
-         (int * Utils.metadeclaration list) =
-  let rec loop ((id_list, sigma, esigma), meta) =
+(* EVERYTHING IS FINE TILL HERE *)
+
+let rec repl lx env verbose =
+  let rec loop (env, meta) =
     begin
       try
 	if verbose then (Lexing.flush_input lx; print_string prompt; flush stdout) else ();
 	let buf = Buffer.create 80 in
 	let rule = Parser.s (Lexer.read buf) lx in
 	let str = Buffer.contents buf in
-        let foo ((id_list, sigma, esigma), meta) rule =
+        let foo (env, meta) rule =
           match rule with
 	  | Quit -> raise Exc_quit
 	  | Load id -> let lx = Lexing.from_channel (open_in id)
 		       in
 		       begin
 		         lx.lex_curr_p <- {lx.lex_curr_p with Lexing.pos_fname = id};
-		         repl lx id_list sigma esigma false
+		         repl lx env false
 		       end
-	  | Proof (id, t) -> (proof id str t id_list sigma esigma verbose, meta)
-	  | Axiom (id, t) -> (add_axiom id str t id_list sigma esigma verbose, meta)
-	  | Definition (id, t, o)
-	    -> (add_let id str t o id_list sigma esigma verbose, meta)
-	  | Print id -> print id id_list sigma esigma; ((id_list, sigma, esigma), meta)
-	  | Print_all -> print_all id_list sigma esigma; ((id_list, sigma, esigma), meta)
-          | Show -> print_meta id_list sigma esigma meta; ((id_list, sigma, esigma), meta)
+	  | Proof (id, t) -> (proof verbose str env id t, meta)
+	  | Axiom (id, t) -> (add_axiom verbose str env id t, meta)
+	  | Definition (id, t, opt)
+	    -> (add_let verbose str env id t opt, meta)
+	  | Print id -> print env id; (env, meta)
+	  | Print_all -> print_all env; (env, meta)
+          | Show -> print_meta env meta; (env, meta)
           (* TODO : change for proofs *)
-	  | Compute t -> normalize t str id_list sigma esigma; ((id_list, sigma, esigma), meta)
-	  | Help -> help (); ((id_list, sigma, esigma), meta)
+	  | Compute t -> normalize str env t; (env, meta)
+	  | Help -> help (); (env, meta)
 	  | Error -> prerr_endline (syntaxerror str lx);
-		     Lexing.flush_input lx; ((id_list, sigma, esigma), meta)
+		     Lexing.flush_input lx; (env, meta)
 
-          | Beginmeta -> ((id_list, sigma, esigma), (0,[]))
-          | Endmeta -> ((id_list, sigma, esigma), (0,[]))
+          | Beginmeta -> (env, (0,[]))
+          | Endmeta -> (env, (0,[]))
           | Unify (t1,t2) ->
              begin
-               let (t1,t2) = (fix_index id_list t1, fix_index id_list t2) in
-               ((id_list, sigma, esigma), Unification.unification meta sigma [] t1 t2)
+               let (t1,t2) = (fix_index [] t1, fix_index [] t2) in
+               (env, Unification.unification false meta env [] t1 t2)
              end
           | Add (l,t) ->
              begin
-               let id_list_old = id_list in
                let rec tmp (id_list,ctx) =
                  function
                  | [] -> (id_list, ctx)
@@ -201,40 +207,40 @@ let rec repl lx id_list sigma esigma verbose : (string list * Utils.declaration 
                     let id_list,ctx = x :: id_list, DefAxiom(x,fix_index id_list t) :: ctx in
                     tmp (id_list,ctx) l
                in
-               let (id_list, l) = tmp (id_list,[]) l in
+               let (id_list, l) = tmp ([],[]) l in
                let t = fix_index id_list t in
                let (meta, _) = Unification.meta_add meta l t dummy_loc in
-               ((id_list_old, sigma, esigma), meta)
+               (env, meta)
              end
           | UAxiom (id,t)->
              begin
-               match find id sigma with
-               | Some n -> prerr_endline (error_declared id); ((id_list, sigma, esigma),meta)
-               | None -> let t = (fix_index id_list t) in
-                         ((id :: id_list, DefAxiom(id,t) :: sigma, DefAxiom(id,t) :: esigma), meta)
+               match Env.find_const false env id with
+               | Some n -> prerr_endline (error_declared id); (env,meta)
+               | None -> let t = (fix_index [] t) in
+                         (Env.add_const env (DefAxiom(id,t)) (DefAxiom(id,t)), meta)
              end
           | UDefinition (id,t1,t2) ->
              begin
-               match find id sigma with
-               | Some n -> prerr_endline (error_declared id); ((id_list, sigma, esigma),meta)
-               | None -> let (t1,t2) = (fix_index id_list t1, fix_index id_list t2) in
-                         ((id :: id_list, DefLet(id,t1,t2) :: sigma, DefLet(id,t1,t2) :: esigma), meta)
+               match Env.find_const false env id with
+               | Some n -> prerr_endline (error_declared id); (env,meta)
+               | None -> let (t1,t2) = (fix_index [] t1, fix_index [] t2) in
+                         (Env.add_const env (DefLet(id,t1,t2)) (DefLet(id,t1,t2)), meta)
              end
         in
         (* TODO: better error management,
            e.g. what if a type-checking error cancels only
          one axiom when we declared several ones. *)
-        loop (List.fold_left foo ((id_list, sigma, esigma),meta) rule)
+        loop (List.fold_left foo (env,meta) rule)
       with
       | Failure a -> prerr_endline (failure a);
-		     loop ((id_list, sigma, esigma), meta)
+		     loop (env, meta)
       | Sys_error a -> prerr_endline (syserror a);
-		       loop ((id_list, sigma, esigma), meta)
-      | Exc_quit -> ((id_list, sigma, esigma), meta)
+		       loop (env, meta)
+      | Exc_quit -> (env, meta)
       | e -> prerr_endline (Printexc.to_string e);
-	     loop ((id_list, sigma, esigma), meta)
+	     loop (env, meta)
     end
-  in loop ((id_list, sigma, esigma), (0,[]))
+  in loop (env, (0,[]))
 
 (* main *)
 
@@ -244,14 +250,14 @@ let main () =
   begin
     Arg.parse options arg_file usage;
     print_endline welcome_message;
-    let ((id_list, sigma, esigma), meta) =
+    let (env, meta) =
       if (!initfile) = "" then
-	(([],[],[]), (0,[]))
+	([], (0,[]))
       else
 	try
-	  repl (Lexing.from_channel (open_in !initfile)) [] [] [] false
+	  repl (Lexing.from_channel (open_in !initfile)) [] false
 	with
-	| Sys_error a -> prerr_endline (syserror a); (([],[],[]), (0,[]))
+	| Sys_error a -> prerr_endline (syserror a); ([], (0,[]))
     in
-    repl lx id_list sigma esigma true
+    repl lx env true
   end
