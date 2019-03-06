@@ -351,22 +351,22 @@ let rec essence meta env ctx t1 =
      let (meta, t1) = essence meta env ctx t1 in
      let (meta, _) = essence meta env ctx t2 in
      let (meta, _) = essence meta env ctx t3 in
-     let (meta, t4) = essence meta env (DefLet("x",t1,nothing) :: ctx) t4 in
+     let (meta, t4) = essence meta env (DefLet("x",nothing,t1) :: ctx) t4 in
      let (meta, _) = essence meta env ctx t5 in
-     let (meta, t6) = essence_with_hint meta env (DefLet("x",t1,nothing) :: ctx) t6 t4 in
+     let (meta, t6) = essence_with_hint meta env (DefLet("x",nothing,t1) :: ctx) t6 t4 in
      meta, app l (Abs(l, "x",nothing, t6)) t1
   | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
      let (meta, _) = essence meta env ctx t1 in
      essence meta env ctx t2
   | Let (l,id,t1,t2,t3) -> let (meta,t1) = essence meta env ctx t1 in
                            let (meta,t2) = essence meta env ctx t2 in
-                           let (meta,t3) = essence meta env (DefLet(id,t1,t2) :: ctx) t3 in
+                           let (meta,t3) = essence meta env (DefLet(id,nothing,t2) :: ctx) t3 in
                            meta, Let(l,id,nothing,t2,t3)
   | Prod (l,id,t1,t2) -> let (meta,t1) = essence meta env ctx t1 in
-                         let (meta,t2) = essence meta env (DefAxiom(id,t1) :: ctx) t2 in
+                         let (meta,t2) = essence meta env (DefAxiom(id,nothing) :: ctx) t2 in
                          meta, Prod(l,id,t1,t2)
   | Abs (l,id,t1,t2) -> let (meta,t1) = essence meta env ctx t1 in
-                        let (meta,t2) = essence meta env (DefAxiom(id,t1) :: ctx) t2 in
+                        let (meta,t2) = essence meta env (DefAxiom(id,nothing) :: ctx) t2 in
                         meta, Abs(l,id,nothing,t2)
   | App (l,t1,ll) -> let (meta,t1) = essence meta env ctx t1 in
                      let rec foo meta l =
@@ -409,7 +409,7 @@ and essence_with_hint meta env ctx t1 t =
   | Let (l,id,t1,t2,t3) ->
      let (meta,t1) = essence meta env ctx t1 in
      let (meta,t2) = essence meta env ctx t2 in
-     let (meta,t3) = essence_with_hint meta env (DefLet(id,t1,t2) :: ctx)
+     let (meta,t3) = essence_with_hint meta env (DefLet(id,nothing,t2) :: ctx)
                                        t3 (lift 0 1 t)
      in meta, Let(l,id,nothing,t2,t3)
   | Prod (l,id,t1,t2) ->
@@ -428,9 +428,8 @@ and essence_with_hint meta env ctx t1 t =
      begin
        match t with
        | Abs (_,_,t1',t2') ->
-          let (meta,t1) = essence_with_hint meta env ctx t1 t1' in
           let (meta,t2) = essence_with_hint
-                            meta env (DefAxiom(id,t1) :: ctx) t2 t2' in
+                            meta env (DefAxiom(id,nothing) :: ctx) t2 t2' in
           meta, Abs(l,id,nothing,t2)
        | _ -> default ()
      end
