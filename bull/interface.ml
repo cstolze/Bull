@@ -102,8 +102,17 @@ let add_axiom verbose str env id t =
       let (m,em,t,et) = check_axiom env [] t in
       begin
 	if verbose then
-	  print_endline (axiom_message id)
-	else ();
+          begin
+	    print_endline (axiom_message id);
+            let (_,meta) = m in
+            if meta <> [] then
+              begin
+                print_endline "=== UNRESOLVED META-VARIABLES ===";
+                print_meta env m;
+                print_endline "\n=== ESSENCE ===";
+                print_meta env em
+              end
+          end;
         Env.add_const env (DefAxiom (id,t)) (DefAxiom(id,et))
       end
     with
@@ -129,8 +138,17 @@ let add_let verbose str env id t opt =
       let (m, em, t1, t2, et1, et2) =
         check_term env [] t1 t2 in
       if verbose then
-	print_endline (let_message id)
-      else ();
+        begin
+	  print_endline (let_message id);
+            let (_,meta) = m in
+            if meta <> [] then
+              begin
+                print_endline "=== UNRESOLVED META-VARIABLES ===";
+                print_meta env m;
+                print_endline "\n=== ESSENCE ===";
+                print_meta env em
+              end
+        end;
        Env.add_const env (DefLet (id, t1, t2)) (DefLet (id, et1, et2))
     with
       Err reason -> prerr_endline reason
@@ -158,8 +176,6 @@ let normalize str env t =
 (* repl *)
 
 exception Exc_quit
-
-(* EVERYTHING IS FINE TILL HERE *)
 
 let rec repl lx env verbose =
   let rec loop (env, meta) =

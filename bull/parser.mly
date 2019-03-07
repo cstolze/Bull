@@ -118,9 +118,14 @@ decl_list :
   | paren_decl_list {$1}
   ;
 
+paren_decl_list2:
+  | OPENP decl CLOSP paren_decl_list2 {List.append $2 $4}
+  ;
+
 pdl_opt :
   | { [] }
-  | paren_decl_list {$1}
+  | ID pdl_opt {($1, Underscore (get_loc ())) :: $2}
+  | OPENP decl CLOSP pdl_opt { List.append $2 $4 }
   ;
 
       /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the "application operator" (which does not exist, haha) automatically */
@@ -128,9 +133,14 @@ pdl_opt :
 term:
     | PI ID COLON term COMMA term
 	     { Prod (get_loc (), $2, $4, $6) }
+    | PI ID COMMA term
+             { Prod (get_loc (), $2, Underscore (get_loc ()), $4) }
     | LAMBDA ID COLON term ENDLAMBDA
 	     term
 	     { Abs (get_loc (), $2, $4, $6) }
+    | LAMBDA ID ENDLAMBDA
+             term
+	     { Abs (get_loc (), $2, Underscore (get_loc ()), $4) }
     | LET ID COLON term ASSIGN term IN term { Let (get_loc (), $2, $4, $6, $8) }
     | term2 { $1 }
     ;

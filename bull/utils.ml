@@ -104,3 +104,9 @@ let notnone x =
   | None -> failwith "notnone"
   | Some x -> x
 
+let find l n =
+    try
+      ignore @@ List.find (fun m -> m = n) l;
+      true
+    with
+    | Not_found -> false

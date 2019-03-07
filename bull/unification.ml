@@ -4,7 +4,6 @@ open Reduction
 open Printer
 
 (* TODO: move the basic meta-env functions to env.ml *)
-
 type env_meta = int * metadeclaration list
 
 let get_meta (_,meta) n =
@@ -304,7 +303,8 @@ let meta_inst is_essence meta env ctx t n s1 t1 =
   let meta = prune is_essence meta env ctx n xi t in
   let t = norm is_essence meta env ctx t in
   let res = create_hopu ctx t xi (List.length t1) in
-  (n, solution meta n res)
+  let (nnn,_) = meta in
+  (nnn, solution meta n res)
 
 (* MAIN UNIFICATION ALGORITHM *)
 

@@ -243,12 +243,12 @@ and force_type meta env ctx t =
   | Some meta, None -> (meta, t, t')
   | None, Some meta -> (meta, t, t')
   | None, None -> raise (Err "force_type")
-and reconstruct_with_type meta env ctx t1 t2 =
+and reconstruct_with_type meta env ctx t1 ttt =
   let unification = unification false in
   let strongly_normalize = strongly_normalize false in
   let default () =
     let (meta, t1, t1') = reconstruct meta env ctx t1 in
-    (unification meta env ctx t1' t2, t1, t1')
+    (unification meta env ctx t1' ttt, t1, t1')
   in
   match t1 with
   | Let(l,id,t1,t2,t3) ->
@@ -261,13 +261,13 @@ and reconstruct_with_type meta env ctx t1 t2 =
      let (meta, t3, t3') =
        (* lift 0 1 t2 is technically correct *)
        reconstruct_with_type
-         meta env (decl :: ctx) t3 (lift 0 1 t2) in
+         meta env (decl :: ctx) t3 (lift 0 1 ttt) in
      (meta, Let(l,id,t2',t2,t3), t3')
   | Abs(l,id,t1,t2) ->
-     let t2 = strongly_normalize env ctx
-              @@ apply_all_substitution meta t2 in
+     let ttt = strongly_normalize env ctx
+              @@ apply_all_substitution meta ttt in
      begin
-       match t2 with
+       match ttt with
        | Prod(_,_,u1,u2) ->
           let (meta,t1,t1') = force_type meta env ctx t1 in
           let meta = unification meta env ctx t1 u1 in
@@ -279,10 +279,10 @@ and reconstruct_with_type meta env ctx t1 t2 =
        | _ -> default ()
      end
   | SPair(l,t1,t2) ->
-     let t2 = strongly_normalize env ctx
-              @@ apply_all_substitution meta t2 in
+     let ttt = strongly_normalize env ctx
+              @@ apply_all_substitution meta ttt in
      begin
-       match t2 with
+       match ttt with
        | Inter(_,u1,u2) ->
           let (meta,t1,t1') = reconstruct_with_type meta env ctx t1 u1
           in
@@ -294,18 +294,18 @@ and reconstruct_with_type meta env ctx t1 t2 =
   | SPrLeft (l, t1) ->
      let (meta, k) = meta_add meta ctx (Sort(dummy_loc, Type)) l in
      let (meta, t, _) = reconstruct meta env ctx
-                                    (Inter(l,t2,k)) in
+                                    (Inter(l,ttt,k)) in
      reconstruct_with_type meta env ctx t1 t
   | SPrRight (l,t1) ->
      let (meta, k) = meta_add meta ctx (Sort(dummy_loc, Type)) l in
      let (meta, t, _) = reconstruct meta env ctx
-                                    (Inter(l,k,t2)) in
+                                    (Inter(l,k,ttt)) in
      reconstruct_with_type meta env ctx t1 t
   | SInLeft (l,t1,t2) ->
-     let t2 = strongly_normalize env ctx
-              @@ apply_all_substitution meta t2 in
+     let ttt = strongly_normalize env ctx
+              @@ apply_all_substitution meta ttt in
      begin
-       match t2 with
+       match ttt with
        | Union(_,u1,u2) ->
           let (meta,t1,t1') = force_type meta env ctx t1
           in
@@ -316,10 +316,10 @@ and reconstruct_with_type meta env ctx t1 t2 =
        | _ -> default ()
      end
   | SInRight (l,t1,t2) ->
-     let t2 = strongly_normalize env ctx
-              @@ apply_all_substitution meta t2 in
+     let ttt = strongly_normalize env ctx
+              @@ apply_all_substitution meta ttt in
      begin
-       match t2 with
+       match ttt with
        | Union(_,u1,u2) ->
           let (meta,t1,t1') = force_type meta env ctx t1
           in
@@ -331,13 +331,13 @@ and reconstruct_with_type meta env ctx t1 t2 =
      end
   | Coercion (l, t1, t) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
-     let meta = unification meta env ctx t1 t2 in
+     let meta = unification meta env ctx t1 ttt in
      let (meta, t, t') = reconstruct meta env ctx t in
      if is_subtype env ctx t1 t' then
        (meta, Coercion(l,t1,t'), t1)
      else raise (Err "coercion")
-  | Underscore l -> let (meta, k) = meta_add meta ctx t2 l in
-                    (meta, k, t2)
+  | Underscore l -> let (meta, k) = meta_add meta ctx ttt l in
+                    (meta, k, ttt)
   | _ -> default ()
 
 let rec essence meta env ctx t1 =
@@ -455,27 +455,96 @@ and essence_with_hint meta env ctx t1 t =
      end
   | _ -> default ()
 
-let clean_meta meta = meta (* TODO: FIXME *)
+let clean_meta meta tl =
+  let rec list_evars =
+    function
+    | Sort _ | Var _ | Const _ | Underscore _ -> []
+    | Let  (_,_,t1,t2,t3) -> List.concat @@ List.map list_evars [t1;t2;t3]
+    | Prod (_,_,t1,t2) | Abs (_,_,t1,t2) | Inter (_,t1,t2)
+      | Union (_,t1,t2) | SPair (_,t1,t2) | SInLeft(_,t1,t2)
+      | SInRight(_,t1,t2) | Coercion (_,t1,t2) -> List.concat @@ List.map list_evars [t1;t2]
+    | App (_,t1,l) -> List.concat @@ List.map list_evars (t1 :: l)
+    | SPrLeft (_, t) | SPrRight (_,t) -> list_evars t
+    | SMatch (_,t1,t2,_,t3,t4,_,t5,t6) -> List.concat @@ List.map list_evars [t1;t2;t3;t4;t5;t6]
+    | Meta (_,n,l) -> n :: (List.concat @@ List.map list_evars l)
+  in
+  let l = List.sort_uniq (fun (x : int) (y : int) -> compare x y)
+          @@ List.concat @@ List.map list_evars tl in
+  let foo = apply_all_substitution meta in
+  let rec map =
+    function
+    | [] -> []
+    | DefAxiom (id,t) :: ctx -> DefAxiom(id, foo t) :: map ctx
+    | DefLet (id,t1,t2) :: ctx -> DefLet(id, foo t1, foo t2) :: map ctx
+  in
+  let rec clean =
+    function
+    | [] -> []
+    | IsSort n :: m ->
+         IsSort n :: clean m
+    | SubstSort (n,t) :: m -> clean m
+    | DefMeta (ctx,n,t) :: m ->
+       DefMeta(map ctx, n, foo t)
+       :: clean m
+    | Subst _ :: m -> clean m
+  in
+  let rec strip =
+    function
+    | [] -> []
+    | DefAxiom (id,t) :: ctx -> t :: strip ctx
+    | DefLet (id,t1,t2) :: ctx -> t1 :: t2 :: strip ctx
+  in
+  let rec clean2 l =
+    function
+    | [] -> []
+    | IsSort n :: m ->
+       if find l n then
+         IsSort n :: clean2 l m
+       else
+         clean2 l m
+    | DefMeta (ctx,n,t) :: m ->
+       if find l n then
+         let l =
+           List.append l (List.concat @@ List.map list_evars (t :: strip ctx)) in
+         DefMeta (ctx,n,t) :: clean2 l m
+       else
+         clean2 l m
+    | _ -> assert false
+  in let n, meta = meta in (n,clean2 l @@ clean meta)
 
+(* In interactive proofs, we want newly generated meta-vars
+to have different names than previously generated essence meta-vars.
+So call this method to synchronize meta and emeta. *)
+let sync_meta_emeta (_,meta) (n,emeta) = (n,meta)
+
+(* TODO: add the possibility for meta and emeta to already exist,
+so we can do interactive proofs *)
 let check_term env ctx t1 t2 =
   let (meta, t1, t2) =
     match t2 with
-    | None -> reconstruct (0,[]) env [] t1
-    | Some t2 -> reconstruct_with_type (0,[]) env [] t1 t2
+    | None -> reconstruct (0,[]) env ctx t1
+    | Some t2 ->
+       let meta, t2, _ = force_type (0,[]) env ctx t2 in
+       reconstruct_with_type meta env ctx t1 t2
   in
   let t1 = apply_all_substitution meta t1 in
   let t2 = apply_all_substitution meta t2 in
-  let meta = clean_meta meta in
+  let meta = clean_meta meta [t1;t2] in
   let emeta = meta in
   let (emeta, et1) = essence emeta env ctx t1 in
   let (emeta, et2) = essence emeta env ctx t2 in
+  (* TODO: unify emeta with previous emeta (in interactive proofs) *)
+  let meta = sync_meta_emeta meta emeta in (* IMPORTANT *)
+  let et1 = apply_all_substitution emeta et1 in
+  let et2 = apply_all_substitution emeta et2 in
   (meta, emeta, t1, t2, et1, et2)
 
 let check_axiom env ctx t =
   let (meta, t1, t2) = force_type (0,[]) env [] t in
   let t1 = apply_all_substitution meta t1 in
-  let meta = clean_meta meta in
+  let meta = clean_meta meta [t1] in
   let emeta = meta in
   let (emeta, et1) = essence emeta env ctx t1 in
+  let et1 = apply_all_substitution emeta et1 in
   (meta, emeta, t1, et1)
 

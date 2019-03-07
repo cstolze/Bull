@@ -1,0 +1,4 @@
+Axiom (nat bool : Type) (true false : bool) (S : nat -> nat) (O : nat).
+Axiom (vect : nat -> Type).
+Axiom (nil : vect O) (cons : forall n, bool -> vect n -> vect (S n)).
+Definition foo := cons _ true (cons _ false (cons _ true nil)).
