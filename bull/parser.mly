@@ -8,10 +8,15 @@
   last to first *)
     | _ -> App(get_loc (), t1, [t2])
 
-  let rec add_args l t =
+  let rec add_args loc l t =
     match l with
     | [] -> t
-    | (id,t1) :: l -> Abs(dummy_loc, id, t1, add_args l t)
+    | (id,t1) :: l -> Abs(loc, id, t1, add_args loc l t)
+
+  let rec add_typs loc l t =
+    match l with
+    | [] -> t
+    | (id,t1) :: l -> Prod(loc, id, t1, add_args loc l t)
 
 %}
 
@@ -79,8 +84,8 @@ s:
     | LEMMA ID COLON term DOT { [Proof($2,$4)] }
     | AXIOM decl_list DOT { List.map (fun (x,y) -> Axiom (x,y)) $2 }
     | DEFINITION ID pdl_opt COLON term ASSIGN term
-		 DOT { [Definition ($2, add_args $3 $7, $5)] }
-    | DEFINITION ID pdl_opt ASSIGN term DOT { [Definition ($2, add_args $3 $5, Underscore dummy_loc)] }
+		 DOT { [Definition ($2, add_args (get_loc ()) $3 $7, $5)] }
+    | DEFINITION ID pdl_opt ASSIGN term DOT { [Definition ($2, add_args (get_loc ()) $3 $5, Underscore dummy_loc)] }
     | PRINT id_list DOT { List.map (fun x -> Print x) $2 }
     | SIG DOT { [Print_all] }
     | SHOW DOT { [Show] }
@@ -96,7 +101,7 @@ s:
     | ADD pdl_opt TURNSTILE term DOT { [Add ($2,$4)] }
     | AXIOM UNTYPED decl_list DOT { List.map (fun (x,y) -> UAxiom (x,y)) $3 }
     | DEFINITION UNTYPED ID pdl_opt COLON term ASSIGN term
-		 DOT { [UDefinition ($3, add_args $4 $8, $6)] }
+		 DOT { [UDefinition ($3, add_args (get_loc ()) $4 $8, $6)] }
     ;
 
 id_list :
@@ -116,31 +121,30 @@ paren_decl_list:
 decl_list :
   | decl {$1}
   | paren_decl_list {$1}
-  ;
+;
 
-paren_decl_list2:
-  | OPENP decl CLOSP paren_decl_list2 {List.append $2 $4}
+pdl : /* parenthesized declaration list */
+  | ID pdl_opt {($1, Underscore (get_loc ())) :: $2}
+  | OPENP decl CLOSP pdl_opt { List.append $2 $4 }
   ;
 
 pdl_opt :
   | { [] }
-  | ID pdl_opt {($1, Underscore (get_loc ())) :: $2}
-  | OPENP decl CLOSP pdl_opt { List.append $2 $4 }
+  | pdl { $1 }
+  ;
+
+arg_list :
+  | decl { $1 }
+  | pdl { $1 }
   ;
 
       /* I had to manage the precedence of operators the hard way, because I couldn't manage the precedence of the "application operator" (which does not exist, haha) automatically */
 
 term:
-    | PI ID COLON term COMMA term
-	     { Prod (get_loc (), $2, $4, $6) }
-    | PI ID COMMA term
-             { Prod (get_loc (), $2, Underscore (get_loc ()), $4) }
-    | LAMBDA ID COLON term ENDLAMBDA
-	     term
-	     { Abs (get_loc (), $2, $4, $6) }
-    | LAMBDA ID ENDLAMBDA
-             term
-	     { Abs (get_loc (), $2, Underscore (get_loc ()), $4) }
+    | PI arg_list COMMA term
+             { add_typs (get_loc ()) $2 $4 }
+    | LAMBDA arg_list ENDLAMBDA term
+             { add_args (get_loc ()) $2 $4 }
     | LET ID COLON term ASSIGN term IN term { Let (get_loc (), $2, $4, $6, $8) }
     | term2 { $1 }
     ;

@@ -22,9 +22,9 @@ let get_meta (_,meta) n =
 (* returns the type of a term *)
 let get_from_meta meta l n subst =
   match get_meta meta n with
-  | IsSort n -> raise (Err "should not happen? 1")
+  | IsSort n -> failwith "should not happen? 1"
   | SubstSort (n,Sort(l,Type)) -> meta, Sort(l,Type), Sort(l,Kind)
-  | SubstSort (n,_) -> raise (Err "should not happen? 2")
+  | SubstSort (n,_) -> failwith "should not happen? 2"
   | DefMeta (l1,n,t2) | Subst (l1,n,_,t2)
     -> (meta, Meta(l,n,subst), apply_substitution t2 subst)
 
@@ -175,6 +175,7 @@ let meta_same meta n s1 s2 =
   | _ -> failwith "should not happen meta-same"
 
 (* HIGHER ORDER PATTERN UNIFICATION *)
+exception HOPU_Error
 
 (* check if the arguments are all distinct variables *)
 let rec strong_pattern tl aux =
@@ -183,11 +184,11 @@ let rec strong_pattern tl aux =
   | Var (_,n) :: tl ->
      begin
        try
-         ignore @@ List.find (fun m -> m = n) aux; raise (Err "HOPU impossible")
+         ignore @@ List.find (fun m -> m = n) aux; raise HOPU_Error
        with
        | Not_found -> strong_pattern tl (n :: aux)
      end
-  | _ -> raise (Err "HOPU impossible")
+  | _ -> raise HOPU_Error
 
 let rec is_offending ctx m xi t =
   match t with
@@ -297,7 +298,7 @@ let rec create_hopu ctx t xi n =
      else
        create_hopu (DefAxiom("",tt)::ctx) t (List.map (fun x -> x+1) xi) 0
 
-(* dummy *)
+(* TODO: comment properly *)
 let meta_inst is_essence meta env ctx t n s1 t1 =
   let xi = strong_pattern (List.concat [t1;s1]) [] in
   let meta = prune is_essence meta env ctx n xi t in
@@ -307,6 +308,7 @@ let meta_inst is_essence meta env ctx t n s1 t1 =
   (nnn, solution meta n res)
 
 (* MAIN UNIFICATION ALGORITHM *)
+exception Unif_Error
 
 let unification is_essence meta env ctx t1 t2 =
   let norm = norm is_essence in
@@ -344,31 +346,31 @@ let unification is_essence meta env ctx t1 t2 =
        (* not implemented: Meta-DelDeps (future work) *)
        begin
          try meta_inst is_essence meta env ctx t n s1 t1 with
-         | Err _ ->
+         | HOPU_Error ->
             match t with
             | App(_,t,l2) -> (* first-order unification *)
                if List.length l2  = List.length t1 then
                  let meta = foo meta ctx t (App(l,Meta(l',n,s1),[])) in
                  bar meta ctx l2 t1
-               else raise (Err "not unifiable")
-            | _ -> raise (Err "not unifiable")
+               else raise Unif_Error
+            | _ -> raise Unif_Error
        end
     | App(l,Meta(l',n,s1),t1), t ->
        begin
          try meta_inst is_essence meta env ctx t n s1 t1 with
-         | Err _ ->
+         | HOPU_Error ->
             match t with (* first-order unification *)
             | App(_,t,l2) ->
                if List.length l2  = List.length t1 then
                  let meta = foo meta ctx (App(l,Meta(l',n,s1),[])) t in
                  bar meta ctx t1 l2
-               else raise (Err "not unifiable")
-            | _ -> raise (Err "not unifiable")
+               else raise Unif_Error
+            | _ -> raise Unif_Error
        end
 
     (* Structural unification *)
     | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then meta
-                                else raise (Err "Sort")
+                                else raise Unif_Error
     | Prod(l,id,t1,t2), Prod(_,_,t1',t2') ->
        let meta = foo meta ctx t1 t1' in
        let meta = foo meta (DefAxiom(id,t1) :: ctx) t2 t2' in
@@ -407,8 +409,8 @@ let unification is_essence meta env ctx t1 t2 =
        let meta = foo meta ctx t1 t1' in
        let meta = foo meta ctx t2 t2' in
        meta
-    | Var(l,x), Var(_,y) -> if x = y then meta else raise (Err "Var")
-    | Const(l,x), Const(_,y) -> if x = y then meta else raise (Err "Const")
+    | Var(l,x), Var(_,y) -> if x = y then meta else raise Unif_Error
+    | Const(l,x), Const(_,y) -> if x = y then meta else raise Unif_Error
     | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
       SMatch (_, t1', t2', _, t3', t4', _, t5', t6') ->
        let meta = foo meta ctx t1 t1' in
@@ -428,7 +430,7 @@ let unification is_essence meta env ctx t1 t2 =
        if List.length l2 = List.length l2' then
          let meta = foo meta ctx t1 t1' in
          bar meta ctx l2 l2'
-       else raise (Err "not unifiable")
+       else raise Unif_Error
 
     (* eta-expansion if only one term is a lambda-abstraction *)
     | t, Abs(l,id,t1,t2) -> (* t's head is not an abstraction *)
@@ -437,7 +439,7 @@ let unification is_essence meta env ctx t1 t2 =
        foo meta (DefAxiom(id,t1) :: ctx) t2 (app dummy_loc t (Var(dummy_loc, 0)))
 
     (* other cases *)
-    | _ -> raise (Err "not unifiable")
+    | _ -> raise Unif_Error
 
   and bar meta ctx l l' =
     match l, l' with

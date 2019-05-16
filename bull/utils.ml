@@ -99,6 +99,12 @@ type sentence =
 (* Error during type reconstruction or unification *)
 exception Err of string
 
+type errcheck =
+  | Kind_Error
+  | Coercion_Error
+  | Const_Error
+  | Force_Type_Error
+
 let notnone x =
   match x with
   | None -> failwith "notnone"
