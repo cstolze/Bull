@@ -46,6 +46,13 @@ let app' l t1 t2 =
   | App(l, t1, l1) -> App(l, t1, t2 @ l1)
   | _ -> App(l, t1, t2)
 
+let loc_term t =
+  match t with
+  | Sort (l, _) | Let (l,_,_,_,_) | Prod (l,_,_,_) | Abs (l,_,_,_) | App (l,_,_) | Inter (l,_,_)
+    | Union (l,_,_) | SPair (l,_,_) | SPrLeft (l,_) | SPrRight (l,_) | SMatch (l,_,_,_,_,_,_,_,_)
+    | SInLeft (l,_,_) | SInRight (l,_,_) | Coercion (l,_,_) | Var (l,_) | Const (l,_)
+    | Underscore l | Meta (l,_,_) -> l
+
 let nothing = Underscore dummy_loc
 
 (* In the contexts, there are let-ins and axioms *)
@@ -96,18 +103,29 @@ type sentence =
   | UAxiom of string * term
   | UDefinition of string * term * term
 
-(* Error during type reconstruction or unification *)
-exception Err of string
-
+(* Error during type reconstruction *)
 type errcheck =
   | Kind_Error
-  | Coercion_Error
-  | Const_Error
-  | Force_Type_Error
+  | Prod_Error of location
+  | App_Error of location * term * term * term * term
+  | Set_Error of location
+  | Proj_Error of location * term * term
+  | Match_Error of location * term * term * term * term
+  | Coercion_Error of location * term * term * term
+  | Const_Error of location * string
+  | Force_Type_Error of location * term * term
+  | Typecheck_Error of location * term * term * term
+  | Wrong_Type_Error of location * term * term
+  | Essence_Error of location * term * term
+
+type env_const = declaration * declaration list
+type env_var = declaration list
+exception Err of (env_var * errcheck)
+let err x y = raise (Err (x,y))
 
 let notnone x =
   match x with
-  | None -> failwith "notnone"
+  | None -> assert false
   | Some x -> x
 
 let find l n =

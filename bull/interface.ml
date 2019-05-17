@@ -90,7 +90,7 @@ let print env id =
     | _ -> failwith "print"
 
 let rec print_all env =
-  List.iter (print env) (List.rev (to_id_list env))
+  List.iter (print env) (List.rev (to_id_list_const env))
 
 let proof verbose str env id t =
   prerr_endline "Error: proof system not implemented.\n"; env
@@ -116,9 +116,9 @@ let add_axiom verbose str env id t =
         Env.add_const env (DefAxiom (id,t)) (DefAxiom(id,et))
       end
     with
-      Err (reason) ->
+      Err reason ->
       begin
-	prerr_endline reason; env
+	prerr_endline (string_of_error reason str); env
       end
   else
     begin
@@ -151,7 +151,7 @@ let add_let verbose str env id t opt =
         end;
        Env.add_const env (DefLet (id, t1, t2)) (DefLet (id, et1, et2))
     with
-      Err reason -> prerr_endline reason
+      Err reason -> prerr_endline (string_of_error reason str)
                   ; env
   else
     begin
@@ -171,7 +171,7 @@ let normalize str env t =
     let t4 = strongly_normalize true env [] et2 in
     print_endline (pretty_print_let (t1,t2,t3,t4) [])
   with
-    Err reason -> prerr_endline reason
+    Err reason -> prerr_endline (string_of_error reason str)
 
 (* repl *)
 

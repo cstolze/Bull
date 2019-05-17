@@ -1,9 +1,6 @@
 open Utils
 open Bruijn
 
-type env_const = declaration * declaration list
-type env_var = declaration list
-
 let find_printer env id =
   let rec aux l =
     match l with
@@ -14,11 +11,17 @@ let find_printer env id =
   in aux env
 
 (* for the print_all function *)
-let rec to_id_list env =
+let rec to_id_list_const env =
   match env with
   | [] -> []
   | (DefAxiom(id',_), _) :: env | (DefLet(id',_,_), _) :: env ->
-     id' :: to_id_list env
+     id' :: to_id_list_const env
+
+let rec to_id_list_var env =
+  match env with
+  | [] -> []
+  | (DefAxiom(id',_)) :: env | (DefLet(id',_,_)) :: env ->
+     id' :: to_id_list_var env
 
 let find_const is_essence env id =
   match find_printer env id with

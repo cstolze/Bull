@@ -1,6 +1,6 @@
 Axiom exp : Type.
 
-Axiom abs : exp -> (exp -> exp) -> exp.
+Axiom lam : exp -> (exp -> exp) -> exp.
 Axiom arr : exp -> (exp -> exp) -> exp.
 Definition ar' t1 t2 := arr t1 (fun x => t2).
 Axiom app : exp -> exp -> exp.
@@ -57,11 +57,11 @@ Axiom s_rule :
       stl s (ar' nat nat) & oml s (ar' nat nat) & oml s (ar' nat nat).
 
 Axiom list_rule :
-      lom list (ar' star star).
+      oml list (ar' star star).
 Axiom nil_rule :
-      lom nil (arr star (fun t => app list t)).
+      oml nil (arr star (fun t => app list t)).
 Axiom cons_rule :
-      lom cons (arr star (fun t => ar' t (ar' (app list t) (app list t)))).
+      oml cons (arr star (fun t => ar' t (ar' (app list t) (app list t)))).
 
 Axiom even_rule :
       lfl even (ar' nat star).

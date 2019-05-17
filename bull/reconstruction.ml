@@ -16,25 +16,19 @@ let principal_type_system meta env ctx s1 s2 =
   match (s1, s2) with
   | (Sort (_,Type), t) -> (meta, t)
   | (t1, t2) ->
-     try
-       let meta = unification false meta env ctx t1
-                              (Sort(dummy_loc,Type))
-       in (meta, t2)
-     with
-     | Unif_Error -> raise (Err "AAA")
+     let meta = unification false meta env ctx t1
+                            (Sort(dummy_loc,Type))
+     in (meta, t2)
 
 (* same as principal type system, but for A | B and A & B *)
 let principal_set_system meta env ctx s1 s2 =
   match (s1, s2) with
   | (Sort (_,Type), Sort(l,Type)) -> (meta, Sort(l,Type))
   | (t1, t2) ->
-     try
-       let meta = unification false meta env ctx t1 (Sort(dummy_loc,Type))
-       in
-       let meta = unification false meta env ctx t2 (Sort(dummy_loc,Type))
-       in (meta, Sort(dummy_loc,Type))
-     with
-     | Unif_Error -> raise (Err "BBB")
+     let meta = unification false meta env ctx t1 (Sort(dummy_loc,Type))
+     in
+     let meta = unification false meta env ctx t2 (Sort(dummy_loc,Type))
+     in (meta, Sort(dummy_loc,Type))
 
 (*
   force-type takes is like reconstruct, except that
@@ -60,13 +54,14 @@ let rec reconstruct meta env ctx t
            * Utils.term) =
   let unification = unification false in
   let strongly_normalize = strongly_normalize false in
+  let err = err ctx in
   match t with
 
   | Sort (l, s) ->
      begin
        match type_of_sort s with
        | Some (l,s) -> (meta, t, Sort (l,s))
-       | None -> raise (Err error_kind)
+       | None -> err @@ Kind_Error
      end
 
   | Let (l, id, t1, t2, t3) ->
@@ -83,8 +78,13 @@ let rec reconstruct meta env ctx t
      let (meta, t2, t2') =
        let decl = DefAxiom(id, t1) in
        force_type meta env (decl :: ctx) t2 in
-     let (meta, tt) = principal_type_system meta env ctx t1' t2' in
-     (meta, Prod(l,id,t1,t2), tt)
+     begin
+       try
+         let (meta, tt) = principal_type_system meta env ctx t1' t2' in
+         (meta, Prod(l,id,t1,t2), tt)
+       with
+       | Unif_Error -> err @@ Prod_Error(l)
+     end
 
   | Abs (l, id, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
@@ -123,21 +123,31 @@ let rec reconstruct meta env ctx t
                                                      k)) in
                  (meta, App(l, t1, t2 :: l2), beta_redex k t2)
                with
-               | Unif_Error -> raise (Err "CCC")
+               | Unif_Error -> err @@ App_Error(l, t1, t1', t2, t2')
           end
      end
 
   | Inter (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = force_type meta env ctx t2 in
-     let (meta, tt) = principal_set_system meta env ctx t1' t2' in
-     (meta, Inter(l,t1,t2), tt)
+     begin
+       try
+         let (meta, tt) = principal_set_system meta env ctx t1' t2' in
+         (meta, Inter(l,t1,t2), tt)
+       with
+       | Unif_Error -> err @@ Set_Error l
+     end
 
   | Union (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = force_type meta env ctx t2 in
-     let (meta, tt) = principal_set_system meta env ctx t1' t2' in
-     (meta, Union(l,t1,t2), tt)
+     begin
+       try
+         let (meta, tt) = principal_set_system meta env ctx t1' t2' in
+         (meta, Union(l,t1,t2), tt)
+       with
+       | Unif_Error -> err @@ Set_Error l
+     end
 
   | SPair (l, t1, t2) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
@@ -162,7 +172,7 @@ let rec reconstruct meta env ctx t
                                                            b)) in
             (meta, SPrLeft(l,t1), a)
           with
-          | Unif_Error -> raise (Err "DDD")
+          | Unif_Error -> err @@ Proj_Error(l,t1,t1')
      end
   | SPrRight (l, t1) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
@@ -180,7 +190,7 @@ let rec reconstruct meta env ctx t
                                                            b)) in
             (meta, SPrRight(l,t1), b)
           with
-          | Unif_Error -> raise (Err "DDD")
+          | Unif_Error -> err @@ Proj_Error(l,t1,t1')
      end
 
   | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
@@ -205,7 +215,7 @@ let rec reconstruct meta env ctx t
           SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
           app dummy_loc t2 t1)
        with
-       | Unif_Error -> raise (Err "DDD")
+       | Unif_Error -> err @@ Match_Error(l,t1,t1',t3,t5)
      end
 
   | SInLeft (l, t1, t2) ->
@@ -225,7 +235,7 @@ let rec reconstruct meta env ctx t
      let (meta, t2, t2') = reconstruct meta env ctx t2 in
      if is_subtype env ctx t1 t2' then
        (meta, Coercion(l,t1,t2), t1)
-     else raise (Err "coercion")
+     else err @@ Coercion_Error(l,t2,t2',t1)
 
   | Var (l, n) -> let (t1,t1') = Env.find_var ctx n in
                   (meta, t1, t1')
@@ -233,7 +243,7 @@ let rec reconstruct meta env ctx t
   | Const (l, id) ->
      begin
      match Env.find_const false env id with
-     | None -> raise (Err "const")
+     | None -> err @@ Const_Error(l, id)
      | Some (t1,t1') -> (meta, t1, t1')
      end
 
@@ -248,6 +258,7 @@ let rec reconstruct meta env ctx t
 and force_type meta env ctx t =
   let unification = unification false in
   let (meta, t, t') = reconstruct meta env ctx t in
+  let err = err ctx in
   let x =
     try
       Some (unification meta env ctx t' (Sort(dummy_loc, Type)))
@@ -264,16 +275,17 @@ and force_type meta env ctx t =
   | Some _, Some _ -> (meta, t, t')
   | Some meta, None -> (meta, t, t')
   | None, Some meta -> (meta, t, t')
-  | None, None -> raise (Err "force_type")
+  | None, None -> err @@ Force_Type_Error(loc_term t,t,t')
 and reconstruct_with_type meta env ctx t1 ttt =
   let unification = unification false in
   let strongly_normalize = strongly_normalize false in
+  let err = err ctx in
   let default () =
     let (meta, t1, t1') = reconstruct meta env ctx t1 in
     try
       unification meta env ctx t1' ttt, t1, t1'
     with
-    | Unif_Error -> raise (Err "XXX")
+    | Unif_Error -> err @@ Typecheck_Error(loc_term t1, t1, t1', ttt)
   in
   match t1 with
   | Let(l,id,t1,t2,t3) ->
@@ -304,7 +316,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
                                       (decl :: ctx) t2 u2 in
               (meta, Abs(l,id,t1,t2), Prod(l,id,t1,t2'))
             with
-            | Unif_Error -> raise (Err "XXX")
+            | Unif_Error -> err @@ Wrong_Type_Error(l, t1, u1)
           end
        | _ -> default ()
      end
@@ -346,7 +358,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
                 reconstruct_with_type meta env ctx t2 u1 in
               (meta, SInLeft(l,t1,t2), Union(l,t2',t1))
             with
-            | Unif_Error -> raise (Err "XXX")
+            | Unif_Error -> err @@ Wrong_Type_Error(l, t1, u2)
           end
        | _ -> default ()
      end
@@ -365,21 +377,9 @@ and reconstruct_with_type meta env ctx t1 ttt =
                 reconstruct_with_type meta env ctx t2 u2 in
               (meta, SInLeft(l,t1,t2), Union(l,t1,t2'))
             with
-            | Unif_Error -> raise (Err "XXX")
+            | Unif_Error -> err @@ Wrong_Type_Error(l, t1, u1)
           end
        | _ -> default ()
-     end
-  | Coercion (l, t1, t) ->
-     let (meta, t1, t1') = force_type meta env ctx t1 in
-     begin
-       try
-         let meta = unification meta env ctx t1 ttt in
-         let (meta, t, t') = reconstruct meta env ctx t in
-         if is_subtype env ctx t1 t' then
-           (meta, Coercion(l,t1,t'), t1)
-         else raise (Err "coercion")
-       with
-       | Unif_Error -> raise (Err "XXX")
      end
   | Underscore l -> let (meta, k) = meta_add meta ctx ttt l in
                     (meta, k, ttt)
@@ -433,13 +433,14 @@ let rec essence meta env ctx t1 =
 
 and essence_with_hint meta env ctx t1 t =
   let unification = unification true in
+  let err = err ctx in
   let default () =
     let (meta, t1) = essence meta env ctx t1 in
     try
       let meta = unification meta env ctx t1 t in
       meta, t1
     with
-    | Unif_Error -> raise (Err "XXX")
+    | Unif_Error -> err @@ Essence_Error(loc_term t1, t1, t)
   in
   let norm () =
     strongly_normalize true env ctx

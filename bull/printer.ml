@@ -2,6 +2,7 @@
 
 open Utils
 open Bruijn
+open Env
 
 (* error localisation *)
 (* hatstring a b returns "   ^^^", where the hats go from position a to position b *)
@@ -28,20 +29,21 @@ let rec extract str a b =
 	extract str a (b+1)
 
 let error_loc (l1,l2) str =
-  let file = l1.Lexing.pos_fname (* we assume the two positions are in the same file *)
-  in
-  let str =
-    if l1.Lexing.pos_lnum = l2.Lexing.pos_lnum then
-      let str = extract str l1.Lexing.pos_cnum l2.Lexing.pos_cnum in
-      let a = l1.Lexing.pos_cnum-l1.Lexing.pos_bol in
-      let b = if l1 = l2 then a+1 else l2.Lexing.pos_cnum-l1.Lexing.pos_bol in
-      let str2 = hatstring a b in
-      str ^ str2
-    else (* multiline error *)
-      "\n..." ^ String.sub str l1.Lexing.pos_cnum (l2.Lexing.pos_cnum - l1.Lexing.pos_cnum) ^ "...\n"
-  in
-  if file = "" then str
-  else "In file " ^ file ^ ", line "^string_of_int l1.Lexing.pos_lnum^", characters " ^ string_of_int (l1.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ " -- " ^ string_of_int (l2.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ ":\n" ^ str
+  if (l1,l2) = dummy_loc then "" else
+    let file = l1.Lexing.pos_fname (* we assume the two positions are in the same file *)
+    in
+    let str =
+      if l1.Lexing.pos_lnum = l2.Lexing.pos_lnum then
+        let str = extract str l1.Lexing.pos_cnum l2.Lexing.pos_cnum in
+        let a = l1.Lexing.pos_cnum-l1.Lexing.pos_bol in
+        let b = if l1 = l2 then a+1 else l2.Lexing.pos_cnum-l1.Lexing.pos_bol in
+        let str2 = hatstring a b in
+        str ^ str2
+      else (* multiline error *)
+        "\n..." ^ String.sub str l1.Lexing.pos_cnum (l2.Lexing.pos_cnum - l1.Lexing.pos_cnum) ^ "...\n"
+    in
+    if file = "" then str
+    else "In file " ^ file ^ ", line "^string_of_int l1.Lexing.pos_lnum^", characters " ^ string_of_int (l1.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ " -- " ^ string_of_int (l2.Lexing.pos_cnum - l1.Lexing.pos_bol) ^ ":\n" ^ str
 
 (* for the precedences, see parser.mly *)
 (* when calling aux, the precedence is (precedence-1) *)
@@ -98,7 +100,7 @@ let rec string_of_term is_essence id_list t =
     | Underscore l -> "_"
     | Meta (l,n,s) -> "?" ^ string_of_int n ^ "["
                       ^ (metacontext 0 id_list s)
-                      ^ "]" (* TODO: FIXME *)
+                      ^ "]"
   in
   aux (fix_id id_list t) 0
 
@@ -141,6 +143,51 @@ let let_message id = id ^ " is defined.\n"
 let help_text = "List of commands:\nHelp.\t\t\t\t     show this list of commands\nLoad \"file\".\t\t      \t     for loading a script file\nAxiom term : type.\t    \t     define a constant or an axiom\nLemma proofname : term.        \t     start an interactive proof (not implemented yet)\nDefinition name [: type] := term.    define a term\nPrint name. \t       \t  \t     print the definition of name\nPrintall. \t\t\t     print all the signature (axioms and definitions)\nCompute name.\t\t\t     normalize name and print the result\nQuit. \t\t\t\t     quit"
 
 (* Error messages *)
+let string_of_error (env,e) str =
+  let id_list = to_id_list_var env in
+  match e with
+  | Kind_Error -> "Error: Type is not a first-class term.\n"
+  | Prod_Error l -> error_loc l str ^ "Error: illegal product.\n"
+  | App_Error (l, t1, t2, t3, t4) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     let t3 = "\"" ^ string_of_term false id_list t3 ^ "\"" in
+     let t4 = "\"" ^ string_of_term false id_list t4 ^ "\"" in
+     error_loc l str ^ "Error: the term " ^ t1 ^ " of type " ^ t2 ^ "cannot be applied to the term " ^ t3 ^ " of type " ^ t4 ^ ".\n"
+  | Set_Error l -> error_loc l str ^ "Error: illegal set.\n"
+  | Proj_Error (l, t1, t2) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     error_loc l str ^ "Error: the term " ^ t1 ^ " has type " ^ t2 ^ " which should be an intersection.\n"
+  | Match_Error (l, t1, t2, t3, t4) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     let t3 = "\"" ^ string_of_term false id_list t3 ^ "\"" in
+     let t4 = "\"" ^ string_of_term false id_list t4 ^ "\"" in
+     error_loc l str ^ "Error: the term " ^ t1 ^ " has type " ^ t2 ^ " which should be the union of " ^ t3 ^ " and " ^ t4 ^ ".\n"
+  | Coercion_Error (l, t1, t2, t3) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     let t3 = "\"" ^ string_of_term false id_list t3 ^ "\"" in
+     error_loc l str ^ "Error: the term " ^ t1 ^ " of type " ^ t2 ^ " cannot be coerced to type " ^ t3 ^ ".\n"
+  | Const_Error (l, id) -> error_loc l str ^ "Error: unbound variable " ^ id ^ ".\n"
+  | Force_Type_Error (l, t1, t2) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     error_loc l str ^ "Error: the term " ^ t1 ^ " has type " ^ t2 ^ " which should be Type.\n"
+  | Typecheck_Error (l, t1, t2, t3) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     let t3 = "\"" ^ string_of_term false id_list t3 ^ "\"" in
+     error_loc l str ^ "Error: the term " ^ t1 ^ " has type " ^ t2 ^ " while it is expected to have type " ^ t3 ^ ".\n"
+  | Wrong_Type_Error (l, t1, t2) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     error_loc l str ^ "Error: found type " ^ t1 ^ " where " ^ t2 ^ " was expected.\n"
+  | Essence_Error (l, t1, t2) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     error_loc l str ^ "Error: found essence " ^ t1 ^ " where " ^ t2 ^ " was expected.\n"
 
 let error_not_declared id = "Error: " ^ id ^ " is not a declared term.\n"
 let error_declared id = "Error: " ^ id ^ " already exists.\n"
@@ -198,7 +245,7 @@ let error_set (l1,l2) str =
   error_loc (l1,l2) str
   ^ "Error: you can't use set operators on non-set terms.\n"
 
-let error_kind = "Error: we do not deal with infinite hierarchy of universes.\n"
+let error_kind = "Error: Type is not a first_class object.\n"
 
 let error_essence (l1,l2) str =
   error_loc (l1,l2) str
