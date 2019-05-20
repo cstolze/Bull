@@ -120,7 +120,7 @@ let pretty_print_let (t1,t2,t3,t4) id_list =
 
 let string_of_axiom id t1 t2 id_list =
   "Axiom " ^ id ^ " : " ^ pretty_print_term id_list t1
-  ^ "\n\tessence = " ^ pretty_print_term id_list t2
+  ^ "\n\tessence = " ^ pretty_print_essence id_list t2
 
 let string_of_let id tuple id_list =
   "Definition " ^ id ^ " = " ^ pretty_print_let tuple id_list

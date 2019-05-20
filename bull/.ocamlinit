@@ -1,24 +1,25 @@
 #directory "_build"
 
 #load "utils.cmo"
-open Utils
 #load "bruijn.cmo"
-open Bruijn
-#load "printer.cmo"
-open Printer
 #load "env.cmo"
-open Env
+#load "printer.cmo"
 #load "reduction.cmo"
-open Reduction
 #load "subtyping.cmo"
-open Subtyping
 #load "unification.cmo"
-open Unification
 #load "reconstruction.cmo"
-open Reconstruction
 #load "parser.cmo"
-open Parser
 #load "lexer.cmo"
-open Lexer
 #load "interface.cmo"
+
+open Utils
+open Bruijn
+open Env
+open Printer
+open Reduction
+open Subtyping
+open Unification
+open Reconstruction
+open Parser
+open Lexer
 open Interface

@@ -16,7 +16,7 @@
   let rec add_typs loc l t =
     match l with
     | [] -> t
-    | (id,t1) :: l -> Prod(loc, id, t1, add_args loc l t)
+    | (id,t1) :: l -> Prod(loc, id, t1, add_typs loc l t)
 
 %}
 

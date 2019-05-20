@@ -26,7 +26,7 @@ Axiom stl : exp -> exp -> Type.
 Axiom oml : exp -> exp -> Type.
 Axiom lfl : exp -> exp -> Type.
 
-Axiom abs_rule :
+Axiom lam_rule :
       forall e t1 t2,
       	     (stl (arr t1 t2) star -> (forall x, stl x t1 -> stl (e x) (t2 x)) -> stl (lam t1 e) (arr t1 t2)) &
        	     (oml (arr t1 t2) star -> (forall x, oml x t1 -> oml (e x) (t2 x)) -> oml (lam t1 e) (arr t1 t2)) &
