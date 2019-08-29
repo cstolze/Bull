@@ -51,5 +51,5 @@ let is_subtype env ctx a b =
   | (_,Union(_,b1,b2)) -> foo env ctx a b1 || foo env ctx a b2
   | (Prod(_,_,a1,a2),Prod(_,_,b1,b2))
     -> foo env ctx b1 a1 && foo env (Env.add_var ctx (DefAxiom("",nothing))) a2 b2
-  | _ -> true (* is_equal env ctx a b *) (* TODO: FIXME *)
+  | _ -> same_term a b
   in foo env ctx a b

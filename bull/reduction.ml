@@ -93,8 +93,8 @@ let rec strongly_normalize is_essence env ctx t =
     -> if is_eta (App (l', t1, l2)) then
          let t1 = lift 0 (-1) t1 in
          match l2 with
-         | [] -> sn t1
-         | _ -> sn (App (l', t1, List.map (lift 0 (-1)) l2))
+         | [] -> t1
+         | _ -> App (l', t1, List.map (lift 0 (-1)) l2)
        else
 	 t
   (* Pair-redex *)
