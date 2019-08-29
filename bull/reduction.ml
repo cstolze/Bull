@@ -73,8 +73,10 @@ let rec strongly_normalize is_essence env ctx t =
   | App(l, App(l',t1,t2), t3) ->
      sn (App(l, t1, List.append t2 t3))
   (* Beta-redex *)
-  | App (l, Abs (l',_,_, t1), t2 :: [])
-    -> sn (beta_redex t1 t2)
+  | App (l, Abs (l',_,_, t1), t2 :: []) ->
+     sn (beta_redex t1 t2)
+  | App (l, Abs (l',x,y, t1), t2 :: t3)
+    -> sn @@ app l (sn (App(l,Abs (l',x,y, t1), t3))) t2
   | Let (l, _, t1, t2, t3) -> sn (beta_redex t2 t1)
   (* Delta-redex *)
   | Var (l, n) -> let (t1, _) = Env.find_var ctx n in
@@ -84,12 +86,15 @@ let rec strongly_normalize is_essence env ctx t =
   | Const (l, id) -> let o = Env.find_const is_essence env id in
 	             (match o with
                       | None -> Const(l, id)
-	              | Some (Const _ as t1,_) -> t1
+	              | Some (Const (_,id') as t1,_) when id = id' -> t1
 	              | Some (t1,_) -> sn t1)
   (* Eta-redex *)
   | Abs (l,_, _, App (l',t1, Var (_,0) :: l2))
     -> if is_eta (App (l', t1, l2)) then
-	 sn (lift 0 (-1) t1)
+         let t1 = lift 0 (-1) t1 in
+         match l2 with
+         | [] -> sn t1
+         | _ -> sn (App (l', t1, List.map (lift 0 (-1)) l2))
        else
 	 t
   (* Pair-redex *)

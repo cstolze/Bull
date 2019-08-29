@@ -1,6 +1,6 @@
 (*
     Bull, a theorem prover based on intersection types and Curry-Howard isomorphism.
-    Copyright (C) 2016 Claude Stolze, ENS Rennes, UPMC, INRIA
+    Copyright (C) 2019 Claude Stolze, INRIA, UCA
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
