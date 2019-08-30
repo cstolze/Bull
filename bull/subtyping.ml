@@ -1,5 +1,6 @@
 open Utils
 open Reduction
+open Unification
 
 (* Note: for now, these functions suppose that there is no type meta-variables in the terms *)
 (* TODO: design an unification algorithm for types modulo subtyping *)
