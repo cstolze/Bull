@@ -91,7 +91,8 @@ let rec reconstruct meta env ctx t
      let (meta, t2, t2') =
        let decl = DefAxiom(id, t1) in
        reconstruct meta env (decl :: ctx) t2 in
-     let (meta,typ,_) = force_type meta env ctx (Prod (l, id, t1, t2')) in
+     let typ = Prod (l, id, t1, t2') in
+     let (meta,_,_) = force_type meta env ctx typ in
      (meta, Abs(l, id, t1, t2), typ)
 
   | App (l, t1, l2) ->
@@ -123,7 +124,7 @@ let rec reconstruct meta env ctx t
                                                      k)) in
                  (meta, App(l, t1, t2 :: l2), beta_redex k t2)
                with
-               | Unif_Error -> err @@ App_Error(l, t1, t1', t2, t2')
+               | Unif_Error -> err @@ App_Error(l, apply_all_substitution meta t1, apply_all_substitution meta t1', apply_all_substitution meta t2, apply_all_substitution meta t2')
           end
      end
 
@@ -172,7 +173,7 @@ let rec reconstruct meta env ctx t
                                                            b)) in
             (meta, SPrLeft(l,t1), a)
           with
-          | Unif_Error -> err @@ Proj_Error(l,t1,t1')
+          | Unif_Error -> err @@ Proj_Error(l,apply_all_substitution meta t1,apply_all_substitution meta t1')
      end
   | SPrRight (l, t1) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
@@ -190,7 +191,7 @@ let rec reconstruct meta env ctx t
                                                            b)) in
             (meta, SPrRight(l,t1), b)
           with
-          | Unif_Error -> err @@ Proj_Error(l,t1,t1')
+          | Unif_Error -> err @@ Proj_Error(l,apply_all_substitution meta t1,apply_all_substitution meta t1')
      end
 
   | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
@@ -215,7 +216,7 @@ let rec reconstruct meta env ctx t
           SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
           app dummy_loc t2 t1)
        with
-       | Unif_Error -> err @@ Match_Error(l,t1,t1',t3,t5)
+       | Unif_Error -> err @@ Match_Error(l,apply_all_substitution meta t1,apply_all_substitution meta t1',apply_all_substitution meta t3,apply_all_substitution meta t5)
      end
 
   | SInLeft (l, t1, t2) ->
@@ -235,16 +236,16 @@ let rec reconstruct meta env ctx t
      let (meta, t2, t2') = reconstruct meta env ctx t2 in
      if is_subtype env ctx t1 t2' then
        (meta, Coercion(l,t1,t2), t1)
-     else err @@ Coercion_Error(l,t2,t2',t1)
+     else err @@ Coercion_Error(l,apply_all_substitution meta t2,apply_all_substitution meta t2',apply_all_substitution meta t1)
 
-  | Var (l, n) -> let (t1,t1') = Env.find_var ctx n in
-                  (meta, t1, t1')
+  | Var (l, n) -> let (_,t1') = Env.find_var ctx n in
+                  (meta, Var(l,n), t1')
 
   | Const (l, id) ->
      begin
      match Env.find_const false env id with
      | None -> err @@ Const_Error(l, id)
-     | Some (t1,t1') -> (meta, t1, t1')
+     | Some (_,t1') -> (meta, Const(l,id), t1')
      end
 
   | Underscore l ->
@@ -275,7 +276,7 @@ and force_type meta env ctx t =
   | Some _, Some _ -> (meta, t, t')
   | Some meta, None -> (meta, t, t')
   | None, Some meta -> (meta, t, t')
-  | None, None -> err @@ Force_Type_Error(loc_term t,t,t')
+  | None, None -> err @@ Force_Type_Error(loc_term t,apply_all_substitution meta t,apply_all_substitution meta t')
 and reconstruct_with_type meta env ctx t1 ttt =
   let unification = unification false in
   let strongly_normalize = strongly_normalize false in
@@ -285,7 +286,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
     try
       unification meta env ctx t1' ttt, t1, t1'
     with
-    | Unif_Error -> err @@ Typecheck_Error(loc_term t1, t1, t1', ttt)
+    | Unif_Error -> err @@ Typecheck_Error(loc_term t1, apply_all_substitution meta t1, apply_all_substitution meta t1', apply_all_substitution meta ttt)
   in
   match t1 with
   | Let(l,id,t1,t2,t3) ->
@@ -316,7 +317,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
                                       (decl :: ctx) t2 u2 in
               (meta, Abs(l,id,t1,t2), Prod(l,id,t1,t2'))
             with
-            | Unif_Error -> err @@ Wrong_Type_Error(l, t1, u1)
+            | Unif_Error -> err @@ Wrong_Type_Error(l, apply_all_substitution meta t1, apply_all_substitution meta u1)
           end
        | _ -> default ()
      end
@@ -358,7 +359,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
                 reconstruct_with_type meta env ctx t2 u1 in
               (meta, SInLeft(l,t1,t2), Union(l,t2',t1))
             with
-            | Unif_Error -> err @@ Wrong_Type_Error(l, t1, u2)
+            | Unif_Error -> err @@ Wrong_Type_Error(l, apply_all_substitution meta t1, apply_all_substitution meta u2)
           end
        | _ -> default ()
      end
@@ -377,7 +378,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
                 reconstruct_with_type meta env ctx t2 u2 in
               (meta, SInLeft(l,t1,t2), Union(l,t1,t2'))
             with
-            | Unif_Error -> err @@ Wrong_Type_Error(l, t1, u1)
+            | Unif_Error -> err @@ Wrong_Type_Error(l, apply_all_substitution meta t1, apply_all_substitution meta u1)
           end
        | _ -> default ()
      end
@@ -440,7 +441,7 @@ and essence_with_hint meta env ctx t1 t =
       let meta = unification meta env ctx t1 t in
       meta, t1
     with
-    | Unif_Error -> err @@ Essence_Error(loc_term t1, t1, t)
+    | Unif_Error -> err @@ Essence_Error(loc_term t1, apply_all_substitution meta t1, apply_all_substitution meta t)
   in
   let norm () =
     strongly_normalize true env ctx
