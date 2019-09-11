@@ -337,7 +337,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
   | SPrLeft (l, t1) ->
      let (meta, k) = meta_add meta ctx (Sort(dummy_loc, Type)) l in
      let (meta, t, _) = reconstruct meta env ctx
-                                    (Inter(l,ttt,k)) in
+                          (Inter(l,ttt,k)) in
      reconstruct_with_type meta env ctx t1 t
   | SPrRight (l,t1) ->
      let (meta, k) = meta_add meta ctx (Sort(dummy_loc, Type)) l in
@@ -449,8 +449,8 @@ and essence_with_hint meta env ctx t1 t =
   in
   match t1 with
   | SPair (l,t1,t2) ->
-     let (meta, t1) = essence_with_hint meta env ctx t1 t in
-     essence_with_hint meta env ctx t2 t1
+     let (meta, _) = essence_with_hint meta env ctx t1 t in
+     essence_with_hint meta env ctx t2 t
   | SPrLeft (l,t1) | SPrRight (l,t1) ->
      essence_with_hint meta env ctx t1 t
   | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
