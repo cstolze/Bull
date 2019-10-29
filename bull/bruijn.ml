@@ -1,9 +1,5 @@
 open Utils
 
-(* TODO:
- WE DO NOT DEAL WITH META VARIABLES FOR NOW
- *)
-
 (* Visitor iterator *)
 (* goes recursively into most of the terms constructors *)
 (* f : recursor
@@ -15,6 +11,9 @@ let visit_term f g h = function
   | Prod (l, id1, t1, t2) -> Prod (l, h id1 t2, f t1, g (h id1 t2) t2)
   | Abs (l, id1, t1, t2) -> Abs (l, h id1 t2, f t1, g (h id1 t2) t2)
   | App (l, t1, l2) -> App (l, f t1, List.map f l2)
+  | SProd (l, id1, t1, t2) -> SProd (l, h id1 t2, f t1, g (h id1 t2) t2)
+  | SAbs (l, id1, t1, t2) -> SAbs (l, h id1 t2, f t1, g (h id1 t2) t2)
+  | SApp (l, t1, t2) -> SApp (l, f t1, f t2)
   | Inter (l, t1, t2) -> Inter (l, f t1, f t2)
   | Union (l, t1, t2) -> Union (l, f t1, f t2)
   | SPair (l, t1, t2) -> SPair (l, f t1, f t2)

@@ -228,14 +228,14 @@ let rec repl lx env verbose =
                let (meta, _) = Unification.meta_add meta l t dummy_loc in
                (env, meta)
              end
-          | UAxiom (id,t)->
+          | UAxiom (id,t)-> (* for debugging *)
              begin
                match Env.find_const false env id with
                | Some n -> prerr_endline (error_declared id); (env,meta)
                | None -> let t = (fix_index [] t) in
                          (Env.add_const env (DefAxiom(id,t)) (DefAxiom(id,t)), meta)
              end
-          | UDefinition (id,t1,t2) ->
+          | UDefinition (id,t1,t2) -> (* for debugging *)
              begin
                match Env.find_const false env id with
                | Some n -> prerr_endline (error_declared id); (env,meta)

@@ -66,30 +66,48 @@ let rec string_of_term is_essence id_list t =
     | Sort (l, s) -> (match s with
 		 | Type -> "Type"
 		 | Kind -> "Kind")
-    | Let (l, id, t1, t2, t3) -> parentheseme 1 ("let " ^ id ^ " : "
-					  ^ aux t1 0 ^ " := " ^ aux t2 0 ^ " in " ^ aux t3 0)
+    | Let (l, id, t1, t2, t3) -> parentheseme 1 ("let " ^ id ^ (if is_essence then "" else " : "
+					  ^ aux t1 0) ^ " := " ^ aux t2 0 ^ " in " ^ aux t3 0)
     | Prod (l, id, t1, t2) -> if is_const id t2 then
 			        parentheseme 1 ("forall " ^ id ^ " : "
 					        ^ aux t1 0 ^ ", "
 					        ^ aux t2 0)
 			      else parentheseme 2 (aux t1 2 ^ " -> "
 						   ^ aux t2 1)
+    | SProd (l, id, t1, t2) -> if is_const id t2 then
+			        parentheseme 1 ("sforall " ^ id ^ " : "
+					        ^ aux t1 0 ^ ", "
+					        ^ aux t2 0)
+			      else parentheseme 2 (aux t1 2 ^ " >> "
+						   ^ aux t2 1)
     | Abs (l, id, t1, t2)
       -> parentheseme 1 ("fun " ^ id ^ (if is_essence
+					then "" else " : " ^ aux t1 0)
+			 ^ " => " ^ aux t2 0)
+    | SAbs (l, id, t1, t2)
+      -> parentheseme 1 ("sfun " ^ id ^ (if is_essence
 					then "" else " : " ^ aux t1 0)
 			 ^ " => " ^ aux t2 0)
     | App (l, t1, l2)
       -> parentheseme 5 (aux t1 4 ^ " "
                          ^ String.concat
                              " " (List.map (fun x -> aux x 5) @@ List.rev l2))
+    | SApp (l, t1, t2)
+      -> parentheseme 5 (aux t1 4 ^ " "
+                         ^ aux t2 5)
     | Inter (l, t1, t2) -> parentheseme 4 (aux t1 4 ^ " & " ^ aux t2 3)
     | Union (l, t1, t2) -> parentheseme 3 (aux t1 3 ^ " | " ^ aux t2 2)
     | SPair (l, t1, t2) -> "< " ^  aux t1 0 ^ ", " ^ aux t2 0 ^ " >"
     | SPrLeft (l, t1) -> parentheseme 6 ("proj_l " ^ aux t1 5)
     | SPrRight (l, t1) -> parentheseme 6 ("proj_r " ^ aux t1 5)
     | SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6) ->
-       "match " ^ aux t1 0 ^ " return " ^ aux t2 0 ^ " with " ^ id1 ^
-         " : " ^ aux t3 0 ^ " => " ^ aux t4 0 ^ " , " ^ id2 ^ " : " ^ aux t5 0 ^ " => " ^ aux t6 0 ^ " end"
+       begin
+         match t2 with
+         | Abs(_,x,_,t2) ->
+            "match " ^ aux t1 0 ^ " as " ^ x ^ " return " ^ aux t2 0 ^ " with " ^ id1 ^
+              " : " ^ aux t3 0 ^ " => " ^ aux t4 0 ^ " , " ^ id2 ^ " : " ^ aux t5 0 ^ " => " ^ aux t6 0 ^ " end"
+         | _ -> assert false
+       end
     | SInLeft (l, t1, t2) -> parentheseme 6 ("inj_l " ^ aux t1 5
 					  ^ " " ^ aux t2 5)
     | SInRight (l, t1, t2) -> parentheseme 6 ("inj_r " ^ aux t1 5

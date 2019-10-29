@@ -20,6 +20,9 @@ type term =
   | Prod of location * string * term * term (* forall s : t1, t2 *)
   | Abs of location * string * term * term (* fun s : t1 => t2 *)
   | App of location * term * term list (* t1 t2 *)
+  | SProd of location * string * term * term (* sforall s : t1, t2 *)
+  | SAbs of location * string * term * term (* sfun s : t1 => t2 *)
+  | SApp of location * term * term (* strong application (for the essence) of t1 and t2 *)
   | Inter of location * term * term (* t1 & t2 *)
   | Union of location * term * term (* t1 | t2 *)
   | SPair of location * term * term (* < t1, t2 > *)
@@ -48,7 +51,7 @@ let app' l t1 t2 =
 
 let loc_term t =
   match t with
-  | Sort (l, _) | Let (l,_,_,_,_) | Prod (l,_,_,_) | Abs (l,_,_,_) | App (l,_,_) | Inter (l,_,_)
+  | Sort (l, _) | Let (l,_,_,_,_) | Prod (l,_,_,_) | Abs (l,_,_,_) | App (l,_,_) | SProd (l,_,_,_) | SAbs (l,_,_,_) | SApp (l,_,_) | Inter (l,_,_)
     | Union (l,_,_) | SPair (l,_,_) | SPrLeft (l,_) | SPrRight (l,_) | SMatch (l,_,_,_,_,_,_,_,_)
     | SInLeft (l,_,_) | SInRight (l,_,_) | Coercion (l,_,_) | Var (l,_) | Const (l,_)
     | Underscore l | Meta (l,_,_) -> l
@@ -100,8 +103,8 @@ type sentence =
   | Endmeta
   | Unify of term * term
   | Add of (string * term) list * term
-  | UAxiom of string * term
-  | UDefinition of string * term * term
+  | UAxiom of string * term (* for debugging *)
+  | UDefinition of string * term * term (* for debugging *)
 
 (* Error during type reconstruction *)
 type errcheck =

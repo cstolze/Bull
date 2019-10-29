@@ -83,6 +83,7 @@ let rec same_term t1 t2 =
   | SPrLeft(l,t1), SPrLeft(_,t1') | SPrRight(l,t1), SPrRight(_,t1') ->
      same_term t1 t1'
   | Var(l,x), Var(_,y) -> x = y
+  | Const(l,x), Const(_,y) -> x = y
   | Meta(l,n,s1), Meta(_,m,s2) ->
      if m = n then
        same_list s1 s2
@@ -194,7 +195,7 @@ let rec is_offending ctx m xi t =
   match t with
   | Sort (l,m) -> true
   | Let (l1,id,t1,t2,t3) -> assert false
-  | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) ->
+  | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) | SProd (l, id, t1, t2) | SAbs (l,id,t1,t2) ->
      is_offending ctx m xi t1 &&
        is_offending (DefAxiom(id,t1) :: ctx) m (List.map (fun x -> x+1) xi) t2
   | App (l,t1,l1) ->
@@ -202,7 +203,7 @@ let rec is_offending ctx m xi t =
        (fun meta t -> is_offending ctx m xi t)
        (is_offending ctx m xi t1)
        l1
-  | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2)
+  | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2) | SApp (l, t1, t2)
     | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
      is_offending ctx m xi t1 &&
        is_offending ctx m xi t2
@@ -243,7 +244,7 @@ let rec prune is_essence meta env ctx m xi t =
   match t with
   | Sort (l,m) -> meta
   | Let (l1,id,t1,t2,t3) -> assert false
-  | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) ->
+  | Prod (l,id,t1,t2) | Abs (l,id,t1,t2) | SProd (l,id,t1,t2) | SAbs (l,id,t1,t2) ->
      let meta = prune is_essence meta env ctx m xi t1 in
      prune is_essence meta env (Env.add_var ctx (DefAxiom(id,t1))) m (0 :: (List.map (fun x -> x+1) xi)) t2
   | App (l,t1,l1) ->
@@ -251,7 +252,7 @@ let rec prune is_essence meta env ctx m xi t =
        (fun meta t -> prune is_essence meta env ctx m xi t)
        (prune is_essence meta env ctx m xi t1)
        l1
-  | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2)
+  | Inter (l,t1,t2) | Union (l,t1,t2) | SPair (l,t1,t2) | SApp(l,t1,t2)
     | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
      let meta = prune is_essence meta env ctx m xi t1 in
      prune is_essence meta env ctx m xi t2
@@ -342,42 +343,65 @@ let unification is_essence meta env ctx t1 t2 =
          bar meta ctx t1 t2
 
     (* Unifying a meta-variable with another term *)
+    | App(l,Meta(l',n,s1),t1), t ->
+       begin
+         try meta_inst is_essence meta env ctx t n s1 t1 with
+         | HOPU_Error ->
+            if t1 = [] then
+              match get_meta meta n with
+              | DefMeta (ctx, _, ttt) ->
+                 let (m, meta) = meta in
+                 let meta = (m+1, DefMeta([], m, t) :: meta) in (* violent prune *)
+                 let (num,meta) = meta_inst is_essence meta env ctx t m [] [] in
+                 (num, solution (num,meta) n (Meta(l,m,[])))
+              | _ -> failwith "should not happen simple_unif"
+            else match t with (* first-order unification *)
+                 | App(_,t,l2) ->
+                    if List.length l2  = List.length t1 then
+                      let meta = foo meta ctx (App(l,Meta(l',n,s1),[])) t in
+                      bar meta ctx t1 l2
+                    else raise Unif_Error
+                 | _ -> raise Unif_Error
+       end
+
     | t, App(l,Meta(l',n,s1),t1) ->
        (* not implemented: Meta-DelDeps (future work) *)
        begin
          try meta_inst is_essence meta env ctx t n s1 t1 with
          | HOPU_Error ->
-            match t with
-            | App(_,t,l2) -> (* first-order unification *)
-               if List.length l2  = List.length t1 then
-                 let meta = foo meta ctx t (App(l,Meta(l',n,s1),[])) in
-                 bar meta ctx l2 t1
-               else raise Unif_Error
-            | _ -> raise Unif_Error
-       end
-    | App(l,Meta(l',n,s1),t1), t ->
-       begin
-         try meta_inst is_essence meta env ctx t n s1 t1 with
-         | HOPU_Error ->
-            match t with (* first-order unification *)
-            | App(_,t,l2) ->
-               if List.length l2  = List.length t1 then
-                 let meta = foo meta ctx (App(l,Meta(l',n,s1),[])) t in
-                 bar meta ctx t1 l2
-               else raise Unif_Error
-            | _ -> raise Unif_Error
+            if t1 = [] then
+              match get_meta meta n with
+              | DefMeta (ctx, _, ttt) ->
+                 let (m, meta) = meta in
+                 let meta = (m+1, DefMeta([], m, t) :: meta) in (* violent prune *)
+                 let (num,meta) = meta_inst is_essence meta env ctx t m [] [] in
+                 (num, solution (num,meta) n (Meta(l,m,[])))
+              | _ -> failwith "should not happen simple_unif"
+            else match t with (* first-order unification *)
+                 | App(_,t,l2) ->
+                    if List.length l2  = List.length t1 then
+                      let meta = foo meta ctx (App(l,Meta(l',n,s1),[])) t in
+                      bar meta ctx t1 l2
+                    else raise Unif_Error
+                 | _ -> raise Unif_Error
        end
 
     (* Structural unification *)
     | Sort(l,t1), Sort(_,t2) -> if t1 = t2 then meta
                                 else raise Unif_Error
-    | Prod(l,id,t1,t2), Prod(_,_,t1',t2') ->
+    | Prod(l,id,t1,t2), Prod(_,_,t1',t2')
+      | SProd(l,id,t1,t2), SProd(_,_,t1',t2') ->
        let meta = foo meta ctx t1 t1' in
        let meta = foo meta (DefAxiom(id,t1) :: ctx) t2 t2' in
        meta
-    | Abs(l,id,t1,t2), Abs(_,_,t1',t2') ->
-       let meta = foo meta ctx t1 t1' in
+    | Abs(l,id,t1,t2), Abs(_,_,t1',t2')
+      | SAbs(l,id,t1,t2), SAbs(_,_,t1',t2') ->
+       let meta = if (not is_essence) then foo meta ctx t1 t1' else meta in
        let meta = foo meta (DefAxiom(id,t1) :: ctx) t2 t2' in
+       meta
+    | SApp(l,t1,t2), SApp(_,t1',t2') ->
+       let meta = foo meta ctx t1 t1' in
+       let meta = foo meta ctx t2 t2' in
        meta
     | Inter(l,t1,t2), Inter(_,t1',t2') ->
        let meta = foo meta ctx t1 t1' in

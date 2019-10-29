@@ -13,6 +13,7 @@ rule read buf = parse
    | "let" { begin Buffer.add_string buf "let"; LET end }
    | "in" { begin Buffer.add_string buf "in"; IN end }
    | "fun" { begin Buffer.add_string buf "fun"; LAMBDA end }
+   | "sfun" { begin Buffer.add_string buf "sfun"; SLAMBDA end }
    | "=>" { begin Buffer.add_string buf "=>"; ENDLAMBDA end }
    | '.' { begin Buffer.add_char buf '.'; DOT end }
    | ',' { begin Buffer.add_char buf ','; COMMA end }
@@ -20,6 +21,7 @@ rule read buf = parse
    | ':' { begin Buffer.add_char buf ':'; COLON end }
    | ';' { begin Buffer.add_char buf ';'; SEMICOLON end }
    | "->" { begin Buffer.add_string buf "->"; ARROW end }
+   | ">>" { begin Buffer.add_string buf ">>"; SARROW end }
    | '&' { begin Buffer.add_char buf '&'; SAND end }
 
    | "|-" { begin Buffer.add_string buf "|-"; TURNSTILE end }
@@ -32,6 +34,7 @@ rule read buf = parse
    | '}' { begin Buffer.add_char buf '}'; CLOSB end }
 
    | "smatch" { begin Buffer.add_string buf "smatch"; SMATCH end }
+   | "as" { begin Buffer.add_string buf "as"; SMATCH end }
    | "return" { begin Buffer.add_string buf "return"; RETURN end }
    | "with" { begin Buffer.add_string buf "with"; WITH end }
    | "end" { begin Buffer.add_string buf "end"; END end }

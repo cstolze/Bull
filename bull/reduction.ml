@@ -3,13 +3,13 @@ open Bruijn
 
 (* Transform (lambda x. t1) t2 into t1[t2/x] *)
 let beta_redex t1 t2 =
-  let aux k l m =
+  let subst k l m =
     if m < k then Var (l, m) (* bound variable *)
     else if m = k then (* x *)
       lift 0 k t2
     else (* the enclosing lambda goes away *)
       Var (l, m-1)
-  in map_term 0 aux t1
+  in map_term 0 subst t1
 
 (* if we know that Gamma |- ?n := t : T, and we consider ?n[subst]
    then we can compute t[subst] (or T[subst]) *)
@@ -72,6 +72,7 @@ let rec strongly_normalize is_essence env ctx t =
   (* Spine fix *)
   | App(l, App(l',t1,t2), t3) ->
      sn (App(l, t1, List.append t2 t3))
+  | App(l, t, []) -> t
   (* Beta-redex *)
   | App (l, Abs (l',_,_, t1), t2 :: []) ->
      sn (beta_redex t1 t2)

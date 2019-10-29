@@ -1,0 +1,154 @@
+(* This is the code from my thesis *)
+(* It should run flawlessly *)
+
+Axiom (s t : Type).
+
+Definition auto_application (x : s & (s -> t)) := (proj_r x) (proj_l x).
+Definition poly_id : (s -> s) & (t -> t) := let id1 x := x in let id2 x := x in < id1, id2 >.
+Definition commut_union (x : s | t) := smatch x with x => inj_r _ x, x => inj_l _ x end.
+
+(****************************************************************************************************)
+
+Axiom (Neg Zero Pos T F : Type) (Test : Pos | Neg).
+Axiom Is_0 : (Neg -> F) & (Zero -> T) & (Pos -> F).
+Definition Is_0_Test := smatch Test with x => coe (Pos -> F) Is_0 x, x => coe (Neg -> F) Is_0 x end.
+
+(****************************************************************************************************)
+
+(* three base types: atomic propositions,
+   non-atomic goals and non-atomic programs *)
+Axiom atom : Type.
+Axiom non_atomic_goal : Type.
+Axiom non_atomic_prog : Type.
+
+(* goals and programs are defined from the base types *)
+Definition goal := atom | non_atomic_goal.
+Definition prog := atom | non_atomic_prog.
+
+(* constructors (implication, conjunction, disjunction) *)
+Axiom impl : (prog -> goal -> non_atomic_goal) & (goal -> prog -> non_atomic_prog).
+Definition impl_1 p g := inj_r atom (proj_l impl p g).
+Definition impl_2 g p := inj_r atom (proj_r impl g p).
+Axiom and : (goal -> goal -> non_atomic_goal) & (prog -> prog -> non_atomic_prog).
+Definition and_1 g1 g2 := inj_r atom (proj_l and g1 g2).
+Definition and_2 p1 p2 := inj_r atom (proj_r and p1 p2).
+Axiom or : (goal -> goal -> non_atomic_goal).
+Definition or_1 g1 g2 := inj_r atom (or g1 g2).
+
+(* solve p g means: the judgment p |- g is valid *)
+Axiom solve : prog -> goal -> Type.
+(* backchain p a g means: if p |- g is valid, then p |- a is valid *)
+Axiom backchain : prog -> atom -> goal -> Type.
+
+(* rules for solve *)
+Axiom solve_and : forall p g1 g2, solve p g1 -> solve p g2 -> solve p (and_1 g1 g2).
+Axiom solve_or1 : forall p g1 g2, solve p g1 -> solve p (or_1 g1 g2).
+Axiom solve_or2 : forall p g1 g2, solve p g2 -> solve p (or_1 g1 g2).
+Axiom solve_impl : forall p1 p2 g, solve (and_2 p1 p2) g -> solve p1 (impl_1 p2 g).
+Axiom solve_atom : forall p a g, backchain p a g -> solve p g -> solve p (inj_l non_atomic_goal a).
+
+(* rules for backchain *)
+Axiom backchain_and1 : forall p1 p2 a g, backchain p1 a g -> backchain (and_2 p1 p2) a g.
+Axiom backchain_and2 : forall p1 p2 a g, backchain p1 a g -> backchain (and_2 p1 p2) a g.
+Axiom backchain_impl_atom : forall a g, backchain (impl_2 g (inj_l non_atomic_prog a)) a g.
+Axiom backchain_impl_impl : forall p a g g1 g2, backchain (impl_2 (and_1 g1 g2) p) a g -> backchain (impl_2 g1 (impl_2 g2 p)) a g.
+Axiom backchain_impl_and1 : forall p1 p2 a g g1, backchain (impl_2 g1 p1) a g -> backchain (impl_2 g1 (and_2 p1 p2)) a g.
+Axiom backchain_impl_and2 : forall p1 p2 a g g1, backchain (impl_2 g1 p2) a g -> backchain (impl_2 g1 (and_2 p1 p2)) a g.
+
+(****************************************************************************************************)
+
+Axiom (O : Type) (Impl : O -> O -> O) (Elim Nf0 : O -> Type).
+Definition Nf A := Nf0 A | Elim A.
+Axiom impl_I : forall A B, (Elim A -> Nf B) -> (Nf0 (Impl A B)).
+Axiom impl_E : forall A B, Elim (Impl A B) -> Nf0 A -> Elim B.
+
+(****************************************************************************************************)
+
+(* Object type *)
+Axiom o : Type.
+
+(* Type connectives *)
+Axiom carrow : o -> o -> o.
+Axiom cinter : o -> o -> o.
+Axiom cunion : o -> o -> o.
+Axiom crelev : o -> o -> o.
+
+(* Transform the object types into real types *)
+Axiom aOk : o -> Type.
+
+(* Semantics *)
+Axiom cabst : forall s t, (aOk s -> aOk t) >> aOk (carrow s t).
+Axiom capp : forall s t, aOk (carrow s t) >> aOk s -> aOk t.
+Axiom csabst : forall s t,  (aOk s >> aOk t) >> aOk (crelev s t).
+Axiom csapp : forall s t, aOk (crelev s t) >> aOk s >> aOk t.
+Axiom cpair : forall s t, (aOk s & aOk t) >> aOk (cinter s t).
+Axiom cpri : forall s t, aOk (cinter s t) >> (aOk s & aOk t).
+Axiom cini : forall s t, (aOk s | aOk t) >> aOk (cunion s t).
+Axiom ccopair : forall s t, aOk (cunion s t) >> (aOk s | aOk t).
+
+(****************************************************************************************************)
+
+Axiom A : o.
+Axiom B : o.
+
+Definition halfomega := cabst (cinter A (carrow A B)) B
+ (fun x => capp A B (proj_r (cpri A (carrow A B) x))
+  (proj_l (cpri A (carrow A B) x))).
+Definition idpair := cpair (carrow A A) (carrow B B)
+ <cabst A A (fun x => x), cabst B B (fun x => x)>.
+Definition communion := cabst (cunion A B) (cunion B A) (fun x => smatch ccopair A B x with y => cini B A (inj_r (aOk B) y), y => cini B A (inj_l (aOk A) y) end).
+
+Definition communion' := csabst (cunion A B) (cunion B A) (sfun x => smatch ccopair A B x with y => cini B A (inj_r (aOk B) y), y => cini B A (inj_l (aOk A) y) end).
+
+(****************************************************************************************************)
+
+Axiom obj' : Type.
+Axiom fam' : Type.
+Axiom knd' : Type.
+Axiom sup' : Type.
+
+Axiom same : obj' & fam' & knd' & sup'.
+Axiom term : (obj' | fam' | knd' | sup') -> Type.
+(* The obj, fam, knd, and sup types have the same essence (term same) *)
+Definition obj := term (coe (obj' | fam' | knd' | sup') (coe obj' same)).
+Definition fam := term (coe (obj' | fam' | knd' | sup') (coe fam' same)).
+Definition knd := term (coe (obj' | fam' | knd' | sup') (coe knd' same)).
+Definition sup := term (coe (obj' | fam' | knd' | sup') (coe sup' same)).
+
+Axiom tp : knd & sup.
+(* star and sqre have the same essence (tp) *)
+Definition star := coe knd tp.
+Definition sqre := coe sup tp.
+
+Axiom lam : (fam -> (obj -> obj) -> obj) & (fam -> (obj -> fam) -> fam).
+Definition lam_1 := coe (fam -> (obj -> obj) -> obj) lam.
+Definition lam_2 := coe (fam -> (obj -> fam) -> fam) lam.
+
+Axiom pi : (fam -> (obj -> fam) -> fam) & (fam -> (obj -> knd) -> knd).
+Definition pi_1 := coe (fam -> (obj -> fam) -> fam) pi.
+Definition pi_2 := coe (fam -> (obj -> knd) -> knd) pi.
+
+Axiom app : (obj -> obj -> obj) & (fam -> obj -> fam).
+Definition app_1 := coe (obj -> obj -> obj) app.
+Definition app_2 := coe (fam -> obj -> fam) app.
+
+Axiom of_1 : obj -> fam -> Type.
+Axiom of_2 : fam -> knd -> Type.
+Axiom of_3 : knd -> sup -> Type.
+
+Axiom of_ax : of_3 star sqre.
+(* Rules for lambda-abstraction are "essentially" the same *)
+Definition of_lam1 := forall t1 t2 t3, of_2 t1 star -> (forall x, of_1 x t1 -> of_1 (t2 x) (t3 x)) -> of_1 (lam_1 t1 t2) (pi_1 t1 t3).
+Definition of_lam2 := forall t1 t2 t3, of_2 t1 star -> (forall x, of_1 x t1 -> of_2 (t2 x) (t3 x)) -> of_2 (lam_2 t1 t2) (pi_2 t1 t3).
+Axiom of_lam : of_lam1 & of_lam2.
+(* Rules for product are ''essentially'' the same *)
+Definition of_pi1 := forall t1 t2, of_2 t1 star -> (forall x, of_1 x t1 -> of_2 (t2 x) star) -> of_2 (pi_1 t1 t2) star.
+Definition of_pi2 := forall t1 t2, of_2 t1 star -> (forall x, of_1 x t1 -> of_3 (t2 x) sqre) -> of_3 (pi_2 t1 t2) sqre.
+Axiom of_pi : of_pi1 & of_pi2.
+(* Rules for application are ''essentially'' the same *)
+Definition of_app1 := forall t1 t2 t3 t4, of_1 t1 (pi_1 t3 t4) -> of_1 t2 t3 -> of_1 (app_1 t1 t2) (t4 t2).
+Definition of_app2 := forall t1 t2 t3 t4, of_2 t1 (pi_2 t3 t4) -> of_1 t2 t3 -> of_2 (app_2 t1 t2) (t4 t2).
+Axiom of_app : of_app1 & of_app2.
+
+(****************************************************************************************************)
+(* EVERYTHING WORKS *)

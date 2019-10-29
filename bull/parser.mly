@@ -25,6 +25,7 @@
 %token LT
 %token GT
 %token LAMBDA
+%token SLAMBDA
 %token ENDLAMBDA
 %token LET
 %token IN
@@ -34,10 +35,12 @@
 %token ASSIGN
 %token SEMICOLON
 %token ARROW
+%token SARROW
 %token SAND
 %token SOR
 %token UNDERSCORE
 %token SMATCH
+%token AS
 %token RETURN
 %token WITH
 %token END
@@ -84,8 +87,8 @@ s:
     | LEMMA ID COLON term DOT { [Proof($2,$4)] }
     | AXIOM decl_list DOT { List.map (fun (x,y) -> Axiom (x,y)) $2 }
     | DEFINITION ID pdl_opt COLON term ASSIGN term
-		 DOT { [Definition ($2, add_args (get_loc ()) $3 $7, $5)] }
-    | DEFINITION ID pdl_opt ASSIGN term DOT { [Definition ($2, add_args (get_loc ()) $3 $5, Underscore dummy_loc)] }
+		 DOT { [Definition ($2, add_args (get_loc ()) $3 $7, add_typs (get_loc ()) $3 $5)] }
+    | DEFINITION ID pdl_opt ASSIGN term DOT { [Definition ($2, add_args (get_loc ()) $3 $5, add_typs (get_loc ()) $3 (Underscore dummy_loc))] }
     | PRINT id_list DOT { List.map (fun x -> Print x) $2 }
     | SIG DOT { [Print_all] }
     | SHOW DOT { [Show] }
@@ -101,7 +104,7 @@ s:
     | ADD pdl_opt TURNSTILE term DOT { [Add ($2,$4)] }
     | AXIOM UNTYPED decl_list DOT { List.map (fun (x,y) -> UAxiom (x,y)) $3 }
     | DEFINITION UNTYPED ID pdl_opt COLON term ASSIGN term
-		 DOT { [UDefinition ($3, add_args (get_loc ()) $4 $8, $6)] }
+		 DOT { [UDefinition ($3, add_args (get_loc ()) $4 $8, add_typs (get_loc ()) $4 $6)] }
     ;
 
 id_list :
@@ -142,15 +145,21 @@ arg_list :
 
 term:
     | PI arg_list COMMA term
-             { add_typs (get_loc ()) $2 $4 }
+         { add_typs (get_loc ()) $2 $4 }
+    | SUBSET arg_list COMMA term
+         { begin match add_typs (get_loc ()) $2 $4 with | Prod(l,id,s,t) -> SProd(l,id,s,t) | _ as t -> t end }
     | LAMBDA arg_list ENDLAMBDA term
              { add_args (get_loc ()) $2 $4 }
-    | LET ID COLON term ASSIGN term IN term { Let (get_loc (), $2, $4, $6, $8) }
+    | SLAMBDA arg_list ENDLAMBDA term
+             { begin match add_args (get_loc ()) $2 $4 with | Abs(l,id,s,t) -> SAbs(l,id,s,t) | _ as t -> t end }
+    | LET ID pdl_opt ASSIGN term IN term { Let (get_loc (), $2, add_typs (get_loc ()) $3 (Underscore(get_loc ())), add_args (get_loc ()) $3 $5, $7) }
+    | LET ID pdl_opt COLON term ASSIGN term IN term { Let (get_loc (), $2, add_typs (get_loc ()) $3 $5, add_args (get_loc ()) $3 $7, $9) }
     | term2 { $1 }
     ;
 
 term2:
     | term3 ARROW term2 { Prod (get_loc (), "_", $1, $3) } /* arrow is right-to-left */
+    | term3 SARROW term2 { SProd (get_loc (), "_", $1, $3) } /* sarrow is right-to-left */
     | term3 { $1 }
     ;
 
@@ -181,7 +190,7 @@ term6:
     | UNDERSCORE { Underscore (get_loc ()) }
     | TYPE { Sort (get_loc (), Type) }
     | LT term COMMA term GT { SPair (get_loc (), $2, $4) }
-    | SMATCH term RETURN term WITH ID COLON term ENDLAMBDA term COMMA ID COLON term ENDLAMBDA term END { SMatch (get_loc (), $2, $4, $6, $8, $10, $12, $14, $16) }
+    | SMATCH term ass ret WITH ID col ENDLAMBDA term COMMA ID col ENDLAMBDA term END { SMatch (get_loc (), $2, Abs(get_loc(), $3, Underscore(get_loc()), $4), $6, $7, $9, $11, $12, $14) }
     | QUESTION ID OPENB tlist CLOSB { Meta(get_loc (), int_of_string $2, $4) }
     ;
 
@@ -189,3 +198,19 @@ tlist:
     | { [] }
     | term { [$1] }
     | term COMMA tlist { $1 :: $3 }
+    ;
+
+ass:
+    | { "_" }
+    | AS ID { $2 }
+    ;
+
+ret:
+    | { Underscore (get_loc ()) }
+    | RETURN term { $2 }
+    ;
+
+col:
+    | { Underscore (get_loc ()) }
+    | COLON term { $2 }
+    ;

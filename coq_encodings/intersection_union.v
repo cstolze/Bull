@@ -62,18 +62,31 @@ Section Examples.
     Abst (inter s (arrow s t)) t (fun x : OK (inter s (arrow s t)) => App s t (Proj_r s (arrow s t) x) (Proj_l s (arrow s t) x)).
 
   (* lambda x. x : (sigma -> sigma) inter (tau -> tau) *)
-  Definition id1 : OK (inter (arrow s s) (arrow t t)) :=
+  Definition polyid : OK (inter (arrow s s) (arrow t t)) :=
     Pair (arrow s s) (arrow t t) (Abst s s (fun x : OK s => x)) (Abst t t (fun x : OK t => x)) (Eqabst s s t t (fun x : OK s => x) (fun x : OK t => x) (fun (x : OK s) (y : OK t) (Z : Eq s t x y) => Z)).
 
   (* lambda x. x : (sigma union tau) -> (tau union sigma) *)
-  Definition id2 : OK (arrow (union s t) (union t s)) :=
-    Abst (union s t) (union t s) (fun x : OK (union s t) => Copair s t (union t s) (Abst s (union t s) (fun y: OK s => Inj_r t s y)) (Abst t (union t s) (fun y : OK t => Inj_l t s y)) x (Eqabst s (union t s) t (union t s) (fun y: OK s => Inj_r t s y) (fun y : OK t => Inj_l t s y) (fun (x : OK s) (y : OK t) (pf : Eq s t x y) => Eqtrans (union t s) t (union t s) (Inj_r t s x) y (Inj_l t s y) (Eqtrans (union t s) s t (Inj_r t s x) x y (Eqinj_r t s x) pf) (Eqsymm (union t s) t (Inj_l t s y) y (Eqinj_l t s y))))).
+  Definition commutunion : OK (arrow (union s t) (union t s)) :=
+    Abst (union s t) (union t s)
+         (fun x : OK (union s t) =>
+            Copair s t (union t s) (Abst s (union t s) (fun y : OK s => Inj_r t s y))
+                   (Abst t (union t s) (fun y : OK t => Inj_l t s y)) x
+                   (Eqabst s (union t s) t (union t s) (fun y : OK s => Inj_r t s y)
+                           (fun y : OK t => Inj_l t s y)
+                           (fun (x0 : OK s) (y : OK t) (pf : Eq s t x0 y) =>
+                              Eqtrans (union t s) s (union t s) (Inj_r t s x0) x0
+                                      (Inj_l t s y)
+                                      (Eqinj_r t s x0)
+                                      (Eqtrans s t (union t s) x0 y (Inj_l t s y) pf
+                                               (Eqsymm (union t s) t (Inj_l t s y) y
+                                                       (Eqinj_l t s y)))))).
 
-  Definition id' : OK (arrow (union s t) (union t s)).
+  Definition commutunion' : OK (arrow (union s t) (union t s)).
   Proof.
     apply (Abst (union s t) (union t s)).
     intro x.
-    apply (Copair _ _ _ (Abst _ _ (fun y : _ => Inj_r _ _ y)) (Abst _ _ (fun y : _ => Inj_l _ _ y)) x).
+    apply (Copair _ _ _ (Abst _ _ (fun y : _ => Inj_r _ _ y))
+                  (Abst _ _ (fun y : _ => Inj_l _ _ y)) x).
     apply Eqabst.
     intros x0 y pf.
     assert (Eq _ _ (Inj_r t _ x0) x0) by apply Eqinj_r.
@@ -90,32 +103,43 @@ Section Examples.
 
 End Examples.
 
-Extraction id2.
-(* let id2 s t =
+Print commutunion.
+(* let commutunion s t =
   abst (union s t) (union t s) (fun x ->
     copair s t (union t s) (abst s (union t s) (fun y -> inj_r t s y))
       (abst t (union t s) (fun y -> inj_l t s y)) x) *)
 
-Extraction id'.
-(* let id' s t =
+Eval compute in commutunion'.
+(* let commutunion' s t =
   abst (union s t) (union t s) (fun x ->
     copair s t (union t s) (abst s (union t s) (fun y -> inj_r t s y))
       (abst t (union t s) (fun y -> inj_l t s y)) x) *)
 
 Section Test.
   Hypotheses (Pos Zero Neg T F : o).
-  Hypotheses (Test : OK (union Pos Neg)) (is_0 : OK (inter (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)))).
+  Hypotheses (Test : OK (union Pos Neg))
+             (is_0 : OK (inter (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)))).
 
   (* is_0 Test *)
   Definition is0test : OK F.
-    apply (Copair _ _ _ (Abst _ _ (fun x : _ => App _ _ (Proj_r _ _ (Proj_r _ _ is_0)) x)) (Abst _ _ (fun x : _ => App _ _ (Proj_l _ _ is_0) x))).
+    apply (Copair _ _ _ (Abst _ _ (fun x : _ => App _ _ (Proj_r _ _ (Proj_r _ _ is_0)) x))
+                  (Abst _ _ (fun x : _ => App _ _ (Proj_l _ _ is_0) x))).
     now apply Test.
     apply Eqabst.
     intros x y pf.
     apply Eqapp.
-    - assert (H : Eq _ _ is_0 (Proj_r (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0)) by apply Eqproj_r.
-      assert (H0 : Eq _ _ (Proj_r (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0) (Proj_r (arrow Zero T) (arrow Pos F) (Proj_r (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0))) by apply Eqproj_r.
-      assert (H1 : Eq _ _ is_0 (Proj_l (arrow Neg F) (inter (arrow Zero T) (arrow Pos F)) is_0)) by apply Eqproj_l.
+    - assert (H : Eq _ _ is_0 (Proj_r (arrow Neg F) (inter (arrow Zero T)
+                                                           (arrow Pos F)) is_0))
+        by apply Eqproj_r.
+      assert (H0 : Eq _ _ (Proj_r (arrow Neg F) (inter (arrow Zero T)
+                                                       (arrow Pos F)) is_0)
+                      (Proj_r (arrow Zero T) (arrow Pos F)
+                              (Proj_r (arrow Neg F) (inter (arrow Zero T)
+                                                           (arrow Pos F)) is_0)))
+        by apply Eqproj_r.
+      assert (H1 : Eq _ _ is_0 (Proj_l (arrow Neg F) (inter (arrow Zero T)
+                                                            (arrow Pos F)) is_0))
+        by apply Eqproj_l.
       apply Eqsymm in H.
       apply Eqsymm in H0.
       eapply Eqtrans.
@@ -126,5 +150,6 @@ Section Test.
     - trivial.
   Defined.
 
+  Print is0test.
   Eval compute in is0test.
 End Test.

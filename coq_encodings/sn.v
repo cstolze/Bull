@@ -25,9 +25,50 @@ Inductive single_step_beta : lambda -> lambda -> Prop :=
 | App_closure_right : forall t1 t2 t2', single_step_beta t2 t2' -> single_step_beta (App t1 t2) (App t1 t2')
 | Lam_closure : forall t1 t2, single_step_beta t1 t2 -> single_step_beta (Abs t1) (Abs t2).
 
-Inductive normalize t1 : Prop :=
-| Stuck : (forall t2, single_step_beta t1 t2 -> False) -> normalize t1
-| Trans : forall t2, single_step_beta t1 t2 -> normalize t2 -> normalize t1.
+Definition nf M := forall N, single_step_beta M N -> False.
+
+Inductive vNF : lambda -> Prop :=
+| NFvar: forall n, vNF (Var n)
+| NFapp: forall M N, vNF M -> NF N -> vNF (App M N)
+with
+NF : lambda -> Prop :=
+| NFval : forall M, vNF M -> NF M
+| NFabs : forall M, NF M -> NF (Abs M).
+
+Fixpoint vNF_to_nf M : vNF M -> nf M
+with NF_to_nf M : NF M -> nf M.
+Proof.
+  {
+    intro H; induction H.
+    - intros N H.
+      inversion H.
+    - intros N1 H1.
+      inversion H1.
+      + rewrite <- H3 in H.
+        inversion H.
+      + apply (vNF_to_nf M H t1'); trivial.
+      + apply (NF_to_nf N H0 t2'); trivial.
+  }
+  {
+    intro H; induction H.
+    - apply vNF_to_nf; trivial.
+    - intros N1 H1.
+      inversion H1.
+      apply (NF_to_nf M H t2); trivial.
+  }
+Qed.
+
+Inductive strongly_normalize t1 : Prop :=
+| Stuck : NF M -> strongly_normalize t1
+| Trans : (forall t2, single_step_beta t1 t2 -> strongly_normalize t2) -> strongly_normalize t1.
+
+
+
+Lemma sn_app : forall M N, strongly_normalize (App M N) -> strongly_normalize M /\ strongly_normalize N.
+Proof.
+  induction M.
+  
+Qed.
 
 Inductive simple_type : Set :=
 | tp : simple_type
@@ -48,3 +89,16 @@ Inductive simply_typed (env : list simple_type) : lambda -> simple_type -> Prop 
 | Abs_rule : forall t T1 T2, simply_typed (cons T1 env) t T2 -> simply_typed env (Abs t) (arr T1 T2)
 | App_rule : forall t1 t2 T1 T2, simply_typed env t1 (arr T1 T2) -> simply_typed env t2 T1 -> simply_typed env (App t1 t2) T2.
 
+Fixpoint C (A : simple_type) (M : lambda) : Prop :=
+   simply_typed nil M A /\
+   match A with
+   | tp => strongly_normalize M
+   | arr A B => forall N, C A N -> C B (App M N)
+   end.
+
+Lemma C_sn : forall A M, C A M -> strongly_normalize M.
+Proof.
+  induction A; intros M (H1, H2).
+  assumption.
+  
+Qed.

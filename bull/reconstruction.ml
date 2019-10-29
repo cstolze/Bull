@@ -14,10 +14,17 @@ let type_of_sort s =
 (* pre-condition: s1 and s2 have to be sorts (or sort meta-vars) *)
 let principal_type_system meta env ctx s1 s2 =
   match (s1, s2) with
-  | (Sort (_,Type), t) -> (meta, t)
+  | (Sort (_,Type), (Meta(_,_,[]) | Sort(_,_) as t)) -> (meta, t)
+  | (Sort (_,Type), Meta(l,n,subst)) ->
+     let (meta, s) = meta_add_sort meta dummy_loc in
+     let (num,meta) = meta in
+     let meta = solution (num,meta) n s
+     in ((num,meta), s)
   | (t1, t2) ->
      let meta = unification false meta env ctx t1
-                            (Sort(dummy_loc,Type))
+                            (Sort(dummy_loc,Type)) in
+     let (meta, s) = meta_add_sort meta dummy_loc in
+     let meta = unification false meta env ctx t2 s
      in (meta, t2)
 
 (* same as principal type system, but for A | B and A & B *)
@@ -86,6 +93,19 @@ let rec reconstruct meta env ctx t
        | Unif_Error -> err @@ Prod_Error(l)
      end
 
+  | SProd (l, id, t1, t2) ->
+     let (meta, t1, t1') = force_type meta env ctx t1 in
+     let (meta, t2, t2') =
+       let decl = DefAxiom(id, t1) in
+       force_type meta env (decl :: ctx) t2 in
+     begin
+       try
+         let (meta, tt) = principal_type_system meta env ctx t1' t2' in
+         (meta, SProd(l,id,t1,t2), tt)
+       with
+       | Unif_Error -> err @@ Prod_Error(l)
+     end
+
   | Abs (l, id, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') =
@@ -95,6 +115,16 @@ let rec reconstruct meta env ctx t
      let (meta,_,_) = force_type meta env ctx typ in
      (meta, Abs(l, id, t1, t2), typ)
 
+  | SAbs (l, id, t1, t2) ->
+     let (meta, t1, t1') = force_type meta env ctx t1 in
+     let (meta, t2, t2') =
+       let decl = DefAxiom(id, t1) in
+       reconstruct meta env (decl :: ctx) t2 in
+     let typ = SProd (l, id, t1, t2') in
+     let (meta,_,_) = force_type meta env ctx typ in
+     (meta, Abs(l, id, t1, t2), typ)
+
+  | SApp (l, t1, t2) -> assert false (* experimental feature, future work *)
   | App (l, t1, l2) ->
      begin
        match l2 with
@@ -114,10 +144,15 @@ let rec reconstruct meta env ctx t
                  reconstruct_with_type meta env ctx t2 u1 in
                (meta, App(l, t1, t2 :: l2),
                 beta_redex u2 t2)
+            | SProd (_, _, u1, u2) -> (* experimental case : the type of t1 is a SProd *)
+               let (meta, t2, t2') =
+                 reconstruct_with_type meta env ctx t2 u1 in
+               (meta, SApp(l, (match l2 with [] -> t1 | _ -> App(l,t1,l2)), t2), (* experimental !!! *)
+               beta_redex u2 t2)
             | _ -> (* case 2: we do not know the type of t1 *)
                let (meta, t2, t2') = reconstruct meta env ctx t2 in
                let (meta, s) = meta_add_sort meta dummy_loc in
-               let (meta, k) = meta_add meta ctx s dummy_loc in
+               let (meta, k) = meta_add meta (DefAxiom("x", t2')::ctx) s dummy_loc in
                try
                  let meta = unification
                               meta env ctx t1' (Prod(l, "x", t2',
@@ -159,7 +194,7 @@ let rec reconstruct meta env ctx t
      knowledge that the argument is an intersection is propagated *)
   | SPrLeft (l, t1) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
-     let t1' = strongly_normalize env ctx @@ apply_all_substitution meta t1 in
+     let t1' = strongly_normalize env ctx @@ apply_all_substitution meta t1' in
      begin
        match t1' with
        | Inter(l,t',_) ->
@@ -177,7 +212,7 @@ let rec reconstruct meta env ctx t
      end
   | SPrRight (l, t1) ->
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
-     let t1' = strongly_normalize env ctx @@ apply_all_substitution meta t1 in
+     let t1' = strongly_normalize env ctx @@ apply_all_substitution meta t1' in
      begin
        match t1' with
        | Inter(l,_,t') ->
@@ -198,6 +233,13 @@ let rec reconstruct meta env ctx t
      let (meta, t1, t1') = reconstruct meta env ctx t1 in
      let (meta, t2, t2') =
        reconstruct_with_type meta env ctx t2 (Prod(dummy_loc, id1, t1', Sort(l,Type))) in
+     let t2' =
+     begin
+         match t2 with
+         | Abs(_,_,_, t2') -> t2'
+         | _ -> assert false
+     end
+     in
      let (meta, t3, t3') = reconstruct_with_type meta env ctx t3 (Sort(dummy_loc, Type)) in
      let (meta, t5, t5') = reconstruct_with_type meta env ctx t5 (Sort(dummy_loc, Type)) in
      begin
@@ -206,15 +248,15 @@ let rec reconstruct meta env ctx t
          let (meta, t4, t4') =
            reconstruct_with_type meta env (DefAxiom("x", t3)
                                            :: ctx)
-                                 t4 (app dummy_loc t2 (SInLeft(dummy_loc, t5, t3))) in
+                                 t4 (beta_redex t2' (SInLeft(dummy_loc, t5, Var(dummy_loc, 0)))) in
          let (meta, t6, t6') =
            reconstruct_with_type meta env (DefAxiom("x", t5)
                                            :: ctx) t6
-                                 (app dummy_loc t2 (SInRight(dummy_loc,t3,t5)))
+                                 (beta_redex t2' (SInRight(dummy_loc, t3, Var(dummy_loc, 0))))
          in
          (meta,
           SMatch (l, t1, t2, id1, t3, t4, id2, t5, t6),
-          app dummy_loc t2 t1)
+          beta_redex t2' t1)
        with
        | Unif_Error -> err @@ Match_Error(l,apply_all_substitution meta t1,apply_all_substitution meta t1',apply_all_substitution meta t3,apply_all_substitution meta t5)
      end
@@ -234,7 +276,7 @@ let rec reconstruct meta env ctx t
   | Coercion (l, t1, t2) ->
      let (meta, t1, t1') = force_type meta env ctx t1 in
      let (meta, t2, t2') = reconstruct meta env ctx t2 in
-     if is_subtype env ctx t1 t2' then
+     if is_subtype env ctx t2' t1 then
        (meta, Coercion(l,t1,t2), t1)
      else err @@ Coercion_Error(l,apply_all_substitution meta t2,apply_all_substitution meta t2',apply_all_substitution meta t1)
 
@@ -273,7 +315,9 @@ and force_type meta env ctx t =
     | Unif_Error -> None
   in
   match x, y with
-  | Some _, Some _ -> (meta, t, t')
+  | Some _, Some _ ->
+     let (meta, s) = meta_add_sort meta dummy_loc in
+     (unification meta env ctx t' s, t, t')
   | Some meta, None -> (meta, t, t')
   | None, Some meta -> (meta, t, t')
   | None, None -> err @@ Force_Type_Error(loc_term t,apply_all_substitution meta t,apply_all_substitution meta t')
@@ -300,7 +344,7 @@ and reconstruct_with_type meta env ctx t1 ttt =
        (* lift 0 1 t2 is technically correct *)
        reconstruct_with_type
          meta env (decl :: ctx) t3 (lift 0 1 ttt) in
-     (meta, Let(l,id,t2',t2,t3), t3')
+     (meta, Let(l,id,t2',t2,t3), ttt)
   | Abs(l,id,t1,t2) ->
      let ttt = strongly_normalize env ctx
               @@ apply_all_substitution meta ttt in
@@ -316,6 +360,26 @@ and reconstruct_with_type meta env ctx t1 ttt =
                 reconstruct_with_type meta env
                                       (decl :: ctx) t2 u2 in
               (meta, Abs(l,id,t1,t2), Prod(l,id,t1,t2'))
+            with
+            | Unif_Error -> err @@ Wrong_Type_Error(l, apply_all_substitution meta t1, apply_all_substitution meta u1)
+          end
+       | _ -> default ()
+     end
+  | SAbs(l,id,t1,t2) ->
+     let ttt = strongly_normalize env ctx
+               @@ apply_all_substitution meta ttt in
+     begin
+       match ttt with
+       | SProd(_,_,u1,u2) ->
+          let (meta,t1,t1') = force_type meta env ctx t1 in
+          begin
+            try
+              let meta = unification meta env ctx t1 u1 in
+              let decl = DefAxiom(id,t1) in
+              let (meta, t2, t2') =
+                reconstruct_with_type meta env
+                                      (decl :: ctx) t2 u2 in
+              (meta, SAbs(l,id,t1,t2), SProd(l,id,t1,t2'))
             with
             | Unif_Error -> err @@ Wrong_Type_Error(l, apply_all_substitution meta t1, apply_all_substitution meta u1)
           end
@@ -338,12 +402,14 @@ and reconstruct_with_type meta env ctx t1 ttt =
      let (meta, k) = meta_add meta ctx (Sort(dummy_loc, Type)) l in
      let (meta, t, _) = reconstruct meta env ctx
                           (Inter(l,ttt,k)) in
-     reconstruct_with_type meta env ctx t1 t
+     let meta, t1, t1' = reconstruct_with_type meta env ctx t1 t in
+     (meta, SPrLeft(l,t1), ttt)
   | SPrRight (l,t1) ->
      let (meta, k) = meta_add meta ctx (Sort(dummy_loc, Type)) l in
      let (meta, t, _) = reconstruct meta env ctx
                                     (Inter(l,k,ttt)) in
-     reconstruct_with_type meta env ctx t1 t
+     let meta, t1, t1' = reconstruct_with_type meta env ctx t1 t in
+     (meta, SPrRight(l,t1), ttt)
   | SInLeft (l,t1,t2) ->
      let ttt = strongly_normalize env ctx
               @@ apply_all_substitution meta ttt in
@@ -400,7 +466,7 @@ let rec essence meta env ctx t1 =
      let (meta, t4) = essence meta env (DefLet("x",nothing,t1) :: ctx) t4 in
      let (meta, _) = essence meta env ctx t5 in
      let (meta, t6) = essence_with_hint meta env (DefLet("x",nothing,t1) :: ctx) t6 t4 in
-     meta, app l (Abs(l, "x",nothing, t6)) t1
+     meta, beta_redex t6 t1
   | SInLeft (l,t1,t2) | SInRight (l,t1,t2) | Coercion (l,t1,t2) ->
      let (meta, _) = essence meta env ctx t1 in
      essence meta env ctx t2
@@ -411,9 +477,21 @@ let rec essence meta env ctx t1 =
   | Prod (l,id,t1,t2) -> let (meta,t1) = essence meta env ctx t1 in
                          let (meta,t2) = essence meta env (DefAxiom(id,nothing) :: ctx) t2 in
                          meta, Prod(l,id,t1,t2)
-  | Abs (l,id,t1,t2) -> let (meta,t1) = essence meta env ctx t1 in
-                        let (meta,t2) = essence meta env (DefAxiom(id,nothing) :: ctx) t2 in
-                        meta, Abs(l,id,nothing,t2)
+  | Abs (l,id,t1,t2) ->
+     let (meta,t1) = essence meta env ctx t1 in
+     let (meta,t2) = essence meta env (DefAxiom(id,nothing) :: ctx) t2 in
+     meta, Abs(l,id,nothing,t2)
+  | SProd (l,id,t1,t2) -> let (meta,t1) = essence meta env ctx t1 in
+                         let (meta,t2) = essence meta env (DefAxiom(id,nothing) :: ctx) t2 in
+                         meta, SProd(l,id,t1,t2)
+  | SAbs (l,id,t1,t2) -> let ident = Abs(l,id,Underscore(dummy_loc), Var (dummy_loc,0)) in
+                         let (meta,t1) = essence meta env ctx t1 in
+                         let (meta,t2) = essence meta env (DefAxiom(id,nothing) :: ctx) t2 in
+                         let meta = unification true meta env ctx (Abs(l,id,t1,t2)) ident in (* experimental, no error catching *)
+                         meta, ident
+  | SApp (l,t1,t2) -> let (meta, t1) = essence meta env ctx t1 in
+                      let (meta, t2) = essence meta env ctx t2 in
+                      meta, t2 (* experimental !!! *)
   | App (l,t1,ll) -> let (meta,t1) = essence meta env ctx t1 in
                      let rec foo meta l =
                        match l with
@@ -510,7 +588,7 @@ let clean_meta meta tl =
     function
     | Sort _ | Var _ | Const _ | Underscore _ -> []
     | Let  (_,_,t1,t2,t3) -> List.concat @@ List.map list_evars [t1;t2;t3]
-    | Prod (_,_,t1,t2) | Abs (_,_,t1,t2) | Inter (_,t1,t2)
+    | Prod (_,_,t1,t2) | Abs (_,_,t1,t2) | Inter (_,t1,t2) | SProd (_,_,t1,t2) | SAbs (_,_,t1,t2) | SApp (_,t1,t2)
       | Union (_,t1,t2) | SPair (_,t1,t2) | SInLeft(_,t1,t2)
       | SInRight(_,t1,t2) | Coercion (_,t1,t2) -> List.concat @@ List.map list_evars [t1;t2]
     | App (_,t1,l) -> List.concat @@ List.map list_evars (t1 :: l)
