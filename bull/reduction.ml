@@ -78,7 +78,7 @@ let rec strongly_normalize is_essence env ctx t =
      sn (beta_redex t1 t2)
   | App (l, Abs (l',x,y, t1), t2 :: t3)
     -> sn @@ app l (sn (App(l,Abs (l',x,y, t1), t3))) t2
-  | Let (l, _, t1, t2, t3) -> sn (beta_redex t2 t1)
+  | Let (l, _, t1, t2, t3) -> sn (beta_redex t3 t2)
   (* Delta-redex *)
   | Var (l, n) -> let (t1, _) = Env.find_var ctx n in
 	     (match t1 with
