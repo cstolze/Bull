@@ -1,0 +1,39 @@
+(* three base types: atomic propositions,
+   non-atomic goals and non-atomic programs *)
+Axiom atom : Type.
+Axiom non_atomic_goal : Type.
+Axiom non_atomic_prog : Type.
+
+(* goals and programs are defined from the base types *)
+Definition goal := atom | non_atomic_goal.
+Definition prog := atom | non_atomic_prog.
+
+(* constructors (implication, conjunction, disjunction) *)
+Axiom impl : (prog -> goal -> non_atomic_goal) & (goal -> prog -> non_atomic_prog).
+Definition impl_1 p g := inj_r atom (proj_l impl p g).
+Definition impl_2 g p := inj_r atom (proj_r impl g p).
+Axiom and : (goal -> goal -> non_atomic_goal) & (prog -> prog -> non_atomic_prog).
+Definition and_1 g1 g2 := inj_r atom (proj_l and g1 g2).
+Definition and_2 p1 p2 := inj_r atom (proj_r and p1 p2).
+Axiom or : (goal -> goal -> non_atomic_goal).
+Definition or_1 g1 g2 := inj_r atom (or g1 g2).
+
+(* solve p g means: the judgment p |- g is valid *)
+Axiom solve : prog -> goal -> Type.
+(* backchain p a g means: if p |- g is valid, then p |- a is valid *)
+Axiom backchain : prog -> atom -> goal -> Type.
+
+(* rules for solve *)
+Axiom solve_and : forall p g1 g2, solve p g1 -> solve p g2 -> solve p (and_1 g1 g2).
+Axiom solve_or1 : forall p g1 g2, solve p g1 -> solve p (or_1 g1 g2).
+Axiom solve_or2 : forall p g1 g2, solve p g2 -> solve p (or_1 g1 g2).
+Axiom solve_impl : forall p1 p2 g, solve (and_2 p1 p2) g -> solve p1 (impl_1 p2 g).
+Axiom solve_atom : forall p a g, backchain p a g -> solve p g -> solve p (inj_l non_atomic_goal a).
+
+(* rules for backchain *)
+Axiom backchain_and1 : forall p1 p2 a g, backchain p1 a g -> backchain (and_2 p1 p2) a g.
+Axiom backchain_and2 : forall p1 p2 a g, backchain p1 a g -> backchain (and_2 p1 p2) a g.
+Axiom backchain_impl_atom : forall a g, backchain (impl_2 g (inj_l non_atomic_prog a)) a g.
+Axiom backchain_impl_impl : forall p a g g1 g2, backchain (impl_2 (and_1 g1 g2) p) a g -> backchain (impl_2 g1 (impl_2 g2 p)) a g.
+Axiom backchain_impl_and1 : forall p1 p2 a g g1, backchain (impl_2 g1 p1) a g -> backchain (impl_2 g1 (and_2 p1 p2)) a g.
+Axiom backchain_impl_and2 : forall p1 p2 a g g1, backchain (impl_2 g1 p2) a g -> backchain (impl_2 g1 (and_2 p1 p2)) a g.

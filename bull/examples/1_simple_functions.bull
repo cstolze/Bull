@@ -1,0 +1,11 @@
+Axiom (s t : Type).
+
+Definition auto_application (x : s & (s -> t)) := (proj_r x) (proj_l x).
+Definition poly_id : (s -> s) & (t -> t) := let id1 x := x in let id2 x := x in < id1, id2 >.
+Definition commut_union (x : s | t) := smatch x with x => inj_r _ x, x => inj_l _ x end.
+
+(* Coq-like vector *)
+Axiom (nat bool : Type) (true false : bool) (S : nat -> nat) (O : nat).
+Axiom (vect : nat -> Type).
+Axiom (nil : vect O) (cons : forall n, bool -> vect n -> vect (S n)).
+Definition test := cons _ true (cons _ false (cons _ true nil)).

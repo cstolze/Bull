@@ -1,0 +1,47 @@
+Axiom obj' : Type.
+Axiom fam' : Type.
+Axiom knd' : Type.
+Axiom sup' : Type.
+
+Axiom same : obj' & fam' & knd' & sup'.
+Axiom term : (obj' | fam' | knd' | sup') -> Type.
+(* The obj, fam, knd, and sup types have the same essence (term same) *)
+Definition obj := term (coe (obj' | fam' | knd' | sup') (coe obj' same)).
+Definition fam := term (coe (obj' | fam' | knd' | sup') (coe fam' same)).
+Definition knd := term (coe (obj' | fam' | knd' | sup') (coe knd' same)).
+Definition sup := term (coe (obj' | fam' | knd' | sup') (coe sup' same)).
+
+Axiom tp : knd & sup.
+(* star and sqre have the same essence (tp) *)
+Definition star := coe knd tp.
+Definition sqre := coe sup tp.
+
+Axiom lam : (fam -> (obj -> obj) -> obj) & (fam -> (obj -> fam) -> fam).
+Definition lam_1 := coe (fam -> (obj -> obj) -> obj) lam.
+Definition lam_2 := coe (fam -> (obj -> fam) -> fam) lam.
+
+Axiom pi : (fam -> (obj -> fam) -> fam) & (fam -> (obj -> knd) -> knd).
+Definition pi_1 := coe (fam -> (obj -> fam) -> fam) pi.
+Definition pi_2 := coe (fam -> (obj -> knd) -> knd) pi.
+
+Axiom app : (obj -> obj -> obj) & (fam -> obj -> fam).
+Definition app_1 := coe (obj -> obj -> obj) app.
+Definition app_2 := coe (fam -> obj -> fam) app.
+
+Axiom of_1 : obj -> fam -> Type.
+Axiom of_2 : fam -> knd -> Type.
+Axiom of_3 : knd -> sup -> Type.
+
+Axiom of_ax : of_3 star sqre.
+(* Rules for lambda-abstraction are "essentially" the same *)
+Definition of_lam1 := forall t1 t2 t3, of_2 t1 star -> (forall x, of_1 x t1 -> of_1 (t2 x) (t3 x)) -> of_1 (lam_1 t1 t2) (pi_1 t1 t3).
+Definition of_lam2 := forall t1 t2 t3, of_2 t1 star -> (forall x, of_1 x t1 -> of_2 (t2 x) (t3 x)) -> of_2 (lam_2 t1 t2) (pi_2 t1 t3).
+Axiom of_lam : of_lam1 & of_lam2.
+(* Rules for product are ''essentially'' the same *)
+Definition of_pi1 := forall t1 t2, of_2 t1 star -> (forall x, of_1 x t1 -> of_2 (t2 x) star) -> of_2 (pi_1 t1 t2) star.
+Definition of_pi2 := forall t1 t2, of_2 t1 star -> (forall x, of_1 x t1 -> of_3 (t2 x) sqre) -> of_3 (pi_2 t1 t2) sqre.
+Axiom of_pi : of_pi1 & of_pi2.
+(* Rules for application are ''essentially'' the same *)
+Definition of_app1 := forall t1 t2 t3 t4, of_1 t1 (pi_1 t3 t4) -> of_1 t2 t3 -> of_1 (app_1 t1 t2) (t4 t2).
+Definition of_app2 := forall t1 t2 t3 t4, of_2 t1 (pi_2 t3 t4) -> of_1 t2 t3 -> of_2 (app_2 t1 t2) (t4 t2).
+Axiom of_app : of_app1 & of_app2.

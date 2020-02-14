@@ -1,0 +1,34 @@
+(* Object type *)
+Axiom o : Type.
+
+(* Type connectives *)
+Axiom carrow : o -> o -> o.
+Axiom cinter : o -> o -> o.
+Axiom cunion : o -> o -> o.
+Axiom crelev : o -> o -> o.
+
+(* Transform the object types into real types *)
+Axiom aOk : o -> Type.
+
+(* Semantics *)
+Axiom cabst : forall s t, (aOk s -> aOk t) >> aOk (carrow s t).
+Axiom capp : forall s t, aOk (carrow s t) >> aOk s -> aOk t.
+Axiom csabst : forall s t,  (aOk s >> aOk t) >> aOk (crelev s t).
+Axiom csapp : forall s t, aOk (crelev s t) >> aOk s >> aOk t.
+Axiom cpair : forall s t, (aOk s & aOk t) >> aOk (cinter s t).
+Axiom cpri : forall s t, aOk (cinter s t) >> (aOk s & aOk t).
+Axiom cini : forall s t, (aOk s | aOk t) >> aOk (cunion s t).
+Axiom ccopair : forall s t, aOk (cunion s t) >> (aOk s | aOk t).
+
+(* Example *)
+Axiom A : o.
+Axiom B : o.
+
+Definition halfomega := cabst (cinter A (carrow A B)) B
+ (fun x => capp A B (proj_r (cpri A (carrow A B) x))
+  (proj_l (cpri A (carrow A B) x))).
+Definition idpair := cpair (carrow A A) (carrow B B)
+ <cabst A A (fun x => x), cabst B B (fun x => x)>.
+Definition communion := cabst (cunion A B) (cunion B A) (fun x => smatch ccopair A B x with y => cini B A (inj_r (aOk B) y), y => cini B A (inj_l (aOk A) y) end).
+
+Definition communion' := csabst (cunion A B) (cunion B A) (sfun x => smatch ccopair A B x with y => cini B A (inj_r (aOk B) y), y => cini B A (inj_l (aOk A) y) end).

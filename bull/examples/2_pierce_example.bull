@@ -1,0 +1,3 @@
+Axiom (Neg Zero Pos T F : Type) (Test : Pos | Neg).
+Axiom Is_0 : (Neg -> F) & (Zero -> T) & (Pos -> F).
+Definition Is_0_Test := smatch Test with x => coe (Pos -> F) Is_0 x, x => coe (Neg -> F) Is_0 x end.

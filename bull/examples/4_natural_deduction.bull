@@ -1,0 +1,4 @@
+Axiom (O : Type) (Impl : O -> O -> O) (Elim Nf0 : O -> Type).
+Definition Nf A := Nf0 A | Elim A.
+Axiom impl_I : forall A B, (Elim A -> Nf B) -> (Nf0 (Impl A B)).
+Axiom impl_E : forall A B, Elim (Impl A B) -> Nf0 A -> Elim B.

@@ -158,7 +158,7 @@ let welcome_message =
   "Welcome to Bull, an experimental LF-based proof checker with set-inspired types.\nType \"Help.\" for help.\n"
 let axiom_message id = id ^ " is assumed.\n"
 let let_message id = id ^ " is defined.\n"
-let help_text = "List of commands:\nHelp.\t\t\t\t     show this list of commands\nLoad \"file\".\t\t      \t     for loading a script file\nAxiom term : type.\t    \t     define a constant or an axiom\nLemma proofname : term.        \t     start an interactive proof (not implemented yet)\nDefinition name [: type] := term.    define a term\nPrint name. \t       \t  \t     print the definition of name\nPrintall. \t\t\t     print all the signature (axioms and definitions)\nCompute name.\t\t\t     normalize name and print the result\nQuit. \t\t\t\t     quit"
+let help_text = "Help.\t\t\t\t\tfor a list of commands\nLoad \"file\".\t\t\t\tfor loading a script file\nAxiom term : type.\t\t\tdefine a constant or anaxiom\nDefinition name [: type] := term.\tdefine a term\nPrint name.\t\t\t\tprint the definition of name\nPrintall.\t\t\t\tprint the full environment (axioms and definitions)\nCompute term.\t\t\t\tnormalize term and print the result\nQuit.\t\t\t\t\tquit"
 
 (* Error messages *)
 let string_of_error (env,e) str =
