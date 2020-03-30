@@ -43,6 +43,7 @@ Comments are enclosed between (* and *), à la Coq.
 Syntax of terms:
 ----------------
 | Type					   # sort Type
+| let ID [args] [: term] := term in term   # let construct
 | name					   # identifier
 | forall x : term, term			   # dependent product
 | term -> term	   			   # non-dependent product
