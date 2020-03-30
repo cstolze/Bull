@@ -25,7 +25,7 @@ Example files can be found in the examples folder.
 
 List of commands:
 -----------------
-
+```
 Help.				     for a list of commands
 Load "file".		      	     for loading a script file
 Axiom term : type.	    	     define a constant or an axiom
@@ -34,7 +34,7 @@ Print name. 	       	  	     print the definition of name
 Printall. 			     print the full environment (axioms and definitions)
 Compute term.			     normalize term and print the result
 Quit. 				     quit
-
+```
 Names are composed of any alphanumeric symbol, _ and '.
 Terms and types have the same syntax.
 
@@ -42,6 +42,7 @@ Comments are enclosed between (* and *), à la Coq.
 
 Syntax of terms:
 ----------------
+```
 | Type					   # sort Type
 | let ID [args] [: term] := term in term   # let construct
 | name					   # identifier
@@ -61,6 +62,7 @@ Syntax of terms:
   id [:t] => term, id [:t] => term	   # strong co-pair
 | inj_l term term   	  		   # left injection
 | inj_r term term			   # right injection
+```
 
 - Relevant lambda-abstractions only type terms equivalent to the identity function.
 - Strong pair has an intersection type and both its arguments must share the same essence.
