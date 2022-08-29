@@ -66,6 +66,7 @@ rule read buf = parse
    | '"' [^ '"' '\n' ]* '"' as x { begin Buffer.add_string buf x; QUOTE x end }
    | ['A' - 'Z' 'a' - 'z' '0' - '9' '_' '\'']+ as x { begin Buffer.add_string buf x; ID x end }
    | eof {EOF}
+   | _ as x { begin let x = String.make 1 x in Buffer.add_string buf x; ERR x end }
 and end_comment buf = parse
    | "*)" { Buffer.add_string buf "*)" }
    | "(*" { begin Buffer.add_string buf "(*"; end_comment buf lexbuf;

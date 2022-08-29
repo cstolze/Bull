@@ -65,6 +65,7 @@
 %token <string> QUOTE
 %token <string> ID
 %token EOF
+%token <string> ERR
 
 %token QUESTION
 %token OPENB
