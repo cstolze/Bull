@@ -84,11 +84,11 @@ let error_meta env m em t et =
     begin
       print_endline "Unresolved implicit arguments:";
       print_endline @@ "Term = " ^ (pretty_print_term [] t);
-      print_endline "=== UNRESOLVED META-VARIABLES ===";
-      print_meta env m;
-      print_endline @@ "\nEssence = " ^ (pretty_print_essence [] et);
-      print_endline "=== ESSENCE ===";
-      print_meta env em
+(*      print_endline "=== UNRESOLVED META-VARIABLES ===";
+      print_meta env m; *)
+      print_endline @@ "Essence = " ^ (pretty_print_essence [] et) ^ "\n";
+(*      print_endline "=== ESSENCE ===";
+      print_meta env em *)
     end
 
 

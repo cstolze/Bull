@@ -207,8 +207,8 @@ let string_of_error (env,e) str =
      let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
      error_loc l str ^ "Error: found type " ^ t1 ^ " where " ^ t2 ^ " was expected.\n"
   | Essence_Error (l, t1, t2) ->
-     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
-     let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
+     let t1 = "\"" ^ string_of_term true id_list t1 ^ "\"" in
+     let t2 = "\"" ^ string_of_term true id_list t2 ^ "\"" in
      error_loc l str ^ "Error: found essence " ^ t1 ^ " where " ^ t2 ^ " was expected.\n"
 
 let error_not_declared id = "Error: " ^ id ^ " is not a declared term.\n"

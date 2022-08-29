@@ -90,7 +90,7 @@ let rec reconstruct meta env ctx t
          let (meta, tt) = principal_type_system meta env ctx t1' t2' in
          (meta, Prod(l,id,t1,t2), tt)
        with
-       | Unif_Error -> err @@ Prod_Error(l, Prod(l,id,t1,t2))
+       | Unif_Error -> err @@ Prod_Error(l, apply_all_substitution meta (Prod(l,id,t1,t2)))
      end
 
   | SProd (l, id, t1, t2) ->
@@ -103,7 +103,7 @@ let rec reconstruct meta env ctx t
          let (meta, tt) = principal_type_system meta env ctx t1' t2' in
          (meta, SProd(l,id,t1,t2), tt)
        with
-       | Unif_Error -> err @@ Prod_Error(l, SProd(l,id,t1,t2))
+       | Unif_Error -> err @@ Prod_Error(l, apply_all_substitution meta (SProd(l,id,t1,t2)))
      end
 
   | Abs (l, id, t1, t2) ->
@@ -171,7 +171,7 @@ let rec reconstruct meta env ctx t
          let (meta, tt) = principal_set_system meta env ctx t1' t2' in
          (meta, Inter(l,t1,t2), tt)
        with
-       | Unif_Error -> err @@ Set_Error (l, Inter(l, t1, t2))
+       | Unif_Error -> err @@ Set_Error (l, apply_all_substitution meta (Inter(l, t1, t2)))
      end
 
   | Union (l, t1, t2) ->
@@ -182,7 +182,7 @@ let rec reconstruct meta env ctx t
          let (meta, tt) = principal_set_system meta env ctx t1' t2' in
          (meta, Union(l,t1,t2), tt)
        with
-       | Unif_Error -> err @@ Set_Error (l, Union(l, t1, t2))
+       | Unif_Error -> err @@ Set_Error (l, apply_all_substitution meta (Union(l, t1, t2)))
      end
 
   | SPair (l, t1, t2) ->
