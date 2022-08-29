@@ -109,9 +109,9 @@ type sentence =
 (* Error during type reconstruction *)
 type errcheck =
   | Kind_Error
-  | Prod_Error of location
+  | Prod_Error of location * term
   | App_Error of location * term * term * term * term
-  | Set_Error of location
+  | Set_Error of location * term
   | Proj_Error of location * term * term
   | Match_Error of location * term * term * term * term
   | Coercion_Error of location * term * term * term

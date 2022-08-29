@@ -165,14 +165,18 @@ let string_of_error (env,e) str =
   let id_list = to_id_list_var env in
   match e with
   | Kind_Error -> "Error: Type is not a first-class term.\n"
-  | Prod_Error l -> error_loc l str ^ "Error: illegal product.\n"
+  | Prod_Error (l, t1) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     error_loc l str ^ "Error: the type " ^ t1 ^ " is illegal.\n"
   | App_Error (l, t1, t2, t3, t4) ->
      let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
      let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
      let t3 = "\"" ^ string_of_term false id_list t3 ^ "\"" in
      let t4 = "\"" ^ string_of_term false id_list t4 ^ "\"" in
-     error_loc l str ^ "Error: the term " ^ t1 ^ " of type " ^ t2 ^ "cannot be applied to the term " ^ t3 ^ " of type " ^ t4 ^ ".\n"
-  | Set_Error l -> error_loc l str ^ "Error: illegal set.\n"
+     error_loc l str ^ "Error: the term " ^ t1 ^ " of type " ^ t2 ^ " cannot be applied to the term " ^ t3 ^ " of type " ^ t4 ^ ".\n"
+  | Set_Error  (l, t1) ->
+     let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
+     error_loc l str ^ "Error: the type " ^ t1 ^ " is illegal.\n"
   | Proj_Error (l, t1, t2) ->
      let t1 = "\"" ^ string_of_term false id_list t1 ^ "\"" in
      let t2 = "\"" ^ string_of_term false id_list t2 ^ "\"" in
