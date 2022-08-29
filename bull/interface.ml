@@ -113,7 +113,10 @@ let add_axiom verbose str env id t =
                 print_meta env em
               end
           end;
-        Env.add_const env (DefAxiom (id,t)) (DefAxiom(id,et))
+        let (_,meta) = m in
+        if meta = [] then
+          Env.add_const env (DefAxiom (id,t)) (DefAxiom(id,et))
+        else env
       end
     with
       Err reason ->
@@ -149,7 +152,10 @@ let add_let verbose str env id t opt =
                 print_meta env em
               end
         end;
-       Env.add_const env (DefLet (id, t1, t2)) (DefLet (id, et1, et2))
+      let (_,meta) = m in
+      if meta = [] then
+        Env.add_const env (DefLet (id, t1, t2)) (DefLet (id, et1, et2))
+      else env
     with
       Err reason -> prerr_endline (string_of_error reason str)
                   ; env
